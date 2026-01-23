@@ -4,27 +4,109 @@ import sqlite3
 import io
 from io import StringIO, BytesIO
 from reportlab.pdfgen import canvas
-# --- CORRECCIÓN 1: Importar A4 en lugar de letter ---
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.colors import navy, grey, red, green, black
-# --- CORRECCIÓN 1: Importar TA_LEFT para los nuevos estilos ---
 from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
 import matplotlib.pyplot as plt
 import numpy as np
+import unicodedata
 
-# --- DATABASE UTILS (Sin cambios) ---
+# --- DATABASE UTILS ---
 def get_connection():
     return sqlite3.connect('strategic_plan.db', timeout=10)
 
 def init_db():
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute('''CREATE TABLE IF NOT EXISTS empresas (id INTEGER PRIMARY KEY, nombre TEXT NOT NULL UNIQUE, giro TEXT, logo BLOB, introduccion TEXT, mision TEXT, vision TEXT, organigrama BLOB, politicas TEXT, valores TEXT, efi_score REAL, efe_score REAL)''')
+        # Tabla de Empresas (con nuevas columnas para análisis)
+        cursor.execute('''CREATE TABLE IF NOT EXISTS empresas (
+                            id INTEGER PRIMARY KEY, nombre TEXT NOT NULL UNIQUE, giro TEXT, logo BLOB, 
+                            objetivo_plan TEXT, mision TEXT, vision TEXT, obj_general TEXT, obj_especificos TEXT,
+                            organigrama BLOB, politicas TEXT, valores TEXT,
+                            posicionamiento_x REAL, posicionamiento_y REAL, analisis_posicionamiento TEXT,
+                            analisis_pest TEXT, analisis_foda TEXT, analisis_made TEXT, analisis_madi TEXT
+                          )''')
+        # Tabla de Matrices (para PEST)
         cursor.execute('''CREATE TABLE IF NOT EXISTS matrices (id INTEGER PRIMARY KEY, empresa_id INTEGER, tipo_matriz TEXT NOT NULL, categoria TEXT, factor TEXT, tipo_foda TEXT, puntaje REAL, importancia REAL, valor_ponderado REAL, FOREIGN KEY (empresa_id) REFERENCES empresas (id) ON DELETE CASCADE)''')
+        # Tabla de FODA Cruzado
         cursor.execute('''CREATE TABLE IF NOT EXISTS foda_cruzado (id INTEGER PRIMARY KEY, empresa_id INTEGER, cuadrante TEXT, factor_fila TEXT, factor_columna TEXT, impacto INTEGER, FOREIGN KEY (empresa_id) REFERENCES empresas (id) ON DELETE CASCADE)''')
+        # Tabla de Finanzas (para más adelante)
+        cursor.execute('''CREATE TABLE IF NOT EXISTS finanzas_planes (id INTEGER PRIMARY KEY, empresa_id INTEGER NOT NULL, nombre_plan TEXT NOT NULL, costo_implementacion REAL, beneficio_anual_esperado REAL, FOREIGN KEY (empresa_id) REFERENCES empresas (id) ON DELETE CASCADE, UNIQUE(empresa_id, nombre_plan))''')
+        # Tabla de Operativización/Presupuesto
+        cursor.execute('''CREATE TABLE IF NOT EXISTS operativizacion (
+                            id INTEGER PRIMARY KEY,
+                            empresa_id INTEGER NOT NULL,
+                            plan TEXT,
+                            estrategia TEXT,
+                            actividades TEXT,
+                            plazo TEXT,
+                            responsable TEXT,
+                            recurso TEXT,
+                            costo REAL,
+                            FOREIGN KEY (empresa_id) REFERENCES empresas (id) ON DELETE CASCADE
+                          )''')
+        # Tabla de Pérdida y Ganancia
+        cursor.execute('''CREATE TABLE IF NOT EXISTS perdida_ganancia (
+                            id INTEGER PRIMARY KEY,
+                            empresa_id INTEGER NOT NULL,
+                            anio TEXT,
+                            ingresos REAL,
+                            egresos REAL,
+                            resultado REAL,
+                            FOREIGN KEY (empresa_id) REFERENCES empresas (id) ON DELETE CASCADE
+                          )''')
+        # Tabla de Flujo de Caja Proyectado
+        cursor.execute('''CREATE TABLE IF NOT EXISTS flujo_caja (
+                            id INTEGER PRIMARY KEY,
+                            empresa_id INTEGER NOT NULL,
+                            anio_proyeccion INTEGER,
+                            saldo_inicial REAL,
+                            ingreso REAL,
+                            egreso REAL,
+                            flujo_neto REAL,
+                            saldo_final REAL,
+                            FOREIGN KEY (empresa_id) REFERENCES empresas (id) ON DELETE CASCADE
+                          )''')
+        # Tabla de Punto de Equilibrio y C/B
+        cursor.execute('''CREATE TABLE IF NOT EXISTS punto_equilibrio (
+                            id INTEGER PRIMARY KEY,
+                            empresa_id INTEGER NOT NULL,
+                            costo_fijo_total REAL,
+                            precio_venta_unidad REAL,
+                            costo_variable_unidad REAL,
+                            unidades_producidas REAL,
+                            FOREIGN KEY (empresa_id) REFERENCES empresas (id) ON DELETE CASCADE
+                          )''')
+        
+        # Tabla para MADE y MADI (con tipos de columna corregidos)
+        cursor.execute('''CREATE TABLE IF NOT EXISTS matriz_marketing (
+                            id INTEGER PRIMARY KEY,
+                            empresa_id INTEGER NOT NULL,
+                            tipo_matriz TEXT NOT NULL,
+                            variable TEXT,
+                            factor TEXT,
+                            producto TEXT,
+                            precio TEXT,
+                            plaza TEXT,
+                            promocion TEXT,
+                            rating REAL,
+                            weight_percent REAL,
+                            valor REAL,
+                            total INTEGER,
+                            FOREIGN KEY (empresa_id) REFERENCES empresas (id) ON DELETE CASCADE
+                          )''')
+        
+        # Lógica para añadir columnas a la tabla 'empresas' si no existen (para no perder datos)
+        columnas_existentes = [c[1] for c in cursor.execute("PRAGMA table_info(empresas)").fetchall()]
+        nuevas_columnas = ['objetivo_plan', 'obj_general', 'obj_especificos', 'posicionamiento_x', 'posicionamiento_y', 'analisis_posicionamiento', 'analisis_pest', 'analisis_foda', 'analisis_made', 'analisis_madi']
+        for col in nuevas_columnas:
+            if col not in columnas_existentes:
+                # Usamos TEXT para máxima compatibilidad al añadir columnas
+                cursor.execute(f"ALTER TABLE empresas ADD COLUMN {col} TEXT")
+
         conn.commit()
 
 def get_empresas():
@@ -36,7 +118,7 @@ def save_image(uploaded_file):
         return uploaded_file.getvalue()
     return None
 
-# --- ANALYSIS & GENERATION UTILS (Sin cambios) ---
+# --- ANALYSIS & GENERATION UTILS ---
 def analizar_foda(df_foda):
     if df_foda.empty: return None, None, None, pd.Series(dtype='float64')
     estrategias = {'FO': 'Ofensiva (F+O)', 'FA': 'Defensiva (F+A)', 'DO': 'Adaptativa (D+O)', 'DA': 'Supervivencia (D+A)'}
@@ -46,15 +128,13 @@ def analizar_foda(df_foda):
     resumen = f"La estrategia principal recomendada es **{analisis_df.iloc[0]['Estrategia']}** ({analisis_df.iloc[0]['Puntaje Total']} puntos), seguida por **{analisis_df.iloc[1]['Estrategia']}** ({analisis_df.iloc[1]['Puntaje Total']} puntos)."
     return analisis_df, resumen, estrategia_principal, puntajes
 
-def generar_planes_por_plantilla(estrategia_foda, efi_score, efe_score, pest_total):
+def generar_planes_por_plantilla(estrategia_foda, pest_total):
     planes = {}
-    if efi_score < 2.5:
-        intro = f"El bajo puntaje EFI ({efi_score:.2f}) sugiere debilidades internas en la estructura o procesos administrativos. Es prioritario abordar estas ineficiencias para fortalecer la base de la organización."
-        obj = "Realizar una auditoría de procesos internos en los próximos 3 meses para identificar y rediseñar 2 flujos de trabajo clave, buscando una mejora medible en la eficiencia del 15%."
-    else:
-        intro = f"Con un sólido puntaje EFI de {efi_score:.2f}, la empresa demuestra una fuerte posición administrativa. El enfoque será consolidar esta ventaja y fomentar la innovación continua."
-        obj = "Implementar un programa de formación en liderazgo y gestión de proyectos para los mandos medios en los próximos 6 meses."
+    
+    intro = "El plan administrativo se enfocará en fortalecer la base de la organización y fomentar la innovación continua."
+    obj = "Implementar un programa de formación en liderazgo y gestión de proyectos para los mandos medios en los próximos 6 meses."
     planes['Administrativo'] = {'introduccion': intro, 'objetivo': obj}
+    
     if "Ofensiva" in estrategia_foda:
         intro = "La posición estratégica es Ofensiva. El plan debe centrarse en usar las fortalezas para capitalizar al máximo las oportunidades de mercado."
         obj = "Lanzar una nueva línea de producto/servicio que explote nuestras fortalezas en los próximos 12 meses, para capturar un 5% más de cuota de mercado."
@@ -65,13 +145,15 @@ def generar_planes_por_plantilla(estrategia_foda, efi_score, efe_score, pest_tot
         intro = "La estrategia es Defensiva/Supervivencia. La prioridad es proteger la posición actual, usando fortalezas para mitigar amenazas."
         obj = "Implementar un plan de retención de clientes clave en los próximos 6 meses, para reducir la tasa de abandono en un 10%."
     planes['Mejora'] = {'introduccion': intro, 'objetivo': obj}
-    if pest_total < 2.5 or efe_score < 2.5:
-        intro = f"El análisis del entorno (PEST: {pest_total:.2f}, EFE: {efe_score:.2f}) revela vulnerabilidad a factores externos. Es crucial desarrollar planes para mitigar riesgos."
+    
+    if pest_total < 2.5:
+        intro = f"El análisis del entorno (PEST: {pest_total:.2f}) revela vulnerabilidad a factores externos. Es crucial desarrollar planes para mitigar riesgos."
         obj = "Formar un comité de gestión de riesgos que, en 2 meses, identifique los 3 principales riesgos externos y desarrolle un plan de respuesta específico."
     else:
-        intro = f"La empresa muestra buena respuesta al entorno (PEST: {pest_total:.2f}, EFE: {efe_score:.2f}). El plan se enfocará en la monitorización proactiva de eventos inesperados."
+        intro = f"La empresa muestra buena respuesta al entorno (PEST: {pest_total:.2f}). El plan se enfocará en la monitorización proactiva de eventos inesperados."
         obj = "Establecer un sistema de vigilancia del entorno trimestral y realizar un simulacro de crisis anual."
     planes['Contingencia'] = {'introduccion': intro, 'objetivo': obj}
+    
     if "Ofensiva" in estrategia_foda or "Adaptativa" in estrategia_foda:
         intro = "La estrategia de crecimiento requiere un apalancamiento tecnológico. Se debe invertir en innovación para ganar ventaja competitiva."
         obj = "Evaluar e implementar una nueva herramienta de CRM o ERP en los próximos 9 meses para mejorar la relación con clientes y la eficiencia operativa."
@@ -79,13 +161,11 @@ def generar_planes_por_plantilla(estrategia_foda, efi_score, efe_score, pest_tot
         intro = "La tecnología debe usarse para robustecer la operación y defender la posición actual. La prioridad es la seguridad y la estabilidad."
         obj = "Realizar una auditoría de ciberseguridad completa en el próximo trimestre y actualizar los sistemas críticos para mitigar vulnerabilidades."
     planes['Tecnológico'] = {'introduccion': intro, 'objetivo': obj}
-    if efi_score < 2.5:
-        intro = "Las debilidades internas (EFI: {:.2f}) impactan directamente en la operación. Es necesario optimizar la cadena de valor y los procesos productivos/de servicio.".format(efi_score)
-        obj = "Mapear la cadena de valor actual para identificar y eliminar un cuello de botella principal en los próximos 4 meses, reduciendo los tiempos de ciclo en un 10%."
-    else:
-        intro = "La operación interna es un punto fuerte (EFI: {:.2f}). El plan se enfocará en escalar las operaciones de manera eficiente para soportar el crecimiento.".format(efi_score)
-        obj = "Desarrollar un plan de escalabilidad operativa para aumentar la capacidad de producción/servicio en un 20% en el próximo año, sin sacrificar la calidad."
+    
+    intro = "El plan operativo se enfocará en optimizar la cadena de valor y escalar las operaciones de manera eficiente para soportar el crecimiento."
+    obj = "Desarrollar un plan de escalabilidad operativa para aumentar la capacidad de producción/servicio en un 20% en el próximo año, sin sacrificar la calidad."
     planes['Operativo'] = {'introduccion': intro, 'objetivo': obj}
+    
     if "Ofensiva" in estrategia_foda or "Adaptativa" in estrategia_foda:
         intro = "Dado que la estrategia implica nuevas iniciativas y crecimiento, se requiere un sistema de monitoreo ágil y riguroso para asegurar que los objetivos se cumplan."
         obj = "Implementar un dashboard de KPIs (Indicadores Clave) en tiempo real para los nuevos proyectos y establecer un ciclo de revisión estratégica mensual."
@@ -93,13 +173,15 @@ def generar_planes_por_plantilla(estrategia_foda, efi_score, efe_score, pest_tot
         intro = "El monitoreo debe centrarse en indicadores de alerta temprana y en el control de los factores críticos para la supervivencia del negocio."
         obj = "Definir 5 indicadores de riesgo clave (KRIs) y establecer un sistema de alertas automáticas para la alta dirección, con revisión semanal."
     planes['Monitoreo y control'] = {'introduccion': intro, 'objetivo': obj}
-    if ("Ofensiva" in estrategia_foda or "Adaptativa" in estrategia_foda) and efe_score > 2.5:
+    
+    if "Ofensiva" in estrategia_foda or "Adaptativa" in estrategia_foda:
         intro = "El entorno es favorable y la estrategia es de crecimiento. El plan financiero debe enfocarse en asegurar los fondos para la expansión."
         obj = "Preparar un caso de negocio y una ronda de financiación (o asegurar una línea de crédito) en los próximos 6 meses para financiar las nuevas iniciativas estratégicas."
     else:
         intro = "La situación financiera debe ser gestionada con prudencia. La prioridad es la optimización de costos, la gestión de la liquidez y la maximización de la rentabilidad actual."
         obj = "Implementar un plan de reducción de costos no esenciales para mejorar el margen de beneficio neto en un 2% en los próximos 6 meses, sin afectar la operación crítica."
     planes['Financiero'] = {'introduccion': intro, 'objetivo': obj}
+    
     return planes
 
 def generar_cuadro_de_mando(planes):
@@ -122,7 +204,7 @@ def generar_cuadro_de_mando(planes):
     df_cmi['Perspectiva'] = pd.Categorical(df_cmi['Perspectiva'], categories=perspectiva_orden, ordered=True)
     return df_cmi.sort_values(by='Perspectiva').reset_index(drop=True)
 
-# --- PDF & GRAPHICS GENERATION UTILS (Sin cambios) ---
+# --- PDF & GRAPHICS GENERATION UTILS ---
 def generar_grafico_foda_radar(puntajes):
     if puntajes is None or puntajes.empty: return None
     labels = np.array(['Ofensiva\n(FO)', 'Defensiva\n(FA)', 'Adaptativa\n(DO)', 'Supervivencia\n(DA)'])
@@ -156,28 +238,6 @@ def generar_grafico_pest_bar(df_pest):
     buf.seek(0)
     return buf
 
-def generar_grafico_efi_efe(efi_score, efe_score):
-    efi_score = efi_score or 0
-    efe_score = efe_score or 0
-    fig, ax = plt.subplots(figsize=(7, 2))
-    ax.set_xlim(1, 4)
-    ax.set_ylim(0, 2)
-    ax.barh([1.5], [efe_score-1], left=1, height=0.5, color='skyblue', label='EFE')
-    ax.text(efe_score if efe_score > 1.1 else 1.1, 1.5, f' {efe_score:.2f}', va='center')
-    ax.barh([0.5], [efi_score-1], left=1, height=0.5, color='lightgreen', label='EFI')
-    ax.text(efi_score if efi_score > 1.1 else 1.1, 0.5, f' {efi_score:.2f}', va='center')
-    ax.axvline(2.5, color='red', linestyle='--', label='Promedio (2.5)')
-    ax.set_yticks([0.5, 1.5])
-    ax.set_yticklabels(['EFI (Interno)', 'EFE (Externo)'])
-    ax.set_title('Posición Interna vs. Externa')
-    ax.get_xaxis().set_visible(True)
-    ax.legend(loc='lower right')
-    buf = BytesIO()
-    plt.savefig(buf, format='PNG', bbox_inches='tight')
-    plt.close(fig)
-    buf.seek(0)
-    return buf
-
 def encabezado_pie_pagina(canvas, doc, logo_bytes, nombre_empresa, version, coordinador):
     canvas.saveState()
     canvas.setFont('Helvetica-Bold', 14)
@@ -197,15 +257,12 @@ def encabezado_pie_pagina(canvas, doc, logo_bytes, nombre_empresa, version, coor
     canvas.drawRightString(doc.width + doc.leftMargin, 0.5*inch, "Aprobado por: Ing. Monica Legarda")
     canvas.restoreState()
 
-# --- CORRECCIÓN 1: Nueva función para estilos APA ---
 def get_apa_styles():
     styles = getSampleStyleSheet()
     styles.add(ParagraphStyle(name='APA_Body', fontName='Times-Roman', fontSize=12, leading=24, alignment=TA_JUSTIFY))
     styles.add(ParagraphStyle(name='APA_H1', parent=styles['APA_Body'], fontName='Times-Bold', fontSize=14, alignment=TA_CENTER, spaceAfter=12))
     styles.add(ParagraphStyle(name='APA_H2', parent=styles['APA_Body'], fontName='Times-Bold', alignment=TA_LEFT, spaceBefore=12, spaceAfter=6))
     return styles
-
-# REEMPLAZA LA FUNCIÓN ANTIGUA CON ESTA VERSIÓN MEJORADA Y DETALLADA
 
 def generar_pdf_completo(empresa_id, version, coordinador):
     # 1. OBTENER TODOS LOS DATOS DE LA BASE DE DATOS
@@ -230,7 +287,7 @@ def generar_pdf_completo(empresa_id, version, coordinador):
     story.append(Paragraph(f"Fecha: {pd.Timestamp.now().strftime('%Y-%m-%d')}", styles['APA_Body']))
     story.append(PageBreak())
 
-    # 4. CONSTRUIR EL RESUMEN EJECUTIVO (APROX. 5 PÁGINAS)
+    # 4. CONSTRUIR EL RESUMEN EJECUTIVO
     story.append(Paragraph("Resumen Ejecutivo", styles['APA_H1']))
     story.append(Paragraph("Este resumen presenta los hallazgos y recomendaciones clave del diagnóstico estratégico. Está diseñado para proporcionar una visión general rápida y comprensible para la alta dirección, facilitando la toma de decisiones informadas.", styles['APA_Body']))
     story.append(Spacer(1, 24))
@@ -238,18 +295,12 @@ def generar_pdf_completo(empresa_id, version, coordinador):
     # Análisis y gráficos
     analisis_foda_df, resumen_foda, estrategia_principal, puntajes_foda = analizar_foda(df_foda)
     pest_total = df_pest['valor_ponderado'].sum() if not df_pest.empty else 0
-    efi_score = empresa.get('efi_score', 0)
-    efe_score = empresa.get('efe_score', 0)
 
     # Página 2 del Resumen: Diagnóstico Gráfico y Análisis
     story.append(Paragraph("Diagnóstico Estratégico General", styles['APA_H2']))
     story.append(Paragraph(f"La estrategia principal recomendada, basada en el análisis FODA cruzado, es la <b>{estrategia_principal}</b>. Esto indica la postura que la empresa debería adoptar prioritariamente. El siguiente gráfico de radar ilustra la ponderación de las cuatro posibles estrategias.", styles['APA_Body']))
     grafico_foda = generar_grafico_foda_radar(puntajes_foda)
     if grafico_foda: story.append(Image(grafico_foda, width=5*inch, height=5*inch))
-    
-    story.append(Paragraph(f"La evaluación de factores internos (EFI) y externos (EFE) posiciona a la empresa de la siguiente manera. Un puntaje superior a 2.5 indica una posición fuerte en esa área. La empresa obtuvo un <b>EFI de {efi_score:.2f}</b> y un <b>EFE de {efe_score:.2f}</b>.", styles['APA_Body']))
-    grafico_efi_efe = generar_grafico_efi_efe(efi_score, efe_score)
-    if grafico_efi_efe: story.append(Image(grafico_efi_efe, width=6*inch, height=1.7*inch))
     story.append(PageBreak())
 
     # Página 3 del Resumen: Factores Críticos
@@ -262,14 +313,12 @@ def generar_pdf_completo(empresa_id, version, coordinador):
         pest_table.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), '#CCCCCC'), ('GRID', (0,0), (-1,-1), 1, '#000000')]))
         story.append(pest_table)
     story.append(Spacer(1, 24))
-    
-    # (Aquí se agregarían tablas similares para los factores críticos de EFI y EFE si estuvieran disponibles con ese detalle)
     story.append(PageBreak())
 
     # Página 4 del Resumen: Objetivos Estratégicos
     story.append(Paragraph("Objetivos Estratégicos Propuestos", styles['APA_H2']))
     story.append(Paragraph("Derivado del diagnóstico, se proponen los siguientes objetivos macro para cada área de planificación. Estos objetivos forman la base del Cuadro de Mando Integral.", styles['APA_Body']))
-    planes = generar_planes_por_plantilla(estrategia_principal, efi_score, efe_score, pest_total)
+    planes = generar_planes_por_plantilla(estrategia_principal, pest_total)
     for nombre_plan, datos_plan in planes.items():
         story.append(Paragraph(f"<b>{nombre_plan}:</b> {datos_plan['objetivo']}", styles['APA_Body']))
         story.append(Spacer(1, 6))
@@ -277,7 +326,7 @@ def generar_pdf_completo(empresa_id, version, coordinador):
 
     # Página 5 del Resumen: Conclusiones y Próximos Pasos
     story.append(Paragraph("Conclusiones y Próximos Pasos", styles['APA_H2']))
-    story.append(Paragraph(f"<b>Conclusión General:</b> La empresa se encuentra en una posición estratégica <b>{estrategia_principal}</b>. Las fortalezas internas son {'adecuadas' if efi_score > 2.5 else 'insuficientes'} para la situación actual, y la capacidad de respuesta al entorno es {'fuerte' if efe_score > 2.5 else 'débil'}. Es imperativo actuar sobre los planes propuestos para capitalizar las ventajas y mitigar los riesgos.", styles['APA_Body']))
+    story.append(Paragraph(f"<b>Conclusión General:</b> La empresa se encuentra en una posición estratégica <b>{estrategia_principal}</b>. Es imperativo actuar sobre los planes propuestos para capitalizar las ventajas y mitigar los riesgos.", styles['APA_Body']))
     story.append(Spacer(1, 12))
     story.append(Paragraph("<b>Recomendaciones Inmediatas:</b>", styles['APA_Body']))
     story.append(Paragraph("1. Revisar y aprobar el presente plan estratégico.", styles['APA_Body']))
@@ -295,7 +344,6 @@ def generar_pdf_completo(empresa_id, version, coordinador):
     story.append(Paragraph(f"<b>Misión:</b> {empresa.get('mision', 'N/A')}", styles['APA_Body']))
     story.append(Paragraph(f"<b>Visión:</b> {empresa.get('vision', 'N/A')}", styles['APA_Body']))
     story.append(Paragraph(f"<b>Valores y Principios:</b> {empresa.get('valores', 'N/A')}", styles['APA_Body']))
-    # ... y así con todos los campos de texto ...
     story.append(PageBreak())
 
     # Anexo B: Diagnóstico Detallado
@@ -311,7 +359,7 @@ def generar_pdf_completo(empresa_id, version, coordinador):
     story.append(Paragraph("<b>Matriz FODA Cruzado Completa</b>", styles['APA_Body']))
     if not df_foda.empty:
         foda_data_full = [df_foda.columns.tolist()] + df_foda.values.tolist()
-        foda_table_full = Table(foda_data_full)
+        foda_table_full = Table(foda_data_full, colWidths=[1.2*inch, 2*inch, 2*inch, 1*inch])
         foda_table_full.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), '#CCCCCC'), ('GRID', (0,0), (-1,-1), 1, '#000000')]))
         story.append(foda_table_full)
     story.append(PageBreak())
@@ -334,7 +382,7 @@ def generar_pdf_completo(empresa_id, version, coordinador):
     pdf_buffer.seek(0)
     return pdf_buffer
 
-# --- MAIN APP (Sin cambios) ---
+# --- MAIN APP ---
 init_db()
 st.set_page_config(layout="wide")
 st.title("Asistente de Plan Estratégico ♟️")
@@ -369,49 +417,227 @@ if not empresa_id:
     st.info("👈 Por favor, selecciona o crea una empresa en el menú lateral para comenzar.")
     st.stop()
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["1. Introducción", "2. Diagnóstico Situacional", "3. Planes Estratégicos", "4. Cuadro de Mando Integral", "5. Resumen y Conclusiones"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["1. Introducción", "2. Diagnóstico Situacional", "3. Planes Estratégicos", "4. CMI/Indicadores", "5. Operativización/Presupuesto", "6. Resumen y Conclusiones"])
 
 with tab1:
     st.header("Introducción y Cultura Organizacional")
     with get_connection() as conn:
         empresa_data = pd.read_sql(f"SELECT * FROM empresas WHERE id={empresa_id}", conn).iloc[0]
+
     with st.form("form_intro"):
         st.subheader("Datos Generales")
         nombre = st.text_input("Nombre de la Empresa", empresa_data['nombre'])
         giro = st.text_input("Giro del Negocio", empresa_data['giro'])
         logo_file = st.file_uploader("Subir Logo", type=['png', 'jpg', 'jpeg'])
-        if empresa_data['logo']: st.image(BytesIO(empresa_data['logo']), width=150)
+        if empresa_data['logo']:
+            st.image(BytesIO(empresa_data['logo']), width=150)
+        
         st.divider()
+
         st.subheader("Cultura Organizacional")
-        intro = st.text_area("Porqué del Plan Estratégico", empresa_data['introduccion'])
+        objetivo_plan = st.text_area("Objetivo del Plan Estratégico", empresa_data.get('objetivo_plan', ''))
         mision = st.text_area("Misión", empresa_data['mision'])
         vision = st.text_area("Visión", empresa_data['vision'])
-        organigrama_file = st.file_uploader("Subir Organigrama", type=['png', 'jpg', 'jpeg'])
-        if empresa_data['organigrama']: st.image(BytesIO(empresa_data['organigrama']))
+        obj_gen = st.text_area("Objetivo General", empresa_data.get('obj_general', ''))
+        obj_esp = st.text_area("Objetivos Específicos", empresa_data.get('obj_especificos', ''))
         politicas = st.text_area("Políticas de la Empresa", empresa_data['politicas'])
         valores = st.text_area("Valores y Principios", empresa_data['valores'])
+        organigrama_file = st.file_uploader("Subir Organigrama", type=['png', 'jpg', 'jpeg'])
+        if empresa_data['organigrama']:
+            st.image(BytesIO(empresa_data['organigrama']))
+
         if st.form_submit_button("Guardar Introducción"):
             logo_bytes = save_image(logo_file) if logo_file else empresa_data['logo']
             org_bytes = save_image(organigrama_file) if organigrama_file else empresa_data['organigrama']
+            
             with get_connection() as conn:
-                conn.execute('''UPDATE empresas SET nombre=?, giro=?, logo=?, introduccion=?, mision=?, vision=?, organigrama=?, politicas=?, valores=? WHERE id=?''', 
-                             (nombre, giro, logo_bytes, intro, mision, vision, org_bytes, politicas, valores, empresa_id))
+                conn.execute('''UPDATE empresas SET 
+                                nombre=?, giro=?, logo=?, objetivo_plan=?, mision=?, vision=?, 
+                                obj_general=?, obj_especificos=?, politicas=?, valores=?, organigrama=?
+                                WHERE id=?''', 
+                             (nombre, giro, logo_bytes, objetivo_plan, mision, vision, 
+                              obj_gen, obj_esp, politicas, valores, org_bytes, empresa_id))
             st.success("Datos de introducción guardados."); st.rerun()
 
 with tab2:
     st.header("Diagnóstico Situacional (Análisis de Matrices)")
-    diag_tab1, diag_tab2, diag_tab3 = st.tabs(["Matriz PEST", "Matrices EFI y EFE", "Matriz FODA Cruzado"])
+    with get_connection() as conn:
+        analisis_data = pd.read_sql(f"SELECT analisis_made, analisis_madi, analisis_posicionamiento, analisis_pest, analisis_foda FROM empresas WHERE id={empresa_id}", conn).iloc[0]
+
+    def procesar_made_madi(data_str, tipo):
+        if isinstance(data_str, pd.DataFrame):
+            data_str = data_str.to_csv(sep='\t', index=False)
+        df = pd.read_csv(StringIO(data_str), sep='\t', header=0)
+        def normalize_text(text):
+            if text is None: return ""
+            return unicodedata.normalize('NFKD', str(text)).encode('ascii', 'ignore').decode('utf-8').lower().replace(' ', '_').replace('%', '_percent')
+        df.columns = [normalize_text(col) for col in df.columns]
+        column_mapping = {
+            'n': 'N', 'variable': 'Variable', 'factor': 'Factor', 'producto': 'Producto',
+            'precio': 'Precio', 'plaza': 'Plaza', 'promocion': 'Promocion',
+            'rating': 'Rating', 'weight__percent': 'Weight %', 'weight_percent': 'Weight %'
+        }
+        df.rename(columns=column_mapping, inplace=True)
+        p_cols = ['Producto', 'Precio', 'Plaza', 'Promocion']
+        for col in p_cols:
+            if col in df.columns:
+                df[col] = df[col].astype(str).str.lower()
+        df['Total'] = df[p_cols].apply(lambda row: row.str.contains('si', na=False)).sum(axis=1)
+        numeric_cols = ['Rating', 'Weight %']
+        for col in numeric_cols:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
+        df['Valor'] = df.get('Rating', 0) * (df.get('Weight %', 0) / 100.0)
+        df['empresa_id'] = empresa_id
+        df_to_db = df.rename(columns={
+            'Variable': 'variable', 'Factor': 'factor', 'Producto': 'producto', 'Precio': 'precio',
+            'Plaza': 'plaza', 'Promocion': 'promocion', 'Rating': 'rating', 'Weight %': 'weight_percent',
+            'Valor': 'valor', 'Total': 'total'
+        })
+        columnas_bd = ['empresa_id', 'tipo_matriz', 'variable', 'factor', 'producto', 'precio', 'plaza', 'promocion', 'rating', 'weight_percent', 'valor', 'total']
+        columnas_presentes = [col for col in columnas_bd if col in df_to_db.columns]
+        df_to_db = df_to_db[columnas_presentes]
+        return df_to_db
+
+    def display_and_edit_matrix(tipo_matriz, analisis_propio_data):
+        with get_connection() as conn:
+            df_db = pd.read_sql(f"SELECT * FROM matriz_marketing WHERE empresa_id=? AND tipo_matriz='{tipo_matriz}'", conn, params=(empresa_id,))
+        if not df_db.empty:
+            st.info("Puedes editar los datos directamente en la tabla.")
+            df_display = df_db.rename(columns={
+                'variable': 'Variable', 'factor': 'Factor', 'producto': 'Producto', 'precio': 'Precio',
+                'plaza': 'Plaza', 'promocion': 'Promoción', 'rating': 'Rating', 'weight_percent': 'Weight %',
+                'valor': 'Valor', 'total': 'Total'
+            })
+            edited_df = st.data_editor(
+                df_display, key=f"editor_{tipo_matriz}", num_rows="dynamic", use_container_width=True,
+                disabled=['id', 'empresa_id', 'tipo_matriz', 'Valor', 'Total'] 
+            )
+            if st.button(f"💾 Guardar Cambios en {tipo_matriz}"):
+                with get_connection() as conn:
+                    conn.execute(f"DELETE FROM matriz_marketing WHERE empresa_id=? AND tipo_matriz='{tipo_matriz}'", (empresa_id,))
+                    df_to_save = procesar_made_madi(edited_df, tipo_matriz)
+                    df_to_save.to_sql('matriz_marketing', conn, if_exists='append', index=False)
+                st.success(f"Cambios en {tipo_matriz} guardados."); st.rerun()
+            
+            total_score = df_db['total'].sum()
+            st.metric(f"Puntaje Total {tipo_matriz}", f"{total_score}")
+            
+            st.subheader("Análisis Automático Sugerido")
+            if tipo_matriz == 'MADE':
+                if total_score >= 3.5:
+                    st.success(f"**Resultado Fuerte ({total_score}):** La empresa demuestra una excelente gestión de su marketing mix interno.")
+                elif 2.5 <= total_score < 3.5:
+                    st.info(f"**Resultado Promedio ({total_score}):** La gestión de marketing interno es adecuada.")
+                else:
+                    st.warning(f"**Resultado Débil ({total_score}):** La empresa presenta deficiencias significativas en su marketing mix interno.")
+            elif tipo_matriz == 'MADI':
+                if total_score >= 3.5:
+                    st.success(f"**Resultado Favorable ({total_score}):** El entorno de marketing es muy favorable.")
+                elif 2.5 <= total_score < 3.5:
+                    st.info(f"**Resultado Moderado ({total_score}):** El entorno de marketing es estable.")
+                else:
+                    st.warning(f"**Resultado Desfavorable ({total_score}):** El entorno presenta amenazas considerables.")
+
+            with st.form(f"form_analisis_{tipo_matriz.lower()}"):
+                st.subheader("Análisis Propio")
+                analisis_propio = st.text_area(f"Añade aquí tus conclusiones sobre la matriz {tipo_matriz}.", value=analisis_propio_data)
+                if st.form_submit_button("Guardar Análisis"):
+                    with get_connection() as conn:
+                        conn.execute(f"UPDATE empresas SET analisis_{tipo_matriz.lower()}=? WHERE id=?", (analisis_propio, empresa_id))
+                    st.success(f"Análisis de {tipo_matriz} guardado."); st.rerun()
+        else:
+            st.info(f"Aún no hay datos para la Matriz {tipo_matriz}. Pega los datos desde Excel para comenzar.")
+
+    diag_tab1, diag_tab2, diag_tab3, diag_tab4, diag_tab5 = st.tabs([
+        "Matriz MADE", "Matriz MADI", "Matriz de Posicionamiento", "Matriz PEST", "Matriz FODA Numérico"
+    ])
+
     with diag_tab1:
+        st.subheader("Análisis de Marketing Interno (MADE)")
+        with st.expander("📋 Pegar datos de MADE desde Excel"):
+            made_paste_data = st.text_area("Pega tus datos de MADE aquí", height=200, key="paste_MADE")
+            if st.button("Procesar y Reemplazar Datos de MADE", key="process_made"):
+                try:
+                    df_made = procesar_made_madi(made_paste_data, 'MADE')
+                    with get_connection() as conn:
+                        conn.execute("DELETE FROM matriz_marketing WHERE empresa_id=? AND tipo_matriz='MADE'", (empresa_id,))
+                        df_made.to_sql('matriz_marketing', conn, if_exists='append', index=False)
+                    st.success(f"¡{len(df_made)} filas importadas a MADE exitosamente!"); st.rerun()
+                except Exception as e:
+                    st.error(f"Error al procesar datos de MADE: {e}")
+        display_and_edit_matrix('MADE', analisis_data.get('analisis_made', ''))
+
+    with diag_tab2:
+        st.subheader("Análisis de Marketing Externo (MADI)")
+        with st.expander("📋 Pegar datos de MADI desde Excel"):
+            madi_paste_data = st.text_area("Pega tus datos de MADI aquí", height=200, key="paste_MADI")
+            if st.button("Procesar y Reemplazar Datos de MADI", key="process_madi"):
+                try:
+                    df_madi = procesar_made_madi(madi_paste_data, 'MADI')
+                    with get_connection() as conn:
+                        conn.execute("DELETE FROM matriz_marketing WHERE empresa_id=? AND tipo_matriz='MADI'", (empresa_id,))
+                        df_madi.to_sql('matriz_marketing', conn, if_exists='append', index=False)
+                    st.success(f"¡{len(df_madi)} filas importadas a MADI exitosamente!"); st.rerun()
+                except Exception as e:
+                    st.error(f"Error al procesar datos de MADI: {e}")
+        display_and_edit_matrix('MADI', analisis_data.get('analisis_madi', ''))
+
+    with diag_tab3:
+        st.subheader("Matriz de Posicionamiento")
+        with get_connection() as conn:
+            pos_data = pd.read_sql("SELECT posicionamiento_x, posicionamiento_y FROM empresas WHERE id=?", conn, params=(empresa_id,)).iloc[0]
+        with st.form("form_posicionamiento"):
+            coord_x = st.number_input("Coordenada X", value=float(pos_data.get('posicionamiento_x') or 0))
+            coord_y = st.number_input("Coordenada Y", value=float(pos_data.get('posicionamiento_y') or 0))
+            if st.form_submit_button("Guardar y Generar Gráfico"):
+                with get_connection() as conn:
+                    conn.execute("UPDATE empresas SET posicionamiento_x=?, posicionamiento_y=? WHERE id=?", (coord_x, coord_y, empresa_id))
+                st.success("Coordenadas guardadas."); st.rerun()
+        
+        fig, ax = plt.subplots()
+        ax.axhline(0, color='gray', lw=1); ax.axvline(0, color='gray', lw=1)
+        ax.plot(coord_x, coord_y, 'ro', markersize=10)
+        ax.set_title("Matriz de Posicionamiento"); ax.set_xlabel("Eje X"); ax.set_ylabel("Eje Y")
+        ax.grid(True, which='both', linestyle='--', linewidth=0.5)
+        st.pyplot(fig)
+        
+        st.subheader("📌 Diagnóstico Estratégico de Posicionamiento")
+        interpretaciones = {
+            "Superior Derecho": {"titulo": "Estrategia de Diferenciación Premium", "color": "success", "texto": "La organización se ubica en un cuadrante de alto valor percibido."},
+            "Superior Izquierdo": {"titulo": "Estrategia de Liderazgo en Valor (Eficiencia)", "color": "info", "texto": "Esta es una posición altamente competitiva: alta calidad a precios accesibles."},
+            "Inferior Izquierdo": {"titulo": "Estrategia de Liderazgo en Costos / Economía", "color": "warning", "texto": "La empresa compite en el segmento de volumen y eficiencia."},
+            "Inferior Derecho": {"titulo": "Zona de Riesgo Estratégico", "color": "error", "texto": "Esta posición es críticamente insostenible."}
+        }
+        if coord_x > 0 and coord_y > 0: key = "Superior Derecho"
+        elif coord_x < 0 and coord_y > 0: key = "Superior Izquierdo"
+        elif coord_x < 0 and coord_y < 0: key = "Inferior Izquierdo"
+        elif coord_x > 0 and coord_y < 0: key = "Inferior Derecho"
+        else: key = None
+
+        if key:
+            res = interpretaciones[key]
+            if res['color'] == "success": st.success(f"**{res['titulo']}**")
+            elif res['color'] == "info": st.info(f"**{res['titulo']}**")
+            elif res['color'] == "warning": st.warning(f"**{res['titulo']}**")
+            else: st.error(f"**{res['titulo']}**")
+            st.write(f"**Análisis Ejecutivo:** {res['texto']}")
+
+        with st.form("form_analisis_pos"):
+            st.subheader("Análisis Propio")
+            analisis_propio_pos = st.text_area("Añade aquí tus conclusiones sobre el posicionamiento.", value=analisis_data.get('analisis_posicionamiento', ''))
+            if st.form_submit_button("Guardar Análisis de Posicionamiento"):
+                with get_connection() as conn:
+                    conn.execute("UPDATE empresas SET analisis_posicionamiento=? WHERE id=?", (analisis_propio_pos, empresa_id))
+                st.success("Análisis de Posicionamiento guardado."); st.rerun()
+
+    with diag_tab4:
         st.subheader("Análisis PEST")
         with st.expander("📋 Pegar datos desde Excel"):
-            st.info("Copia las columnas de tu Excel y pégalas aquí. Columnas: Categoría PEST, Factor, Tipo FODA, Puntaje, Importancia %")
-            pest_paste_data = st.text_area("Pega tus datos aquí", height=200, key="pest_paste")
+            pest_paste_data = st.text_area("Pega tus datos aquí", height=200, key="pest_input_secondary")
             if st.button("Procesar Datos Pegados de PEST"):
                 try:
-                    df_pasted = pd.read_csv(StringIO(pest_paste_data), sep='\t', header=None)
-                    if "Puntaje" in str(df_pasted.iloc[0].values):
-                        st.warning("Se detectó una fila de encabezado y se ha ignorado.")
-                        df_pasted = pd.read_csv(StringIO(pest_paste_data), sep='\t', header=0)
+                    df_pasted = pd.read_csv(StringIO(pest_paste_data), sep='\t', header=0)
                     df_pasted.columns = ['categoria', 'factor', 'tipo_foda', 'puntaje', 'importancia']
                     df_pasted['puntaje'] = pd.to_numeric(df_pasted['puntaje'])
                     df_pasted['importancia'] = pd.to_numeric(df_pasted['importancia'].astype(str).str.replace(',', '.'))
@@ -419,155 +645,289 @@ with tab2:
                     df_pasted['empresa_id'] = empresa_id
                     df_pasted['tipo_matriz'] = 'PEST'
                     with get_connection() as conn:
+                        conn.execute("DELETE FROM matrices WHERE empresa_id=? AND tipo_matriz='PEST'", (empresa_id,))
                         df_pasted.to_sql('matrices', conn, if_exists='append', index=False)
                     st.success(f"¡{len(df_pasted)} filas importadas a PEST exitosamente!"); st.rerun()
                 except Exception as e:
-                    st.error(f"Error al procesar los datos: {e}. Revisa que el formato sea correcto y que los números sean válidos.")
+                    st.error(f"Error al procesar los datos: {e}.")
+        
         with get_connection() as conn:
-            df_pest = pd.read_sql(f"SELECT id, categoria, factor, tipo_foda, puntaje, importancia, valor_ponderado FROM matrices WHERE empresa_id={empresa_id} AND tipo_matriz='PEST'", conn)
+            df_pest = pd.read_sql(f"SELECT * FROM matrices WHERE empresa_id={empresa_id} AND tipo_matriz='PEST'", conn)
+        
         if not df_pest.empty:
-            st.subheader("Factores PEST Registrados")
-            # --- CORRECCIÓN 2: Advertencia de Streamlit ---
-            st.dataframe(df_pest.drop(columns=['id']), use_container_width=True)
-            total_importancia = df_pest['importancia'].sum()
-            total_ponderado = df_pest['valor_ponderado'].sum()
-            st.metric("Suma de Importancia (%)", f"{total_importancia:.2f}", help="La suma de los porcentajes.")
-            st.metric("Puntaje Ponderado Total", f"{total_ponderado:.2f}", help="> 2.5 es fuerte, < 2.5 es débil.")
-            if total_ponderado > 2.5: st.success("Análisis: La empresa responde efectivamente a factores externos.")
-            else: st.warning("Análisis: La empresa es vulnerable a factores externos.")
-            if st.button("🗑️ Limpiar Matriz PEST"):
-                with get_connection() as conn: conn.execute("DELETE FROM matrices WHERE empresa_id=? AND tipo_matriz='PEST'", (empresa_id,));
-                st.rerun()
-        else:
-            st.info("Aún no hay factores PEST.")
-    with diag_tab2:
-        st.subheader("Puntajes Totales de Matrices EFI y EFE")
-        with get_connection() as conn:
-            scores = pd.read_sql("SELECT efi_score, efe_score FROM empresas WHERE id=?", conn, params=(empresa_id,)).iloc[0]
-        with st.form("form_scores"):
-            efi_score = st.number_input("Puntaje Total Ponderado EFI", min_value=0.0, max_value=4.0, value=float(scores.get('efi_score') or 2.5), step=0.01)
-            efe_score = st.number_input("Puntaje Total Ponderado EFE", min_value=0.0, max_value=4.0, value=float(scores.get('efe_score') or 2.5), step=0.01)
-            if st.form_submit_button("Guardar Puntajes"):
+            edited_pest = st.data_editor(df_pest, num_rows="dynamic", key="editor_pest_v2", use_container_width=True, disabled=['id', 'empresa_id', 'tipo_matriz'])
+            if st.button("💾 Guardar Cambios en PEST"):
                 with get_connection() as conn:
-                    conn.execute("UPDATE empresas SET efi_score=?, efe_score=? WHERE id=?", (efi_score, efe_score, empresa_id))
-                st.success("Puntajes EFI y EFE guardados."); st.rerun()
-        st.subheader("Análisis de Posición Estratégica")
-        col1, col2 = st.columns(2)
-        col1.metric("Puntaje EFI (Interno)", f"{efi_score:.2f}")
-        if efi_score > 2.5: col1.success("Posición interna Fuerte.")
-        else: col1.warning("Posición interna Débil.")
-        col2.metric("Puntaje EFE (Externo)", f"{efe_score:.2f}")
-        if efe_score > 2.5: col2.success("Respuesta externa Fuerte.")
-        else: col2.warning("Respuesta externa Débil.")
-    with diag_tab3:
+                    conn.execute("DELETE FROM matrices WHERE empresa_id=? AND tipo_matriz='PEST'", (empresa_id,))
+                    edited_pest.to_sql('matrices', conn, if_exists='append', index=False)
+                st.success("Cambios en PEST guardados."); st.rerun()
+
+            total_ponderado = df_pest['valor_ponderado'].sum()
+            st.metric("Puntaje Ponderado Total PEST", f"{total_ponderado:.2f}")
+            if total_ponderado > 2.5:
+                st.success(f"**Perfil de Adaptación Proactiva ({total_ponderado:.2f})**")
+            else:
+                st.warning(f"**Perfil de Vulnerabilidad Externa ({total_ponderado:.2f})**")
+
+        with st.form("form_analisis_pest"):
+            st.subheader("Análisis Propio")
+            analisis_propio_pest = st.text_area("Añade aquí tus conclusiones sobre la matriz PEST.", value=analisis_data.get('analisis_pest', ''))
+            if st.form_submit_button("Guardar Análisis"):
+                with get_connection() as conn:
+                    conn.execute("UPDATE empresas SET analisis_pest=? WHERE id=?", (analisis_propio_pest, empresa_id))
+                st.success("Análisis de PEST guardado."); st.rerun()
+
+    with diag_tab5:
         st.subheader("Análisis FODA Cruzado (Numérico)")
         with st.expander("📋 Pegar datos de FODA Cruzado desde Excel"):
-            st.info("Copia las columnas de tu Excel (sin encabezados). Columnas: Cuadrante, Factor Fila, Factor Columna, Impacto")
-            foda_paste_data = st.text_area("Pega tus datos de FODA aquí", height=200, key="foda_paste")
+            foda_paste_data = st.text_area("Pega tus datos de FODA aquí", height=200, key="foda_paste_area")
             if st.button("Procesar Datos Pegados de FODA"):
-                # --- BLOQUE TRY...EXCEPT COMPLETO PARA MANEJAR ERRORES ---
                 try:
-                    df_foda_pasted = pd.read_csv(StringIO(foda_paste_data), sep='\t', header=None)
+                    df_foda_pasted = pd.read_csv(StringIO(foda_paste_data), sep='\t', header=0)
                     df_foda_pasted.columns = ['cuadrante', 'factor_fila', 'factor_columna', 'impacto']
-                    
-                    # --- SOLUCIÓN AL ERROR ArrowTypeError ---
-                    # Forzar la columna 'impacto' a ser numérica de forma segura
                     df_foda_pasted['impacto'] = pd.to_numeric(df_foda_pasted['impacto'], errors='coerce').fillna(0).astype(int)
-                    
                     df_foda_pasted['empresa_id'] = empresa_id
                     with get_connection() as conn:
+                        conn.execute("DELETE FROM foda_cruzado WHERE empresa_id=?", (empresa_id,))
                         df_foda_pasted.to_sql('foda_cruzado', conn, if_exists='append', index=False)
                     st.success(f"¡{len(df_foda_pasted)} filas importadas a FODA Cruzado!"); st.rerun()
                 except Exception as e:
-                    st.error(f"Error al procesar los datos: {e}. Asegúrate de que el formato de pegado sea correcto.")
-
+                    st.error(f"Error al procesar los datos: {e}.")
+        
         with get_connection() as conn:
-            df_foda = pd.read_sql(f"SELECT id, cuadrante, factor_fila, factor_columna, impacto FROM foda_cruzado WHERE empresa_id={empresa_id}", conn)
+            df_foda = pd.read_sql(f"SELECT * FROM foda_cruzado WHERE empresa_id={empresa_id}", conn)
+        
         if not df_foda.empty:
-            st.subheader("Datos de FODA Cruzado Registrados")
-            # --- CORRECCIÓN 2: Advertencia de Streamlit ---
-            st.dataframe(df_foda.drop(columns=['id']), use_container_width=True)
-            st.divider()
-            st.subheader("Análisis de Estrategia FODA")
-            analisis_df, resumen, _, _ = analizar_foda(df_foda)
+            edited_foda = st.data_editor(df_foda, num_rows="dynamic", key="editor_foda", use_container_width=True, disabled=['id', 'empresa_id'])
+            if st.button("💾 Guardar Cambios en FODA"):
+                with get_connection() as conn:
+                    conn.execute("DELETE FROM foda_cruzado WHERE empresa_id=?", (empresa_id,))
+                    edited_foda.to_sql('foda_cruzado', conn, if_exists='append', index=False)
+                st.success("Cambios en FODA guardados."); st.rerun()
+
+            analisis_df, _, estrategia_principal, _ = analizar_foda(df_foda)
             if analisis_df is not None:
-                st.table(analisis_df)
-                st.info(resumen)
-            if st.button("🗑️ Limpiar Matriz FODA Cruzado"):
-                with get_connection() as conn: conn.execute("DELETE FROM foda_cruzado WHERE empresa_id=?", (empresa_id,));
-                st.rerun()
-        else:
-            st.info("Aún no hay datos para el FODA Cruzado.")
+                st.subheader("🎯 Postura Competitiva Sugerida")
+                st.info(f"Estrategia Principal: {estrategia_principal}")
+
+        with st.form("form_analisis_foda"):
+            st.subheader("Análisis Propio")
+            analisis_propio_foda = st.text_area("Añade aquí tus conclusiones sobre la matriz FODA.", value=analisis_data.get('analisis_foda', ''))
+            if st.form_submit_button("Guardar Análisis"):
+                with get_connection() as conn:
+                    conn.execute("UPDATE empresas SET analisis_foda=? WHERE id=?", (analisis_propio_foda, empresa_id))
+                st.success("Análisis de FODA guardado."); st.rerun()
+
+    st.divider()
+    st.header("🚀 Formulación de Estrategias Maestras")
+    with get_connection() as conn:
+        res_madi = pd.read_sql(f"SELECT SUM(valor) as score FROM matriz_marketing WHERE empresa_id={empresa_id} AND tipo_matriz='MADI'", conn)
+        madi_score = float(res_madi['score'].iloc[0] or 0)
+        res_made = pd.read_sql(f"SELECT SUM(valor) as score FROM matriz_marketing WHERE empresa_id={empresa_id} AND tipo_matriz='MADE'", conn)
+        made_score = float(res_made['score'].iloc[0] or 0)
+        empresa_data_pos = pd.read_sql(f"SELECT posicionamiento_x FROM empresas WHERE id={empresa_id}", conn).iloc[0]
+        coord_x_val = float(empresa_data_pos.get('posicionamiento_x') or 0)
+        df_foda_final = pd.read_sql(f"SELECT cuadrante, impacto FROM foda_cruzado WHERE empresa_id={empresa_id}", conn)
+    
+    if not df_foda_final.empty:
+        _, _, estrategia_principal, _ = analizar_foda(df_foda_final)
+        col1, col2 = st.columns(2)
+        with col1:
+            st.subheader("🎯 Postura Estratégica")
+            st.write(f"Postura basada en {estrategia_principal}")
+        with col2:
+            st.subheader("🛠️ Ejes Estratégicos Relevantes")
+            st.markdown("- **Desarrollo de Capacidades Organizacionales**")
+
+        st.markdown("### 📋 Matriz de Estrategias Seleccionadas")
+        data_estrategias = {
+            "Nivel": ["Corporativo", "Competitivo", "Operativo"],
+            "Estrategia": [
+                "Crecimiento Intensivo" if made_score > 0 else "Estabilidad y Consolidación",
+                "Diferenciación" if coord_x_val > 0 else "Liderazgo en Costos",
+                "Innovación Continua" if madi_score > 0 else "Optimización de Procesos"
+            ],
+            "Justificación Técnica": [
+                f"Basado en un indicador MADE de {made_score:.2f}.",
+                "Basado en la posición relativa en la matriz de mercado.",
+                f"Orientado a fortalecer el desempeño interno (MADI: {madi_score:.2f})."
+            ]
+        }
+        st.table(pd.DataFrame(data_estrategias))
+    else:
+        st.warning("Complete el Análisis FODA Cruzado para visualizar las Estrategias Maestras.")
 
 with tab3:
     st.header("Planes Estratégicos")
-    st.info("Genera un borrador de planes basado en tu diagnóstico. Luego, completa los campos de 'Matriz' y 'Finalización' para cada uno.")
     if st.button("⚙️ Generar Borrador de Planes"):
-        with st.spinner("Analizando diagnóstico y construyendo planes..."):
+        with st.spinner("Analizando diagnóstico..."):
             with get_connection() as conn:
-                empresa_data = pd.read_sql(f"SELECT * FROM empresas WHERE id={empresa_id}", conn).iloc[0]
                 df_pest = pd.read_sql(f"SELECT valor_ponderado FROM matrices WHERE empresa_id={empresa_id} AND tipo_matriz='PEST'", conn)
                 df_foda = pd.read_sql(f"SELECT cuadrante, impacto FROM foda_cruzado WHERE empresa_id={empresa_id}", conn)
             pest_total = df_pest['valor_ponderado'].sum() if not df_pest.empty else 0
             _, _, estrategia_principal, _ = analizar_foda(df_foda)
-            efi_score = empresa_data.get('efi_score') or 0
-            efe_score = empresa_data.get('efe_score') or 0
             if not estrategia_principal:
-                st.error("No se pueden generar los planes. Faltan los datos del Análisis FODA Cruzado.")
+                st.error("Faltan los datos del Análisis FODA Cruzado.")
             else:
-                st.session_state['generated_plans_dict'] = generar_planes_por_plantilla(estrategia_principal, efi_score, efe_score, pest_total)
+                st.session_state['generated_plans_dict'] = generar_planes_por_plantilla(estrategia_principal, pest_total)
     if 'generated_plans_dict' in st.session_state:
-        st.subheader("Borrador de Planes Generado")
         for plan_nombre, plan_datos in st.session_state['generated_plans_dict'].items():
             with st.expander(f"**Plan {plan_nombre}**"):
-                st.markdown("##### Introducción del Plan")
                 st.info(plan_datos['introduccion'])
-                st.markdown("##### Objetivo del Plan")
                 st.success(plan_datos['objetivo'])
-                st.markdown("##### Matriz del Plan")
-                st.text_area("Define aquí las acciones, responsables, plazos y recursos.", key=f"matriz_{plan_nombre}", height=150)
-                st.markdown("##### Finalización del Plan")
-                st.text_area("Describe aquí los entregables, métricas de éxito y criterios de cierre.", key=f"final_{plan_nombre}", height=100)
+
 
 with tab4:
-    st.header("Cuadro de Mando Integral (Balanced Scorecard)")
-    st.info("Esta sección genera automáticamente un Cuadro de Mando Integral basado en los objetivos de los planes estratégicos generados en la pestaña anterior.")
+    st.header("CMI / Indicadores")
     if 'generated_plans_dict' not in st.session_state:
-        st.warning("Primero debes generar los planes en la Pestaña 3 para poder construir el Cuadro de Mando Integral.")
+        st.warning("Primero debes generar los planes en la Pestaña 3.")
     else:
         if st.button("📊 Generar Cuadro de Mando Integral"):
-            with st.spinner("Clasificando objetivos y construyendo el CMI..."):
-                df_cmi = generar_cuadro_de_mando(st.session_state['generated_plans_dict'])
-                st.session_state['df_cmi'] = df_cmi
+            df_cmi = generar_cuadro_de_mando(st.session_state['generated_plans_dict'])
+            st.session_state['df_cmi'] = df_cmi
         if 'df_cmi' in st.session_state:
-            st.subheader("Cuadro de Mando Integral Propuesto")
-            st.markdown("Este es un punto de partida. Debes refinar los KPIs, Metas e Iniciativas para cada objetivo.")
-            df_cmi_display = st.session_state['df_cmi'].style.apply(
-                lambda row: ['background-color: #E6F3FF'] * len(row) if row['Perspectiva'] == 'Financiera' else
-                            ['background-color: #E6FFF3'] * len(row) if row['Perspectiva'] == 'Clientes' else
-                            ['background-color: #FFF3E6'] * len(row) if row['Perspectiva'] == 'Procesos Internos' else
-                            ['background-color: #F3E6FF'] * len(row),
-                axis=1
-            )
-            # --- CORRECCIÓN 2: Advertencia de Streamlit ---
-            st.dataframe(df_cmi_display, use_container_width=True, height=500)
+            st.dataframe(st.session_state['df_cmi'], use_container_width=True, height=500)
             
 with tab5:
+    st.header("Operativización / Presupuesto")
+    
+    # --- SECCIÓN 1: CUADRO DE OPERATIVIZACIÓN (CASCADA) ---
+    st.subheader("📝 Cuadro de Operativización y Presupuesto (Cascada)")
+    st.info("Estructura: Plan -> Estrategia -> Actividad. Los costos se suman por actividad.")
+    
+    with get_connection() as conn:
+        df_oper = pd.read_sql(f"SELECT id, plan, estrategia, actividades, plazo, responsable, recurso, costo FROM operativizacion WHERE empresa_id={empresa_id}", conn)
+    
+    edited_oper = st.data_editor(
+        df_oper, 
+        num_rows="dynamic", 
+        key="editor_oper_cascada", 
+        use_container_width=True, 
+        disabled=['id'],
+        column_config={
+            "plan": st.column_config.SelectboxColumn("Plan", options=["Administrativo", "Mejora", "Contingencia", "Tecnológico", "Operativo", "Monitoreo y control", "Financiero"], help="Seleccione el Plan Maestro"),
+            "estrategia": st.column_config.TextColumn("Estrategia", help="Estrategia específica para el plan"),
+            "actividades": st.column_config.TextColumn("Actividad", help="Actividad para cumplir la estrategia"),
+            "costo": st.column_config.NumberColumn("Costo", format="$%.2f")
+        }
+    )
+    
+    if st.button("💾 Guardar Operativización"):
+        with get_connection() as conn:
+            conn.execute("DELETE FROM operativizacion WHERE empresa_id=?", (empresa_id,))
+            edited_oper['empresa_id'] = empresa_id
+            if 'id' in edited_oper.columns: edited_oper = edited_oper.drop(columns=['id'])
+            edited_oper.to_sql('operativizacion', conn, if_exists='append', index=False)
+        st.success("Operativización guardada correctamente."); st.rerun()
+    
+    total_inversion = edited_oper['costo'].sum() if not edited_oper.empty else 0
+    st.metric("Inversión Total Requerida (Suma de Actividades)", f"${total_inversion:,.2f}")
+    
+    st.divider()
+    
+    # --- SECCIÓN 2: PÉRDIDA Y GANANCIA ---
+    st.subheader("📊 Estado de Pérdidas y Ganancias (Último Año)")
+    with get_connection() as conn:
+        df_pg = pd.read_sql(f"SELECT id, anio, ingresos, egresos, resultado FROM perdida_ganancia WHERE empresa_id={empresa_id}", conn)
+    
+    if df_pg.empty:
+        df_pg = pd.DataFrame([{'anio': '2025', 'ingresos': 0.0, 'egresos': 0.0, 'resultado': 0.0}])
+    
+    edited_pg = st.data_editor(df_pg, num_rows="dynamic", key="editor_pg_v2", use_container_width=True, disabled=['id', 'resultado'])
+    if st.button("💾 Guardar P&G"):
+        edited_pg['resultado'] = edited_pg['ingresos'] - edited_pg['egresos']
+        with get_connection() as conn:
+            conn.execute("DELETE FROM perdida_ganancia WHERE empresa_id=?", (empresa_id,))
+            edited_pg['empresa_id'] = empresa_id
+            if 'id' in edited_pg.columns: edited_pg = edited_pg.drop(columns=['id'])
+            edited_pg.to_sql('perdida_ganancia', conn, if_exists='append', index=False)
+        st.success("Datos de P&G guardados."); st.rerun()
+    
+    st.divider()
+    
+    # --- SECCIÓN 3: FLUJO DE CAJA PROYECTADO ---
+    st.subheader("📈 Flujo de Caja Proyectado")
+    anios_proy = st.selectbox("A cuántos años desea proyectar?", [1, 2, 3, 4, 5], index=2, key="sel_anios")
+    
+    with get_connection() as conn:
+        df_fc = pd.read_sql(f"SELECT id, anio_proyeccion, saldo_inicial, ingreso, egreso, flujo_neto, saldo_final FROM flujo_caja WHERE empresa_id={empresa_id}", conn)
+    
+    if len(df_fc) != anios_proy:
+        df_fc = pd.DataFrame([{'anio_proyeccion': i+1, 'saldo_inicial': 0.0, 'ingreso': 0.0, 'egreso': 0.0, 'flujo_neto': 0.0, 'saldo_final': 0.0} for i in range(anios_proy)])
+    
+    edited_fc = st.data_editor(df_fc, num_rows="fixed", key="editor_fc_v2", use_container_width=True, disabled=['id', 'anio_proyeccion', 'flujo_neto', 'saldo_final'])
+    
+    if st.button("🧮 Calcular y Guardar Flujo"):
+        for idx in range(len(edited_fc)):
+            if idx > 0: edited_fc.at[idx, 'saldo_inicial'] = edited_fc.at[idx-1, 'saldo_final']
+            edited_fc.at[idx, 'flujo_neto'] = edited_fc.at[idx, 'ingreso'] - edited_fc.at[idx, 'egreso']
+            edited_fc.at[idx, 'saldo_final'] = edited_fc.at[idx, 'saldo_inicial'] + edited_fc.at[idx, 'flujo_neto']
+        
+        with get_connection() as conn:
+            conn.execute("DELETE FROM flujo_caja WHERE empresa_id=?", (empresa_id,))
+            edited_fc['empresa_id'] = empresa_id
+            if 'id' in edited_fc.columns: edited_fc = edited_fc.drop(columns=['id'])
+            edited_fc.to_sql('flujo_caja', conn, if_exists='append', index=False)
+        st.success("Flujo de caja guardado."); st.rerun()
+    
+    st.divider()
+    
+    # --- SECCIÓN 4: ANÁLISIS COSTO / BENEFICIO (C/B) ---
+    st.subheader("💰 Análisis de Costo / Beneficio (C/B)")
+    
+    with get_connection() as conn:
+        pe_data = pd.read_sql(f"SELECT * FROM punto_equilibrio WHERE empresa_id={empresa_id}", conn)
+    
+    if pe_data.empty:
+        pe_data = pd.DataFrame([{'costo_fijo_total': total_inversion, 'precio_venta_unidad': 0.0, 'costo_variable_unidad': 0.0, 'unidades_producidas': 0.0}])
+    
+    with st.form("form_cb"):
+        col1, col2 = st.columns(2)
+        with col1:
+            cf = st.number_input("Costo Fijo Total (Inversión)", value=float(total_inversion), help="Tomado automáticamente de la Operativización")
+            pv = st.number_input("Precio de Venta por Unidad ($)", value=float(pe_data.iloc[0]['precio_venta_unidad']))
+        with col2:
+            cv = st.number_input("Costo Variable por Unidad ($)", value=float(pe_data.iloc[0]['costo_variable_unidad']))
+            unidades = st.number_input("Unidades Producidas/Vendidas estimadas", value=float(pe_data.iloc[0]['unidades_producidas']))
+        
+        if st.form_submit_button("📊 Calcular Punto de Equilibrio y Retorno"):
+            with get_connection() as conn:
+                conn.execute("DELETE FROM punto_equilibrio WHERE empresa_id=?", (empresa_id,))
+                conn.execute("INSERT INTO punto_equilibrio (empresa_id, costo_fijo_total, precio_venta_unidad, costo_variable_unidad, unidades_producidas) VALUES (?,?,?,?,?)", 
+                             (empresa_id, cf, pv, cv, unidades))
+            st.success("Datos de C/B guardados."); st.rerun()
+    
+    # Cálculos de C/B
+    cf = float(pe_data.iloc[0]['costo_fijo_total'])
+    pv = float(pe_data.iloc[0]['precio_venta_unidad'])
+    cv = float(pe_data.iloc[0]['costo_variable_unidad'])
+    
+    margen_contribucion = pv - cv
+    if margen_contribucion > 0:
+        pe_unidades = cf / margen_contribucion
+        pe_dolares = pe_unidades * pv
+        
+        # Tiempo de retorno basado en flujo de caja neto promedio
+        flujo_neto_total = edited_fc['flujo_neto'].sum() if not edited_fc.empty else 0
+        flujo_promedio_mensual = (flujo_neto_total / (len(edited_fc) * 12)) if len(edited_fc) > 0 else 0
+        tiempo_retorno = (cf / flujo_promedio_mensual) if flujo_promedio_mensual > 0 else 0
+        
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Punto de Equilibrio (Unidades)", f"{pe_unidades:,.0f} und")
+        c2.metric("Punto de Equilibrio (Dólares)", f"${pe_dolares:,.2f}")
+        c3.metric("Tiempo de Retorno Est.", f"{tiempo_retorno:.1f} meses" if tiempo_retorno > 0 else "N/A")
+        
+        st.write(f"**Análisis:** Para recuperar la inversión de **${cf:,.2f}**, la empresa debe vender al menos **{pe_unidades:,.0f} unidades**, lo que representa una facturación de **${pe_dolares:,.2f}**.")
+    else:
+        st.warning("El Precio de Venta debe ser mayor al Costo Variable para calcular el Punto de Equilibrio.")
+
+with tab6:
     st.header("Resumen, Conclusiones y Exportación")
-    st.subheader("📥 Exportar Plan Estratégico a PDF")
-    st.info("Asegúrate de haber completado todas las secciones anteriores para un informe completo. El formato será A4 con estilos APA.")
     with st.form("pdf_form"):
         pdf_version = st.text_input("Versión del Plan Estratégico", "1.0")
-        pdf_coordinador = st.text_input("Nombre del Coordinador que revisa", "Jefe de Proyecto")
-        submitted = st.form_submit_button("🚀 Generar y Descargar PDF")
-        if submitted:
-            with st.spinner("Recopilando datos, generando gráficos y construyendo el PDF..."):
-                pdf_bytes = generar_pdf_completo(empresa_id, pdf_version, pdf_coordinador)
-                st.session_state['pdf_file'] = pdf_bytes
+        pdf_coordinador = st.text_input("Nombre del Coordinador", "Jefe de Proyecto")
+        if st.form_submit_button("🚀 Generar y Descargar PDF"):
+            pdf_bytes = generar_pdf_completo(empresa_id, pdf_version, pdf_coordinador)
+            st.session_state['pdf_file'] = pdf_bytes
     if 'pdf_file' in st.session_state:
-        st.download_button(
-            label="✅ Descargar PDF Ahora",
-            data=st.session_state['pdf_file'],
-            file_name=f"Plan_Estrategico_{empresa_seleccionada.replace(' ', '_')}_V{pdf_version}.pdf",
-            mime="application/pdf"
-        )
+        st.download_button(label="✅ Descargar PDF Ahora", data=st.session_state['pdf_file'], file_name=f"Plan_Estrategico_V{pdf_version}.pdf", mime="application/pdf")
