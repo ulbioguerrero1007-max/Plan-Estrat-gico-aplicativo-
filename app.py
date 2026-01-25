@@ -1007,19 +1007,27 @@ def pantalla_acceso():
         if st.button("Finalizar Registro"):
             if nombre and usuario and correo and clave:
                 try:
+                    # 1. Intentar el registro en Auth
                     res = supabase.auth.sign_up({"email": correo, "password": clave})
+                    
                     if res.user:
-                        # Asumiendo que tienes una tabla 'perfiles' como en el código original
-                        # Si no existe, esta parte fallará, pero se mantiene para replicar la funcionalidad de registro
-                        supabase.table('perfiles').insert({
-                            "id": res.user.id,
-                            "username": usuario.lower().strip(),
-                            "nombre_completo": nombre,
-                            "email": correo
-                        }).execute()
-                        st.success("¡Cuenta creada! Intenta entrar ahora.")
+                        # 2. Intentar insertar en la tabla perfiles
+                        try:
+                            perfil_data = {
+                                "id": res.user.id,
+                                "username": usuario.lower().strip(),
+                                "nombre_completo": nombre,
+                                "email": correo
+                            }
+                            supabase.table('perfiles').insert(perfil_data).execute()
+                            st.success("¡Cuenta creada exitosamente! Ya puedes iniciar sesión.")
+                        except Exception as db_error:
+                            st.warning(f"Usuario creado en Auth, pero hubo un problema con el perfil: {db_error}")
+                            st.info("Intenta iniciar sesión; si el error persiste, contacta al administrador.")
+                    else:
+                        st.error("No se pudo crear el usuario en el sistema de autenticación.")
                 except Exception as e:
-                    st.error(f"Error técnico: {e}")
+                    st.error(f"Error en el registro: {e}")
             else:
                 st.warning("Por favor, llena todos los campos.")
 
