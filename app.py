@@ -48,7 +48,7 @@ st.markdown("""
 # 2. MOTORES LÓGICOS (EL CEREBRO)
 # ==========================================
 
-ef conectar_supabase():
+def conectar_supabase():
     """Establece conexión con la base de datos eterna."""
     try:
         # st.secrets lee tus credenciales de Streamlit Cloud
@@ -194,5 +194,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
