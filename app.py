@@ -526,8 +526,12 @@ def aplicacion_principal():
             df.rename(columns=column_mapping, inplace=True)
             p_cols = ['Producto', 'Precio', 'Plaza', 'Promocion']
             for col in p_cols:
-                if col in df.columns:
+                if col not in df.columns:
+                    df[col] = "no" # Valor por defecto si la columna no existe
+                else:
                     df[col] = df[col].astype(str).str.lower()
+            
+            # Cálculo del total basado en las columnas de marketing mix (si/no)
             df['Total'] = df[p_cols].apply(lambda row: row.str.contains('si', na=False)).sum(axis=1)
             numeric_cols = ['Rating', 'Weight %']
             for col in numeric_cols:
