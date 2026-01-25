@@ -1007,25 +1007,24 @@ def pantalla_acceso():
         if st.button("Finalizar Registro"):
             if nombre and usuario and correo and clave:
                 try:
-                    # 1. Intentar el registro en Auth
-                    res = supabase.auth.sign_up({"email": correo, "password": clave})
+                    # Registramos al usuario enviando los datos adicionales como metadatos
+                    # El Trigger en Supabase se encargará de crear el perfil automáticamente
+                    res = supabase.auth.sign_up({
+                        "email": correo, 
+                        "password": clave,
+                        "options": {
+                            "data": {
+                                "full_name": nombre,
+                                "username": usuario.lower().strip()
+                            }
+                        }
+                    })
                     
                     if res.user:
-                        # 2. Intentar insertar en la tabla perfiles
-                        try:
-                            perfil_data = {
-                                "id": res.user.id,
-                                "username": usuario.lower().strip(),
-                                "nombre_completo": nombre,
-                                "email": correo
-                            }
-                            supabase.table('perfiles').insert(perfil_data).execute()
-                            st.success("¡Cuenta creada exitosamente! Ya puedes iniciar sesión.")
-                        except Exception as db_error:
-                            st.warning(f"Usuario creado en Auth, pero hubo un problema con el perfil: {db_error}")
-                            st.info("Intenta iniciar sesión; si el error persiste, contacta al administrador.")
+                        st.success("¡Registro solicitado con éxito!")
+                        st.info("Si has configurado la confirmación por correo, por favor revísalo. Si no, ya puedes intentar iniciar sesión.")
                     else:
-                        st.error("No se pudo crear el usuario en el sistema de autenticación.")
+                        st.error("No se pudo completar el registro en el servidor.")
                 except Exception as e:
                     st.error(f"Error en el registro: {e}")
             else:
