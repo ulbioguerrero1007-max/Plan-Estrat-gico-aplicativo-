@@ -124,41 +124,35 @@ def pantalla_acceso():
         
         if st.button("Acceder"):
             try:
-                # Intentamos login con Supabase
                 res = supabase.auth.sign_in_with_password({"email": identificador, "password": password})
                 st.session_state.user = res.user
                 st.session_state.logged_in = True
                 st.success("¡Bienvenido!")
                 st.rerun()
             except Exception as e:
-                st.error("Credenciales incorrectas o usuario no encontrado.")
+                st.error(f"Error al entrar: {e}")
 
-            else:
-            st.subheader("📝 Registro de Nuevo Consultor")
-            nombre = st.text_input("Nombre Completo")
-            usuario = st.text_input("Nombre de Usuario (sin @)")
-            correo = st.text_input("Correo Electrónico")
-            clave = st.text_input("Contraseña", type="password")
-            
-            if st.button("Finalizar Registro"):
-                if nombre and usuario and correo and clave:
-                    try:
-                        # 1. Crear usuario en Auth
-                        res = supabase.auth.sign_up({"email": correo, "password": clave})
-                        if res.user:
-                            # 2. Crear perfil en nuestra tabla 'perfiles'
-                            supabase.table('perfiles').insert({
-                                "id": res.user.id,
-                                "username": usuario.lower().strip(),
-                                "nombre_completo": nombre,
-                                "email": correo
-                            }).execute()
-                            st.success("¡Cuenta creada! Intenta entrar ahora.")
-                    except Exception as e:
-                        # Esto nos dirá el error real sin errores de alineación
-                        st.error(f"Error técnico: {e}")
-                else:
-                    st.warning("Por favor, llena todos los campos.")
+    else:
+        st.subheader("📝 Registro de Nuevo Consultor")
+        nombre = st.text_input("Nombre Completo")
+        usuario = st.text_input("Nombre de Usuario (sin @)")
+        correo = st.text_input("Correo Electrónico")
+        clave = st.text_input("Contraseña", type="password")
+        
+        if st.button("Finalizar Registro"):
+            if nombre and usuario and correo and clave:
+                try:
+                    res = supabase.auth.sign_up({"email": correo, "password": clave})
+                    if res.user:
+                        supabase.table('perfiles').insert({
+                            "id": res.user.id,
+                            "username": usuario.lower().strip(),
+                            "nombre_completo": nombre,
+                            "email": correo
+                        }).execute()
+                        st.success("¡Cuenta creada! Intenta entrar ahora.")
+                except Exception as e:
+                    st.error(f"Error técnico: {e}")
             else:
                 st.warning("Por favor, llena todos los campos.")
                 
@@ -197,6 +191,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
