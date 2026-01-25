@@ -1,6 +1,5 @@
 streamlit
-supabase
 pandas
-matplotlib
-numpy
-reportlab
+supabase
+openai
+plotly
