@@ -48,19 +48,24 @@ st.markdown("""
 # 2. MOTORES LÓGICOS (EL CEREBRO)
 # ==========================================
 
-def conectar_supabase():
+ef conectar_supabase():
     """Establece conexión con la base de datos eterna."""
     try:
-        return create_client(st.secrets["supabase_url"], st.secrets["supabase_key"])
-    except:
+        # st.secrets lee tus credenciales de Streamlit Cloud
+        url = st.secrets["supabase_url"]
+        key = st.secrets["supabase_key"]
+        return create_client(url, key)
+    except Exception as e:
+        # Si algo falla, nos avisará aquí
+        st.error(f"Error de conexión: {e}")
         return None
 
+# ESTA ES LA LÍNEA CLAVE: Creamos la conexión para que todo el código la vea
+supabase = conectar_supabase()
+
 def analizar_foda_profesional(df_foda):
-    """Procesa la matriz FODA y devuelve resultados estratégicos."""
-    if df_foda.empty: return None
-    # Lógica simplificada para el ejemplo
-    puntajes = df_foda.groupby('cuadrante')['impacto'].sum()
-    return puntajes
+    # ... resto de tus funciones ...
+    pass
 
 # ==========================================
 # 3. COMPONENTES DE LA INTERFAZ (LA CARA)
@@ -189,4 +194,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
