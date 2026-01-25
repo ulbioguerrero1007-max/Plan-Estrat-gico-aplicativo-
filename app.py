@@ -56,8 +56,9 @@ def conectar_supabase():
         key = st.secrets["supabase_key"]
         return create_client(url, key)
        except Exception as e:
-                    # Esto nos dirá el error real que envía Supabase
-                    st.error(f"Error técnico: {e}")
+        # Si algo falla, nos avisará aquí
+        st.error(f"Error de conexión: {e}")
+        return None
 
 # ESTA ES LA LÍNEA CLAVE: Creamos la conexión para que todo el código la vea
 supabase = conectar_supabase()
@@ -196,6 +197,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
