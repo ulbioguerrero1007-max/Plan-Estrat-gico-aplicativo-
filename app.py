@@ -112,22 +112,48 @@ def pantalla_acceso():
     
     opcion = st.sidebar.radio("Acceso al Sistema", ["Entrar", "Crear Cuenta"])
     
-    with st.container():
-        if opcion == "Entrar":
-            st.subheader("🔐 Iniciar Sesión")
-            st.text_input("Correo o Usuario")
-            st.text_input("Contraseña", type="password")
-            if st.button("Acceder"):
+    if opcion == "Entrar":
+        st.subheader("🔐 Iniciar Sesión")
+        identificador = st.text_input("Correo o Usuario")
+        password = st.text_input("Contraseña", type="password")
+        
+        if st.button("Acceder"):
+            try:
+                # Intentamos login con Supabase
+                res = supabase.auth.sign_in_with_password({"email": identificador, "password": password})
+                st.session_state.user = res.user
                 st.session_state.logged_in = True
+                st.success("¡Bienvenido!")
                 st.rerun()
-        else:
-            st.subheader("📝 Registro de Nuevo Consultor")
-            st.text_input("Nombre Completo")
-            st.text_input("Nombre de Usuario (@usuario)")
-            st.text_input("Correo Electrónico")
-            st.text_input("Contraseña", type="password")
-            st.button("Finalizar Registro")
+            except Exception as e:
+                st.error("Credenciales incorrectas o usuario no encontrado.")
 
+    else:
+        st.subheader("📝 Registro de Nuevo Consultor")
+        nombre = st.text_input("Nombre Completo")
+        usuario = st.text_input("Nombre de Usuario (sin @)")
+        correo = st.text_input("Correo Electrónico")
+        clave = st.text_input("Contraseña", type="password")
+        
+        if st.button("Finalizar Registro"):
+            if nombre and usuario and correo and clave:
+                try:
+                    # 1. Crear usuario en Auth
+                    res = supabase.auth.sign_up({"email": correo, "password": clave})
+                    if res.user:
+                        # 2. Crear perfil en nuestra tabla 'perfiles'
+                        supabase.table('perfiles').insert({
+                            "id": res.user.id,
+                            "username": usuario.lower().strip(),
+                            "nombre_completo": nombre,
+                            "email": correo
+                        }).execute()
+                        st.success("¡Cuenta creada! Revisa tu correo para confirmar (si está activo) o intenta entrar.")
+                except Exception as e:
+                    st.error(f"Error al registrar: {e}")
+            else:
+                st.warning("Por favor, llena todos los campos.")
+                
 # ==========================================
 # 5. FLUJO PRINCIPAL (MAIN)
 # ==========================================
@@ -163,3 +189,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
