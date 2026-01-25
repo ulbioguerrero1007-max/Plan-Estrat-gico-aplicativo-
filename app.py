@@ -539,6 +539,7 @@ def aplicacion_principal():
                     df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
             df['Valor'] = df.get('Rating', 0) * (df.get('Weight %', 0) / 100.0)
             df['empresa_id'] = empresa_id
+            df['tipo_matriz'] = tipo
             df_to_db = df.rename(columns={
                 'Variable': 'variable', 'Factor': 'factor', 'Producto': 'producto', 'Precio': 'precio',
                 'Plaza': 'plaza', 'Promocion': 'promocion', 'Rating': 'rating', 'Weight %': 'weight_percent',
