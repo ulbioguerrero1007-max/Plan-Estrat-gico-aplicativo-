@@ -59,13 +59,8 @@ def generar_analisis(prompt, client):
             return response.choices[0].message.content
         except Exception as e:
             err_msg = str(e)
-            # Si el modelo no es válido (400) o está saturado (429), saltamos al siguiente
-            if any(code in err_msg for code in ["400", "429"]) or \
-               any(keyword in err_msg.lower() for keyword in ["rate_limit", "not a valid model", "authentication"]):
-                errores.append(f"{modelo} (No disponible)")
-                continue
-            
-            errores.append(f"{modelo} (Error: {err_msg[:50]}...)")
+            # Capturamos el error real para diagnóstico
+            errores.append(f"{modelo}: {err_msg}")
             continue
             
     return f"No se pudo generar el análisis. Los modelos de Groq están saturados o no disponibles en este momento. Por favor, intenta de nuevo en unos instantes. (Intentados: {', '.join(errores)})"
