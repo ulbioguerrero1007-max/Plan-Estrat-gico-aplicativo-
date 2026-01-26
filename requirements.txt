@@ -1,7 +1,7 @@
 streamlit
 openai>=1.0.0
 pandas
-sqlite3
-supabase
-matplotlib
 reportlab
+matplotlib
+numpy
+supabase
