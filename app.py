@@ -16,6 +16,31 @@ import matplotlib.pyplot as plt
 import numpy as np
 import unicodedata
 from supabase import create_client, Client
+
+def get_ia_client():
+    if "openrouter_api_key" in st.secrets:
+        return OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=st.secrets["openrouter_api_key"],
+        )
+    return None
+
+def generar_analisis_ia(tipo_matriz, datos_contexto):
+    client = get_ia_client()
+    if not client:
+        return "Error: No se encontró la API Key de OpenRouter en st.secrets."
+    
+    prompt = f"Actúa como un consultor senior de estrategia. Analiza la siguiente matriz {tipo_matriz} y proporciona conclusiones estratégicas clave, riesgos y recomendaciones. Datos: {datos_contexto}"
+    
+    try:
+        response = client.chat.completions.create(
+            model="google/gemini-2.0-flash-001", # Modelo por defecto en OpenRouter
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Error al generar análisis: {e}"
+
 st.set_page_config( page_title="Estratega Pro | Business Intelligence", page_icon="♟️", layout="wide",
     initial_sidebar_state="expanded")
 st.markdown("""
@@ -448,10 +473,19 @@ def aplicacion_principal():
                         st.info(f"**Resultado Moderado ({total_score}):** El entorno de marketing es estable.")
                     else:
                         st.warning(f"**Resultado Desfavorable ({total_score}):** El entorno presenta amenazas considerables.")
+                
                 with st.form(f"form_analisis_{tipo_matriz.lower()}"):
-                    st.subheader("Análisis Propio")
-                    analisis_propio = st.text_area(f"Añade aquí tus conclusiones sobre la matriz {tipo_matriz}.", value=analisis_propio_data)
+                    st.subheader("Análisis Estratégico")
+                    if st.form_submit_button("🤖 Generar Análisis con IA"):
+                        with st.spinner("La IA está analizando los datos..."):
+                            contexto = df_db.to_string()
+                            analisis_ia = generar_analisis_ia(tipo_matriz, contexto)
+                            st.session_state[f"ia_analisis_{tipo_matriz}"] = analisis_ia
+                    
+                    current_analisis = st.session_state.get(f"ia_analisis_{tipo_matriz}", analisis_propio_data)
+                    analisis_propio = st.text_area(f"Conclusiones sobre la matriz {tipo_matriz}.", value=current_analisis, height=300)
                     if st.form_submit_button("Guardar Análisis"):
+
                         with get_connection() as conn:
                             conn.execute(f"UPDATE empresas SET analisis_{tipo_matriz.lower()}=? WHERE id=?", (analisis_propio, empresa_id))
                         st.success(f"Análisis de {tipo_matriz} guardado."); st.rerun()
