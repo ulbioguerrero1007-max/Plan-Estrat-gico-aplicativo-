@@ -751,26 +751,46 @@ def aplicacion_principal():
                         st.code(resultado_ia)
 
             if not df_estrategias_existentes.empty:
-                for cuadrante in ['FO', 'FA', 'DO', 'DA']:
-                    st.subheader(f"Cuadrante {cuadrante}")
-                    df_q = df_estrategias_existentes[df_estrategias_existentes['cuadrante'] == cuadrante]
-                    for _, row in df_q.iterrows():
-                        with st.expander(f"**{row['estrategia']}** (Importancia: {row['importancia']})"):
-                            actividades = row['actividades'].split(';')
-                            for i, act in enumerate(actividades, 1):
-                                st.write(f"{i}. {act.strip()}")
+                st.subheader("Edición de Estrategias Generadas")
+                edited_strategies = st.data_editor(
+                    df_estrategias_existentes,
+                    num_rows="dynamic",
+                    key="editor_estrategias",
+                    use_container_width=True,
+                    disabled=['id', 'empresa_id'],
+                    column_config={
+                        "cuadrante": st.column_config.SelectboxColumn("Cuadrante", options=["FO", "FA", "DO", "DA"]),
+                        "estrategia": st.column_config.TextColumn("Estrategia"),
+                        "importancia": st.column_config.SelectboxColumn("Importancia", options=["Alta", "Media Alta", "Media Baja", "Baja"]),
+                        "actividades": st.column_config.TextColumn("Actividades (separadas por ;)")
+                    }
+                )
                 
-                if st.button("🚀 Enviar Estrategias a Operativización"):
-                    with get_connection() as conn:
-                        for _, row in df_estrategias_existentes.iterrows():
-                            actividades = row['actividades'].split(';')
-                            for act in actividades:
-                                conn.execute("""INSERT INTO operativizacion 
-                                    (empresa_id, plan, estrategia, actividades, plazo, responsable, recurso, costo) 
-                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                                    (empresa_id, "Estratégico", row['estrategia'], act.strip(), "Por definir", "Por definir", "Por definir", 0.0))
-                    st.success("Estrategias y actividades enviadas a la pestaña de Operativización.")
-
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("💾 Guardar Cambios en Estrategias"):
+                        with get_connection() as conn:
+                            conn.execute("DELETE FROM estrategias_generadas WHERE empresa_id=?", (empresa_id,))
+                            if 'id' in edited_strategies.columns:
+                                edited_strategies = edited_strategies.drop(columns=['id'])
+                            edited_strategies['empresa_id'] = empresa_id
+                            edited_strategies.to_sql('estrategias_generadas', conn, if_exists='append', index=False)
+                        st.success("Estrategias actualizadas correctamente."); st.rerun()
+                
+                with col2:
+                    if st.button("🚀 Enviar Estrategias a Operativización"):
+                        with get_connection() as conn:
+                            # Limpiar operativización previa de tipo 'Estratégico' para esta empresa si se desea evitar duplicados
+                            # conn.execute("DELETE FROM operativizacion WHERE empresa_id=? AND plan='Estratégico'", (empresa_id,))
+                            for _, row in edited_strategies.iterrows():
+                                actividades = str(row['actividades']).split(';')
+                                for act in actividades:
+                                    if act.strip():
+                                        conn.execute("""INSERT INTO operativizacion 
+                                            (empresa_id, plan, estrategia, actividades, plazo, responsable, recurso, costo) 
+                                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                                            (empresa_id, "Estratégico", row['estrategia'], act.strip(), "Por definir", "Por definir", "Por definir", 0.0))
+                        st.success("Estrategias y actividades enviadas a la pestaña de Operativización.")
     with tab3:
         st.header("Planes Estratégicos")
         if st.button("⚙️ Generar Borrador de Planes"):
