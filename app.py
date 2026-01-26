@@ -42,10 +42,10 @@ def generar_analisis_ia(tipo_matriz, datos_contexto):
 def generar_analisis(prompt, client):
     # Lista de modelos verificados y estables en Groq
     modelos_groq = [
-        "llama-3.3-70b-versatile",
-        "llama-3.1-8b-instant",
-        "mixtral-8x7b-32768",
-        "gemma2-9b-it"
+        "llama-3.3-70b-specdec",
+        "llama-3.2-11b-vision-preview",
+        "llama-3.1-70b-versatile",
+        "llama-3.1-8b-instant"
     ]
     errores = []
     for modelo in modelos_groq:
@@ -705,16 +705,14 @@ def aplicacion_principal():
                         conn.execute("UPDATE empresas SET analisis_foda=? WHERE id=?", (analisis_propio_foda, empresa_id))
                     st.success("Análisis de FODA guardado."); st.rerun()
 
-    with tab_est:
+        with tab_est:
         st.header("🎯 Formulación de Estrategias")
         st.info("En esta sección se generan 12 estrategias (3 por cuadrante) basadas en el FODA Cruzado, cada una con 5 actividades específicas.")
         
-        # Inicializar estado de la sesión si no existe
         if 'df_estrategias_temp' not in st.session_state:
             with get_connection() as conn:
                 st.session_state.df_estrategias_temp = pd.read_sql(f"SELECT * FROM estrategias_generadas WHERE empresa_id={empresa_id}", conn)
 
-        # Botón de generación
         with get_connection() as conn:
             df_foda_final = pd.read_sql(f"SELECT cuadrante, factor_fila, factor_columna, impacto FROM foda_cruzado WHERE empresa_id={empresa_id}", conn)
 
@@ -724,27 +722,20 @@ def aplicacion_principal():
             if st.button("🤖 Generar 12 Estrategias Maestras con IA"):
                 with st.spinner("La IA está diseñando las estrategias y actividades..."):
                     client = get_ia_client()
-                    contexto_foda = df_foda_final.to_string()
-                    prompt_est = f"""Actúa como un Director de Estrategia (CSO). Basado en este FODA Cruzado:
-                    {contexto_foda}
-                    Genera exactamente 12 estrategias (3 para cada cuadrante: FO, FA, DO, DA).
-                    Para cada estrategia, define 5 actividades concretas para su cumplimiento.
-                    Clasifica la importancia de cada estrategia según su impacto en el FODA.
+                    # Optimización: Solo enviar datos esenciales para no saturar tokens
+                    contexto_reducido = df_foda_final[['cuadrante', 'factor_fila', 'factor_columna']].to_string(index=False)
                     
-                    Responde ÚNICAMENTE en este formato de texto plano, una por línea:
-                    CUADRANTE|ESTRATEGIA|IMPORTANCIA|ACTIVIDAD1;ACTIVIDAD2;ACTIVIDAD3;ACTIVIDAD4;ACTIVIDAD5
-                    
-                    Ejemplo:
-                    FO|Expandir mercado digital|Alta|Crear web;Pautar en RRSS;SEO;Email marketing;Influencers
-                    
-                    No incluyas encabezados, ni bloques de código, ni explicaciones. Solo las 12 líneas."""
+                    prompt_est = f"""Actúa como Director de Estrategia. Basado en este FODA Cruzado:
+                    {contexto_reducido}
+                    Genera 12 estrategias (3 por cuadrante: FO, FA, DO, DA).
+                    Para cada una, define 5 actividades cortas.
+                    Formato: CUADRANTE|ESTRATEGIA|IMPORTANCIA|ACT1;ACT2;ACT3;ACT4;ACT5
+                    No incluyas nada más que las 12 líneas de texto."""
                     
                     resultado_ia = generar_analisis(prompt_est, client)
                     
-                    # Procesamiento manual ultra-robusto
                     nuevas_filas = []
-                    lineas = resultado_ia.strip().split('\n')
-                    for line in lineas:
+                    for line in resultado_ia.strip().split('\n'):
                         partes = line.split('|')
                         if len(partes) >= 4:
                             nuevas_filas.append({
@@ -757,40 +748,25 @@ def aplicacion_principal():
                     
                     if nuevas_filas:
                         df_nuevas = pd.DataFrame(nuevas_filas)
-                        # Limpiar y guardar
                         with get_connection() as conn:
                             conn.execute("DELETE FROM estrategias_generadas WHERE empresa_id=?", (empresa_id,))
                             df_nuevas.to_sql('estrategias_generadas', conn, if_exists='append', index=False)
-                        
                         st.session_state.df_estrategias_temp = df_nuevas
-                        st.success(f"¡Se han generado {len(nuevas_filas)} estrategias!")
-                        st.rerun()
+                        st.success("Estrategias generadas."); st.rerun()
                     else:
-                        st.error("La IA no devolvió el formato esperado. Intenta de nuevo.")
-                        with st.expander("Ver respuesta de la IA"):
-                            st.text(resultado_ia)
+                        st.error("Error en formato de IA. Revisa la conexión.")
 
             st.subheader("Edición de Estrategias Generadas")
-            
-            # Preparar DataFrame para el editor
             df_editor = st.session_state.df_estrategias_temp.copy()
-            # Asegurar que las columnas necesarias existan
             for col in ['cuadrante', 'estrategia', 'importancia', 'actividades']:
-                if col not in df_editor.columns:
-                    df_editor[col] = ""
+                if col not in df_editor.columns: df_editor[col] = ""
             
-            # Mostrar el editor
             edited_df = st.data_editor(
-                df_editor,
-                num_rows="dynamic",
-                key="editor_final_v4",
-                use_container_width=True,
+                df_editor, num_rows="dynamic", key="editor_v5", use_container_width=True,
                 disabled=['id', 'empresa_id'],
                 column_config={
                     "cuadrante": st.column_config.SelectboxColumn("Cuadrante", options=["FO", "FA", "DO", "DA"]),
-                    "estrategia": st.column_config.TextColumn("Estrategia"),
                     "importancia": st.column_config.SelectboxColumn("Importancia", options=["Alta", "Media Alta", "Media Baja", "Baja"]),
-                    "actividades": st.column_config.TextColumn("Actividades (separadas por ;)")
                 }
             )
             
@@ -804,25 +780,26 @@ def aplicacion_principal():
                         df_to_save['empresa_id'] = empresa_id
                         df_to_save.to_sql('estrategias_generadas', conn, if_exists='append', index=False)
                         st.session_state.df_estrategias_temp = df_to_save
-                    st.success("Cambios guardados."); st.rerun()
+                    st.success("Guardado."); st.rerun()
             
             with col2:
                 if st.button("🚀 Enviar a Operativización"):
+                    # LÓGICA DE DESGLOSE:
+                    # 1. Recorremos cada estrategia de la tabla
+                    # 2. Tomamos el campo 'actividades' y lo dividimos por el separador ';'
+                    # 3. Por cada actividad resultante, creamos una nueva entrada en el presupuesto
                     if not edited_df.empty:
                         with get_connection() as conn:
                             for _, row in edited_df.iterrows():
-                                if str(row['actividades']).strip():
-                                    acts = str(row['actividades']).split(';')
-                                    for a in acts:
-                                        if a.strip():
-                                            conn.execute("""INSERT INTO operativizacion 
-                                                (empresa_id, plan, estrategia, actividades, plazo, responsable, recurso, costo) 
-                                                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                                                (empresa_id, "Estratégico", row['estrategia'], a.strip(), "Por definir", "Por definir", "Por definir", 0.0))
-                        st.success("Enviado a Operativización.")
-                    else:
-                        st.warning("No hay datos para enviar.")
-    with tab3:
+                                lista_actividades = str(row['actividades']).split(';')
+                                for act_individual in lista_actividades:
+                                    if act_individual.strip():
+                                        conn.execute("""INSERT INTO operativizacion 
+                                            (empresa_id, plan, estrategia, actividades, plazo, responsable, recurso, costo) 
+                                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                                            (empresa_id, "Estratégico", row['estrategia'], act_individual.strip(), "Por definir", "Por definir", "Por definir", 0.0))
+                        st.success("¡Desglose completado! Revisa la pestaña de Operativización.")
+with tab3:
         st.header("Planes Estratégicos")
         if st.button("⚙️ Generar Borrador de Planes"):
             with st.spinner("Analizando diagnóstico..."):
