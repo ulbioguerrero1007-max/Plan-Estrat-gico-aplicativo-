@@ -37,9 +37,11 @@ def generar_analisis_ia(tipo_matriz, datos_contexto):
     prompt = f"Actúa como un consultor senior de estrategia. Analiza la siguiente matriz {tipo_matriz} y proporciona conclusiones estratégicas clave, riesgos y recomendaciones. Datos: {datos_contexto}"
     
     try:
-        response = client.chat.completions.create(
-    model="mistralai/mistral-7b-instruct:free",
-    messages=[{"role": "user", "content": prompt}]
+      response = client.chat.completions.create(
+    model="openrouter/auto",
+    messages=[
+        {"role": "user", "content": prompt}
+    ]
 )
         return response.choices[0].message.content
     except Exception as e:
@@ -857,6 +859,7 @@ def main():
 if __name__ == "__main__":
     init_db()
     main()
+
 
 
 
