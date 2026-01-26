@@ -39,15 +39,29 @@ def generar_analisis_ia(tipo_matriz, datos_contexto):
     return generar_analisis(prompt, client)
 
 def generar_analisis(prompt, client):
-    try:
-        response = client.chat.completions.create(
-            model="openrouter/auto",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        return response.choices[0].message.content
-
-    except Exception as e:
-        return f"Error al generar análisis: {e}"
+    # Lista de modelos gratuitos para intentar en orden si uno falla
+    modelos_gratuitos = [
+        "google/gemini-2.0-flash-exp:free",
+        "mistralai/mistral-7b-instruct:free",
+        "huggingfaceh4/zephyr-7b-beta:free",
+        "openrouter/auto" # Intento final por si acaso
+    ]
+    
+    ultimo_error = ""
+    for modelo in modelos_gratuitos:
+        try:
+            response = client.chat.completions.create(
+                model=modelo,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            ultimo_error = str(e)
+            if "402" in ultimo_error or "credits" in ultimo_error.lower():
+                continue # Probar el siguiente modelo gratuito
+            return f"Error al generar análisis: {e}"
+            
+    return f"No se pudo generar el análisis con modelos gratuitos. Error: {ultimo_error}"
 
 st.set_page_config( page_title="Estratega Pro | Business Intelligence", page_icon="♟️", layout="wide",
     initial_sidebar_state="expanded")
