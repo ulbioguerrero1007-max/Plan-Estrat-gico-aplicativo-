@@ -54,14 +54,58 @@ st.markdown("""
 
 # --- CONFIGURACIÓN DE SEGURIDAD (SUPABASE) ---
 def init_supabase():
+   # --- GESTIÓN DE AUTENTICACIÓN (SUPABASE) ---
+def login_user(email, password):
     try:
-        if "supabase_url" in st.secrets and "supabase_key" in st.secrets:
-            return create_client(st.secrets["supabase_url"], st.secrets["supabase_key"])
-        return None
-    except Exception:
+        response = supabase.auth.sign_in_with_password({"email": email, "password": password})
+        return response
+    except Exception as e:
+        st.error(f"Error al iniciar sesión: {e}")
         return None
 
-supabase = init_supabase()
+def register_user(email, password):
+    try:
+        response = supabase.auth.sign_up({"email": email, "password": password})
+        return response
+    except Exception as e:
+        st.error(f"Error al registrarse: {e}")
+        return None
+
+# Interfaz de Autenticación en el Sidebar o Pantalla Principal
+if 'user' not in st.session_state:
+    st.title("🔐 Acceso a Estratega Pro")
+    auth_mode = st.radio("Selecciona una opción", ["Iniciar Sesión", "Registrarse"])
+    
+    with st.form("auth_form"):
+        email = st.text_input("Correo Electrónico")
+        password = st.text_input("Contraseña", type="password")
+        submit = st.form_submit_button("Confirmar")
+        
+        if submit:
+            if auth_mode == "Iniciar Sesión":
+                res = login_user(email, password)
+                if res:
+                    st.session_state['user'] = res.user
+                    st.session_state['user_id'] = res.user.id
+                    st.success("¡Bienvenido!")
+                    st.rerun()
+            else:
+                res = register_user(email, password)
+                if res:
+                    st.info("Registro enviado. Revisa tu correo para confirmar (si es necesario).")
+    st.stop() # Detiene la ejecución hasta que se loguee
+
+# Si llegamos aquí, el usuario ya está logueado
+user_id = st.session_state['user_id']
+user_email = st.session_state['user'].email
+
+with st.sidebar:
+    st.write(f"👤 Usuario: **{user_email}**")
+    if st.button("Cerrar Sesión"):
+        supabase.auth.sign_out()
+        del st.session_state['user']
+        del st.session_state['user_id']
+        st.rerun()
 
 # --- GESTIÓN DE SESIÓN DE USUARIO ---
 if 'user_id' not in st.session_state:
@@ -290,3 +334,4 @@ if empresa_id:
 
 else:
     st.warning("Por favor, selecciona o crea una empresa en el menú lateral.")
+
