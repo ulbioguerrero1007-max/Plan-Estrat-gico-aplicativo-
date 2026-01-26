@@ -15,6 +15,7 @@ from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
 import matplotlib.pyplot as plt
 import numpy as np
 import unicodedata
+import time
 from supabase import create_client, Client
 
 def get_ia_client():
@@ -39,29 +40,36 @@ def generar_analisis_ia(tipo_matriz, datos_contexto):
     return generar_analisis(prompt, client)
 
 def generar_analisis(prompt, client):
-    # Lista de modelos gratuitos para intentar en orden si uno falla
+    # Lista ampliada de modelos gratuitos para mayor probabilidad de éxito
     modelos_gratuitos = [
         "google/gemini-2.0-flash-exp:free",
+        "google/learnlm-1.5-pro-experimental:free",
         "mistralai/mistral-7b-instruct:free",
+        "microsoft/phi-3-mini-128k-instruct:free",
         "huggingfaceh4/zephyr-7b-beta:free",
-        "openrouter/auto" # Intento final por si acaso
+        "meta-llama/llama-3.1-8b-instruct:free",
+        "qwen/qwen-2-7b-instruct:free"
     ]
     
-    ultimo_error = ""
+    errores = []
     for modelo in modelos_gratuitos:
         try:
             response = client.chat.completions.create(
                 model=modelo,
-                messages=[{"role": "user", "content": prompt}]
+                messages=[{"role": "user", "content": prompt}],
+                timeout=30
             )
             return response.choices[0].message.content
         except Exception as e:
-            ultimo_error = str(e)
-            if "402" in ultimo_error or "credits" in ultimo_error.lower():
-                continue # Probar el siguiente modelo gratuito
-            return f"Error al generar análisis: {e}"
+            err_msg = str(e)
+            # Si es error de créditos (402) o saturación (429), intentamos el siguiente
+            if "402" in err_msg or "429" in err_msg or "credits" in err_msg.lower() or "rate-limit" in err_msg.lower():
+                errores.append(f"{modelo}: Saturado/Sin créditos")
+                time.sleep(1) # Breve pausa antes de intentar con otro modelo
+                continue
+            return f"Error técnico al generar análisis con {modelo}: {e}"
             
-    return f"No se pudo generar el análisis con modelos gratuitos. Error: {ultimo_error}"
+    return f"Lo siento, todos los modelos gratuitos están saturados en este momento. Inténtalo de nuevo en unos minutos. Detalles: {', '.join(errores)}"
 
 st.set_page_config( page_title="Estratega Pro | Business Intelligence", page_icon="♟️", layout="wide",
     initial_sidebar_state="expanded")
