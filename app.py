@@ -41,18 +41,14 @@ def generar_analisis_ia(tipo_matriz, datos_contexto):
 
 def generar_analisis(prompt, client):
     # Lista de modelos gratuitos verificados y estables en OpenRouter
-    modelos_gratuitos = [
-    "meta-llama/llama-3-8b-instruct:free",
-    "mistralai/mistral-7b-instruct:free",
-    "qwen/qwen-2-7b-instruct:free"
-]
-
+    modelos_gratuitos = [ openrouter/auto ]
     errores = []
     for modelo in modelos_gratuitos:
         try:
             response = client.chat.completions.create(
                 model=modelo,
-                messages=[{"role": "user", "content": prompt}],
+                messages=[{"role": "system", "content": "Eres un analista estratégico empresarial."},
+                {"role": "user", "content": prompt}],
                 timeout=25 # Tiempo de espera ligeramente menor para agilizar la rotación
             )
             return response.choices[0].message.content
@@ -873,4 +869,5 @@ def main():
 if __name__ == "__main__":
     init_db()
     main()
+
 
