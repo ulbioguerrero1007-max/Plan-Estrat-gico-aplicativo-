@@ -814,7 +814,7 @@ with tab3:
                 with st.expander(f"**Plan {plan_nombre}**"):
                     st.info(plan_datos['introduccion'])
                     st.success(plan_datos['objetivo'])
-    with tab4:
+with tab4:
         st.header("CMI / Indicadores")
         if 'generated_plans_dict' not in st.session_state:
             st.warning("Primero debes generar los planes en la Pestaña 3.")
@@ -977,3 +977,4 @@ def main():
 if __name__ == "__main__":
     init_db()
     main()
+
