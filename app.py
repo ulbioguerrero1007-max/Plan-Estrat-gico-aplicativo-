@@ -42,12 +42,12 @@ def generar_analisis_ia(tipo_matriz, datos_contexto):
 def generar_analisis(prompt, client):
     # Lista de modelos gratuitos verificados y estables en OpenRouter
     modelos_gratuitos = [
-        "google/gemini-2.0-flash-exp:free",
-        "meta-llama/llama-3.1-8b-instruct:free",
-        "mistralai/mistral-7b-instruct:free",
+        "google/gemini-flash-1.5:free",
+        "meta-llama/llama-3-8b-instruct:free",
+        "mistralai/mistral-7b-instruct-v0.3:free",
+        "nousresearch/nous-hermes-2-mixtral-8x7b-dpo:free",
         "microsoft/phi-3-mini-128k-instruct:free",
-        "qwen/qwen-2-7b-instruct:free",
-        "huggingfaceh4/zephyr-7b-beta:free"
+        "qwen/qwen-2-7b-instruct:free"
     ]
     
     errores = []
