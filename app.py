@@ -18,12 +18,16 @@ import unicodedata
 from supabase import create_client, Client
 
 def get_ia_client():
-    if "openrouter_api_key" in st.secrets:
-        return OpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=st.secrets["openrouter_api_key"],
-        )
-    return None
+    api_key = st.secrets.get("OPENROUTER_API_KEY")
+
+    if not api_key:
+        st.error("❌ No se encontró la API Key de OpenRouter en st.secrets")
+        st.stop()
+
+    return OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=api_key,
+    )
 
 def generar_analisis_ia(tipo_matriz, datos_contexto):
     client = get_ia_client()
@@ -853,3 +857,4 @@ def main():
 if __name__ == "__main__":
     init_db()
     main()
+
