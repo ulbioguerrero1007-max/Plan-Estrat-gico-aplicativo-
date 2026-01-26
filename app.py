@@ -56,7 +56,7 @@ def generar_analisis(prompt, client):
                 model=modelo,
                 messages=[{"role": "system", "content": "Eres un analista estratégico empresarial."},
                 {"role": "user", "content": prompt}],
-                timeout=25 # Tiempo de espera ligeramente menor para agilizar la rotación
+                timeout=10 # Tiempo de espera ligeramente menor para agilizar la rotación
             )
             return response.choices[0].message.content
         except Exception as e:
@@ -876,6 +876,7 @@ def main():
 if __name__ == "__main__":
     init_db()
     main()
+
 
 
 
