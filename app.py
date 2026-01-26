@@ -695,36 +695,6 @@ def aplicacion_principal():
                     with get_connection() as conn:
                         conn.execute("UPDATE empresas SET analisis_foda=? WHERE id=?", (analisis_propio_foda, empresa_id))
                     st.success("Análisis de FODA guardado."); st.rerun()
-        st.divider()
-        st.header("🚀 Formulación de Estrategias Maestras")
-        with get_connection() as conn:
-            res_madi = pd.read_sql(f"SELECT SUM(valor) as score FROM matriz_marketing WHERE empresa_id={empresa_id} AND tipo_matriz='MADI'", conn)
-            madi_score = float(res_madi['score'].iloc[0] or 0)
-            res_made = pd.read_sql(f"SELECT SUM(valor) as score FROM matriz_marketing WHERE empresa_id={empresa_id} AND tipo_matriz='MADE'", conn)
-            made_score = float(res_made['score'].iloc[0] or 0)
-            empresa_data_pos = pd.read_sql(f"SELECT posicionamiento_x FROM empresas WHERE id={empresa_id}", conn).iloc[0]
-            coord_x_val = float(empresa_data_pos.get('posicionamiento_x') or 0)
-            df_foda_final = pd.read_sql(f"SELECT cuadrante, impacto FROM foda_cruzado WHERE empresa_id={empresa_id}", conn)
-        if not df_foda_final.empty:
-            _, _, estrategia_principal, _ = analizar_foda(df_foda_final)
-            col1, col2 = st.columns(2)
-            with col1:
-                st.subheader("🎯 Postura Estratégica")
-                st.write(f"Postura basada en {estrategia_principal}")
-            with col2:
-                st.subheader("🛠️ Ejes Estratégicos Relevantes")
-                st.markdown("- **Desarrollo de Capacidades Organizacionales**")
-            st.markdown("### 📋 Matriz de Estrategias Seleccionadas")
-            data_estrategias = { "Nivel": ["Corporativo", "Competitivo", "Operativo"], "Estrategia": [
-                    "Crecimiento Intensivo" if made_score > 0 else "Estabilidad y Consolidación",
-                    "Diferenciación" if coord_x_val > 0 else "Liderazgo en Costos",
-                    "Innovación Continua" if madi_score > 0 else "Optimización de Procesos"
-                ], "Justificación Técnica": [ f"Basado en un indicador MADE de {made_score:.2f}.",
-                    "Basado en la posición relativa en la matriz de mercado.",
-                    f"Orientado a fortalecer el desempeño interno (MADI: {madi_score:.2f})."]}
-            st.table(pd.DataFrame(data_estrategias))
-        else:
-            st.warning("Complete el Análisis FODA Cruzado para visualizar las Estrategias Maestras.")
     with tab3:
         st.header("Planes Estratégicos")
         if st.button("⚙️ Generar Borrador de Planes"):
