@@ -824,7 +824,7 @@ def aplicacion_principal():
                 st.session_state['df_cmi'] = df_cmi
             if 'df_cmi' in st.session_state:
                 st.dataframe(st.session_state['df_cmi'], use_container_width=True, height=500)
-  with tab5:
+   with tab5:
         st.header("Operativización / Presupuesto")
         st.subheader("📝 Cuadro de Operativización y Presupuesto (Cascada)")
         st.info("Estructura: Plan -> Estrategia -> Actividad. Los costos se suman por actividad.")
@@ -977,6 +977,7 @@ def main():
 if __name__ == "__main__":
     init_db()
     main()
+
 
 
 
