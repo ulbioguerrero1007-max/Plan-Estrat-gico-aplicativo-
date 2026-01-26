@@ -43,7 +43,7 @@ def generar_analisis_ia(tipo_matriz, datos_contexto):
         {"role": "user", "content": prompt}
     ]
 )
-        return response.choices[0].message.content
+    return response.choices[0].message.content
     except Exception as e:
         return f"Error al generar análisis: {e}"
 
@@ -859,6 +859,7 @@ def main():
 if __name__ == "__main__":
     init_db()
     main()
+
 
 
 
