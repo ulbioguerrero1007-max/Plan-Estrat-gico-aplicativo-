@@ -709,9 +709,11 @@ def aplicacion_principal():
         st.header("🎯 Formulación de Estrategias")
         st.info("En esta sección se generan 12 estrategias (3 por cuadrante) basadas en el FODA Cruzado, cada una con 5 actividades específicas.")
         
+        # Cargar datos iniciales
         with get_connection() as conn:
             df_foda_final = pd.read_sql(f"SELECT cuadrante, factor_fila, factor_columna, impacto FROM foda_cruzado WHERE empresa_id={empresa_id}", conn)
-            df_estrategias_existentes = pd.read_sql(f"SELECT * FROM estrategias_generadas WHERE empresa_id={empresa_id}", conn)
+            if 'df_estrategias_temp' not in st.session_state:
+                st.session_state.df_estrategias_temp = pd.read_sql(f"SELECT * FROM estrategias_generadas WHERE empresa_id={empresa_id}", conn)
 
         if df_foda_final.empty:
             st.warning("Primero debe completar el Análisis FODA Cruzado en la pestaña de Diagnóstico Situacional.")
@@ -729,38 +731,51 @@ def aplicacion_principal():
                     Responde ÚNICAMENTE en formato CSV con este encabezado exacto:
                     cuadrante|estrategia|importancia|actividades
                     Usa '|' como separador. En actividades, separa las 5 actividades con ';'.
-                    Las importancias deben ser: 'Alta', 'Media Alta', 'Media Baja' o 'Baja'."""
+                    Las importancias deben ser: 'Alta', 'Media Alta', 'Media Baja' o 'Baja'.
+                    No incluyas explicaciones, solo el CSV."""
                     
                     resultado_ia = generar_analisis(prompt_est, client)
                     try:
+                        # Limpieza robusta del resultado de la IA
                         csv_data = resultado_ia.strip()
-                        if "```csv" in csv_data:
-                            csv_data = csv_data.split("```csv")[1].split("```")[0].strip()
-                        elif "```" in csv_data:
-                            csv_data = csv_data.split("```")[1].split("```")[0].strip()
+                        if "```" in csv_data:
+                            csv_data = csv_data.split("```")[1]
+                            if csv_data.startswith("csv"):
+                                csv_data = csv_data[3:]
+                            csv_data = csv_data.split("```")[0].strip()
                         
+                        # Leer CSV y asegurar columnas
                         df_nuevas_est = pd.read_csv(StringIO(csv_data), sep='|')
+                        df_nuevas_est.columns = [c.strip().lower() for c in df_nuevas_est.columns]
+                        
+                        # Mapeo de columnas para asegurar consistencia
+                        column_map = {'cuadrante': 'cuadrante', 'estrategia': 'estrategia', 'importancia': 'importancia', 'actividades': 'actividades'}
+                        df_nuevas_est = df_nuevas_est.rename(columns=column_map)
                         df_nuevas_est['empresa_id'] = empresa_id
                         
+                        # Guardar en DB y actualizar Session State
                         with get_connection() as conn:
                             conn.execute("DELETE FROM estrategias_generadas WHERE empresa_id=?", (empresa_id,))
                             df_nuevas_est.to_sql('estrategias_generadas', conn, if_exists='append', index=False)
-                        st.success("¡12 Estrategias generadas y guardadas exitosamente!"); st.rerun()
+                        
+                        st.session_state.df_estrategias_temp = df_nuevas_est
+                        st.success("¡12 Estrategias generadas y cargadas exitosamente!"); st.rerun()
                     except Exception as e:
                         st.error(f"Error al procesar las estrategias de la IA: {e}")
                         st.code(resultado_ia)
 
-            # Mostrar el editor siempre que haya datos, o permitir agregar manualmente
             st.subheader("Edición de Estrategias Generadas")
             
-            # Si no hay estrategias, crear un DataFrame vacío con la estructura correcta
-            if df_estrategias_existentes.empty:
-                df_estrategias_existentes = pd.DataFrame(columns=['cuadrante', 'estrategia', 'importancia', 'actividades'])
+            # Asegurar que el DataFrame tenga la estructura correcta para el editor
+            df_display = st.session_state.df_estrategias_temp.copy()
+            if df_display.empty:
+                df_display = pd.DataFrame(columns=['cuadrante', 'estrategia', 'importancia', 'actividades'])
             
+            # El editor de datos
             edited_strategies = st.data_editor(
-                df_estrategias_existentes,
+                df_display,
                 num_rows="dynamic",
-                key="editor_estrategias",
+                key="editor_estrategias_v3",
                 use_container_width=True,
                 disabled=['id', 'empresa_id'],
                 column_config={
@@ -774,22 +789,26 @@ def aplicacion_principal():
             col1, col2 = st.columns(2)
             with col1:
                 if st.button("💾 Guardar Cambios en Estrategias"):
-                    if not edited_strategies.empty:
+                    if edited_strategies is not None:
                         with get_connection() as conn:
                             conn.execute("DELETE FROM estrategias_generadas WHERE empresa_id=?", (empresa_id,))
-                            if 'id' in edited_strategies.columns:
-                                edited_strategies = edited_strategies.drop(columns=['id'])
-                            edited_strategies['empresa_id'] = empresa_id
-                            edited_strategies.to_sql('estrategias_generadas', conn, if_exists='append', index=False)
+                            df_to_save = edited_strategies.copy()
+                            if 'id' in df_to_save.columns:
+                                df_to_save = df_to_save.drop(columns=['id'])
+                            df_to_save['empresa_id'] = empresa_id
+                            df_to_save.to_sql('estrategias_generadas', conn, if_exists='append', index=False)
+                            st.session_state.df_estrategias_temp = df_to_save
                         st.success("Estrategias actualizadas correctamente."); st.rerun()
-                    else:
-                        st.warning("No hay estrategias para guardar.")
             
             with col2:
                 if st.button("🚀 Enviar Estrategias a Operativización"):
-                    if not edited_strategies.empty:
+                    if edited_strategies is not None and not edited_strategies.empty:
                         with get_connection() as conn:
+                            # Opcional: Limpiar previas si se desea
+                            # conn.execute("DELETE FROM operativizacion WHERE empresa_id=? AND plan='Estratégico'", (empresa_id,))
                             for _, row in edited_strategies.iterrows():
+                                if pd.isna(row['actividades']) or str(row['actividades']).strip() == "":
+                                    continue
                                 actividades = str(row['actividades']).split(';')
                                 for act in actividades:
                                     if act.strip():
@@ -799,7 +818,7 @@ def aplicacion_principal():
                                             (empresa_id, "Estratégico", row['estrategia'], act.strip(), "Por definir", "Por definir", "Por definir", 0.0))
                         st.success("Estrategias y actividades enviadas a la pestaña de Operativización.")
                     else:
-                        st.warning("Primero debe generar o escribir estrategias.")
+                        st.warning("No hay estrategias para enviar.")
     with tab3:
         st.header("Planes Estratégicos")
         if st.button("⚙️ Generar Borrador de Planes"):
