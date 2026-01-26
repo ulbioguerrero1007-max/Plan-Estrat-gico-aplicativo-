@@ -796,7 +796,7 @@ def aplicacion_principal():
                             st.success("¡Desglose completado! Revisa la pestaña de Operativización.")
                         else:
                             st.warning("No hay datos para enviar.")
-with tab3:
+    with tab3:
         st.header("Planes Estratégicos")
         if st.button("⚙️ Generar Borrador de Planes"):
             with st.spinner("Analizando diagnóstico..."):
@@ -814,7 +814,7 @@ with tab3:
                 with st.expander(f"**Plan {plan_nombre}**"):
                     st.info(plan_datos['introduccion'])
                     st.success(plan_datos['objetivo'])
-with tab4:
+    with tab4:
         st.header("CMI / Indicadores")
         if 'generated_plans_dict' not in st.session_state:
             st.warning("Primero debes generar los planes en la Pestaña 3.")
@@ -824,7 +824,7 @@ with tab4:
                 st.session_state['df_cmi'] = df_cmi
             if 'df_cmi' in st.session_state:
                 st.dataframe(st.session_state['df_cmi'], use_container_width=True, height=500)
-with tab5:
+  with tab5:
         st.header("Operativización / Presupuesto")
         st.subheader("📝 Cuadro de Operativización y Presupuesto (Cascada)")
         st.info("Estructura: Plan -> Estrategia -> Actividad. Los costos se suman por actividad.")
@@ -916,7 +916,7 @@ with tab5:
             st.write(f"**Análisis:** Para recuperar la inversión de **${cf:,.2f}**, la empresa debe vender al menos **{pe_unidades:,.0f} unidades**, lo que representa una facturación de **${pe_dolares:,.2f}**.")
         else:
             st.warning("El Precio de Venta debe ser mayor al Costo Variable para calcular el Punto de Equilibrio.")
-with tab6:
+    with tab6:
         st.header("Resumen, Conclusiones y Exportación")
         with st.form("pdf_form"):
             pdf_version = st.text_input("Versión del Plan Estratégico", "1.0")
@@ -977,5 +977,6 @@ def main():
 if __name__ == "__main__":
     init_db()
     main()
+
 
 
