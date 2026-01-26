@@ -405,11 +405,6 @@ def aplicacion_principal():
                                   obj_gen, obj_esp, politicas, valores, org_bytes, empresa_id))
                 st.success("Datos de introducción guardados."); st.rerun()
     with tab2:
-        if st.button("PRUEBA IA"):
-    with st.spinner("Probando IA..."):
-        texto = generar_analisis("Explica qué es un plan estratégico")
-        st.write(texto)
-
         st.header("Diagnóstico Situacional (Análisis de Matrices)")
         with get_connection() as conn:
             analisis_data = pd.read_sql(f"SELECT analisis_made, analisis_madi, analisis_posicionamiento, analisis_pest, analisis_foda FROM empresas WHERE id={empresa_id}", conn).iloc[0]
