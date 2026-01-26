@@ -41,7 +41,14 @@ def generar_analisis_ia(tipo_matriz, datos_contexto):
 
 def generar_analisis(prompt, client):
     # Lista de modelos gratuitos verificados y estables en OpenRouter
-    modelos_gratuitos = ["openrouter/auto"]
+    modelos_gratuitos = [    "meta-llama/llama-3.3-70b-instruct:free",
+    "deepseek/deepseek-r1-0528:free",
+    "mistralai/mistral-small-3.1-24b:free",
+    "qwen/qwen-3-235b-a22b:free",
+    "google/gemma-3-4b-instruct:free",
+    "meta-llama/llama-3.2-3b-instruct:free",
+    "qwen/qwen-3-coder:free",
+    "openrouter/auto"]
     errores = []
     for modelo in modelos_gratuitos:
         try:
@@ -869,6 +876,7 @@ def main():
 if __name__ == "__main__":
     init_db()
     main()
+
 
 
 
