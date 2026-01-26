@@ -775,7 +775,7 @@ def aplicacion_principal():
                             for act in actividades:
                                 conn.execute("""INSERT INTO operativizacion 
                                     (empresa_id, plan, estrategia, actividades, plazo, responsable, recurso, costo) 
-                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)\"\"\",
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                                     (empresa_id, "Estratégico", row['estrategia'], act.strip(), "Por definir", "Por definir", "Por definir", 0.0))
                     st.success("Estrategias y actividades enviadas a la pestaña de Operativización.")
 
@@ -960,4 +960,5 @@ def main():
 if __name__ == "__main__":
     init_db()
     main()
+
 
