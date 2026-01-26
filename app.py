@@ -773,7 +773,7 @@ def aplicacion_principal():
                         for _, row in df_estrategias_existentes.iterrows():
                             actividades = row['actividades'].split(';')
                             for act in actividades:
-                                conn.execute(\"\"\"INSERT INTO operativizacion 
+                                conn.execute("""INSERT INTO operativizacion 
                                     (empresa_id, plan, estrategia, actividades, plazo, responsable, recurso, costo) 
                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)\"\"\",
                                     (empresa_id, "Estratégico", row['estrategia'], act.strip(), "Por definir", "Por definir", "Por definir", 0.0))
@@ -960,3 +960,4 @@ def main():
 if __name__ == "__main__":
     init_db()
     main()
+
