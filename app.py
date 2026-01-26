@@ -750,25 +750,31 @@ def aplicacion_principal():
                         st.error(f"Error al procesar las estrategias de la IA: {e}")
                         st.code(resultado_ia)
 
-            if not df_estrategias_existentes.empty:
-                st.subheader("Edición de Estrategias Generadas")
-                edited_strategies = st.data_editor(
-                    df_estrategias_existentes,
-                    num_rows="dynamic",
-                    key="editor_estrategias",
-                    use_container_width=True,
-                    disabled=['id', 'empresa_id'],
-                    column_config={
-                        "cuadrante": st.column_config.SelectboxColumn("Cuadrante", options=["FO", "FA", "DO", "DA"]),
-                        "estrategia": st.column_config.TextColumn("Estrategia"),
-                        "importancia": st.column_config.SelectboxColumn("Importancia", options=["Alta", "Media Alta", "Media Baja", "Baja"]),
-                        "actividades": st.column_config.TextColumn("Actividades (separadas por ;)")
-                    }
-                )
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.button("💾 Guardar Cambios en Estrategias"):
+            # Mostrar el editor siempre que haya datos, o permitir agregar manualmente
+            st.subheader("Edición de Estrategias Generadas")
+            
+            # Si no hay estrategias, crear un DataFrame vacío con la estructura correcta
+            if df_estrategias_existentes.empty:
+                df_estrategias_existentes = pd.DataFrame(columns=['cuadrante', 'estrategia', 'importancia', 'actividades'])
+            
+            edited_strategies = st.data_editor(
+                df_estrategias_existentes,
+                num_rows="dynamic",
+                key="editor_estrategias",
+                use_container_width=True,
+                disabled=['id', 'empresa_id'],
+                column_config={
+                    "cuadrante": st.column_config.SelectboxColumn("Cuadrante", options=["FO", "FA", "DO", "DA"], required=True),
+                    "estrategia": st.column_config.TextColumn("Estrategia", required=True),
+                    "importancia": st.column_config.SelectboxColumn("Importancia", options=["Alta", "Media Alta", "Media Baja", "Baja"], required=True),
+                    "actividades": st.column_config.TextColumn("Actividades (separadas por ;)", required=True)
+                }
+            )
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("💾 Guardar Cambios en Estrategias"):
+                    if not edited_strategies.empty:
                         with get_connection() as conn:
                             conn.execute("DELETE FROM estrategias_generadas WHERE empresa_id=?", (empresa_id,))
                             if 'id' in edited_strategies.columns:
@@ -776,12 +782,13 @@ def aplicacion_principal():
                             edited_strategies['empresa_id'] = empresa_id
                             edited_strategies.to_sql('estrategias_generadas', conn, if_exists='append', index=False)
                         st.success("Estrategias actualizadas correctamente."); st.rerun()
-                
-                with col2:
-                    if st.button("🚀 Enviar Estrategias a Operativización"):
+                    else:
+                        st.warning("No hay estrategias para guardar.")
+            
+            with col2:
+                if st.button("🚀 Enviar Estrategias a Operativización"):
+                    if not edited_strategies.empty:
                         with get_connection() as conn:
-                            # Limpiar operativización previa de tipo 'Estratégico' para esta empresa si se desea evitar duplicados
-                            # conn.execute("DELETE FROM operativizacion WHERE empresa_id=? AND plan='Estratégico'", (empresa_id,))
                             for _, row in edited_strategies.iterrows():
                                 actividades = str(row['actividades']).split(';')
                                 for act in actividades:
@@ -791,6 +798,8 @@ def aplicacion_principal():
                                             VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                                             (empresa_id, "Estratégico", row['estrategia'], act.strip(), "Por definir", "Por definir", "Por definir", 0.0))
                         st.success("Estrategias y actividades enviadas a la pestaña de Operativización.")
+                    else:
+                        st.warning("Primero debe generar o escribir estrategias.")
     with tab3:
         st.header("Planes Estratégicos")
         if st.button("⚙️ Generar Borrador de Planes"):
