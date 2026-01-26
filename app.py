@@ -591,8 +591,15 @@ def aplicacion_principal():
                 else: st.error(f"**{res['titulo']}**")
                 st.write(f"**Análisis Ejecutivo:** {res['texto']}")
             with st.form("form_analisis_pos"):
-                st.subheader("Análisis Propio")
-                analisis_propio_pos = st.text_area("Añade aquí tus conclusiones sobre el posicionamiento.", value=analisis_data.get('analisis_posicionamiento', ''))
+                st.subheader("Análisis Estratégico")
+                if st.form_submit_button("🤖 Generar Análisis con IA"):
+                    with st.spinner("La IA está analizando la posición..."):
+                        contexto_pos = f"Coordenada X: {coord_x}, Coordenada Y: {coord_y}. Cuadrante: {key}. Interpretación: {interpretaciones.get(key, {}).get('texto', '')}"
+                        analisis_ia_pos = generar_analisis_ia("Posicionamiento", contexto_pos)
+                        st.session_state["ia_analisis_posicionamiento"] = analisis_ia_pos
+                
+                current_analisis_pos = st.session_state.get("ia_analisis_posicionamiento", analisis_data.get('analisis_posicionamiento', ''))
+                analisis_propio_pos = st.text_area("Conclusiones sobre el posicionamiento.", value=current_analisis_pos, height=300)
                 if st.form_submit_button("Guardar Análisis de Posicionamiento"):
                     with get_connection() as conn:
                         conn.execute("UPDATE empresas SET analisis_posicionamiento=? WHERE id=?", (analisis_propio_pos, empresa_id))
@@ -632,8 +639,15 @@ def aplicacion_principal():
                 else:
                     st.warning(f"**Perfil de Vulnerabilidad Externa ({total_ponderado:.2f})**")
             with st.form("form_analisis_pest"):
-                st.subheader("Análisis Propio")
-                analisis_propio_pest = st.text_area("Añade aquí tus conclusiones sobre la matriz PEST.", value=analisis_data.get('analisis_pest', ''))
+                st.subheader("Análisis Estratégico")
+                if st.form_submit_button("🤖 Generar Análisis con IA"):
+                    with st.spinner("La IA está analizando el entorno PEST..."):
+                        contexto_pest = df_pest.to_string()
+                        analisis_ia_pest = generar_analisis_ia("PEST", contexto_pest)
+                        st.session_state["ia_analisis_pest"] = analisis_ia_pest
+                
+                current_analisis_pest = st.session_state.get("ia_analisis_pest", analisis_data.get('analisis_pest', ''))
+                analisis_propio_pest = st.text_area("Conclusiones sobre la matriz PEST.", value=current_analisis_pest, height=300)
                 if st.form_submit_button("Guardar Análisis"):
                     with get_connection() as conn:
                         conn.execute("UPDATE empresas SET analisis_pest=? WHERE id=?", (analisis_propio_pest, empresa_id))
@@ -668,8 +682,15 @@ def aplicacion_principal():
                     st.subheader("🎯 Postura Competitiva Sugerida")
                     st.info(f"Estrategia Principal: {estrategia_principal}")
             with st.form("form_analisis_foda"):
-                st.subheader("Análisis Propio")
-                analisis_propio_foda = st.text_area("Añade aquí tus conclusiones sobre la matriz FODA.", value=analisis_data.get('analisis_foda', ''))
+                st.subheader("Análisis Estratégico")
+                if st.form_submit_button("🤖 Generar Análisis con IA"):
+                    with st.spinner("La IA está analizando el FODA Cruzado..."):
+                        contexto_foda = df_foda.to_string()
+                        analisis_ia_foda = generar_analisis_ia("FODA Cruzado", contexto_foda)
+                        st.session_state["ia_analisis_foda"] = analisis_ia_foda
+                
+                current_analisis_foda = st.session_state.get("ia_analisis_foda", analisis_data.get('analisis_foda', ''))
+                analisis_propio_foda = st.text_area("Conclusiones sobre la matriz FODA.", value=current_analisis_foda, height=300)
                 if st.form_submit_button("Guardar Análisis"):
                     with get_connection() as conn:
                         conn.execute("UPDATE empresas SET analisis_foda=? WHERE id=?", (analisis_propio_foda, empresa_id))
