@@ -38,8 +38,8 @@ def generar_analisis_ia(tipo_matriz, datos_contexto):
     
     try:
         response = client.chat.completions.create(
-            model="google/gemini-2.0-flash-001", # Modelo por defecto en OpenRouter
-            messages=[{"role": "user", "content": prompt}]
+    model="meta-llama/llama-3.1-8b-instruct:free",
+    messages=[{"role": "user", "content": prompt}]
         )
         return response.choices[0].message.content
     except Exception as e:
@@ -857,4 +857,5 @@ def main():
 if __name__ == "__main__":
     init_db()
     main()
+
 
