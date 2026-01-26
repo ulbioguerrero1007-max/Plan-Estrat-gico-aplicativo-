@@ -136,6 +136,15 @@ def init_db():
                             valor REAL, total INTEGER,
                             FOREIGN KEY (empresa_id) REFERENCES empresas (id) ON DELETE CASCADE
                           )''')
+        cursor.execute('''CREATE TABLE IF NOT EXISTS estrategias_generadas (
+                            id INTEGER PRIMARY KEY,
+                            empresa_id INTEGER NOT NULL,
+                            cuadrante TEXT NOT NULL,
+                            estrategia TEXT NOT NULL,
+                            importancia TEXT NOT NULL,
+                            actividades TEXT NOT NULL,
+                            FOREIGN KEY (empresa_id) REFERENCES empresas (id) ON DELETE CASCADE
+                          )''')
         columnas_existentes = [c[1] for c in cursor.execute("PRAGMA table_info(empresas)").fetchall()]
         nuevas_columnas = ['objetivo_plan', 'obj_general', 'obj_especificos', 'posicionamiento_x', 'posicionamiento_y', 'analisis_posicionamiento', 'analisis_pest', 'analisis_foda', 'analisis_made', 'analisis_madi']
         for col in nuevas_columnas:
@@ -153,10 +162,15 @@ def analizar_foda(df_foda):
     if df_foda.empty: return None, None, None, pd.Series(dtype='float64')
     estrategias = {'FO': 'Ofensiva (F+O)', 'FA': 'Defensiva (F+A)', 'DO': 'Adaptativa (D+O)', 'DA': 'Supervivencia (D+A)'}
     puntajes = df_foda.groupby('cuadrante')['impacto'].sum().reindex(estrategias.keys(), fill_value=0)
-    analisis_df = pd.DataFrame({'Estrategia': [estrategias[c] for c in puntajes.index], 'Puntaje Total': puntajes.values}).sort_values(by='Puntaje Total', ascending=False).reset_index(drop=True)
+    # Ordenar puntajes de mayor a menor para el radar y el análisis
+    puntajes_ordenados = puntajes.sort_values(ascending=False)
+    analisis_df = pd.DataFrame({
+        'Estrategia': [estrategias[c] for c in puntajes_ordenados.index],
+        'Puntaje Total': puntajes_ordenados.values
+    }).reset_index(drop=True)
     estrategia_principal = analisis_df.iloc[0]['Estrategia']
     resumen = f"La estrategia principal recomendada es **{analisis_df.iloc[0]['Estrategia']}** ({analisis_df.iloc[0]['Puntaje Total']} puntos), seguida por **{analisis_df.iloc[1]['Estrategia']}** ({analisis_df.iloc[1]['Puntaje Total']} puntos)."
-    return analisis_df, resumen, estrategia_principal, puntajes
+    return analisis_df, resumen, estrategia_principal, puntajes_ordenados
 def generar_planes_por_plantilla(estrategia_foda, pest_total):
     planes = {}
     intro = "El plan administrativo se enfocará en fortalecer la base de la organización y fomentar la innovación continua."
@@ -396,7 +410,7 @@ def aplicacion_principal():
     if not empresa_id:
         st.info("👈 Por favor, selecciona o crea una empresa en el menú lateral para comenzar.")
         st.stop()
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["1. Introducción", "2. Diagnóstico Situacional", "3. Planes Estratégicos", "4. CMI/Indicadores", "5. Operativización/Presupuesto", "6. Resumen y Conclusiones"])
+    tab1, tab2, tab_est, tab3, tab4, tab5, tab6 = st.tabs(["1. Introducción", "2. Diagnóstico Situacional", "3. Estrategia", "4. Planes Estratégicos", "5. CMI/Indicadores", "6. Operativización/Presupuesto", "7. Resumen y Conclusiones"])
     with tab1:
         st.header("Introducción y Cultura Organizacional")
         with get_connection() as conn:
@@ -677,10 +691,13 @@ def aplicacion_principal():
                         conn.execute("DELETE FROM foda_cruzado WHERE empresa_id=?", (empresa_id,))
                         edited_foda.to_sql('foda_cruzado', conn, if_exists='append', index=False)
                     st.success("Cambios en FODA guardados."); st.rerun()
-                analisis_df, _, estrategia_principal, _ = analizar_foda(df_foda)
+                analisis_df, _, estrategia_principal, puntajes_foda = analizar_foda(df_foda)
                 if analisis_df is not None:
                     st.subheader("🎯 Postura Competitiva Sugerida")
                     st.info(f"Estrategia Principal: {estrategia_principal}")
+                    st.dataframe(analisis_df, use_container_width=True)
+                    grafico_foda = generar_grafico_foda_radar(puntajes_foda)
+                    if grafico_foda: st.image(grafico_foda)
             with st.form("form_analisis_foda"):
                 st.subheader("Análisis Estratégico")
                 if st.form_submit_button("🤖 Generar Análisis con IA"):
@@ -695,6 +712,73 @@ def aplicacion_principal():
                     with get_connection() as conn:
                         conn.execute("UPDATE empresas SET analisis_foda=? WHERE id=?", (analisis_propio_foda, empresa_id))
                     st.success("Análisis de FODA guardado."); st.rerun()
+
+    with tab_est:
+        st.header("🎯 Formulación de Estrategias")
+        st.info("En esta sección se generan 12 estrategias (3 por cuadrante) basadas en el FODA Cruzado, cada una con 5 actividades específicas.")
+        
+        with get_connection() as conn:
+            df_foda_final = pd.read_sql(f"SELECT cuadrante, factor_fila, factor_columna, impacto FROM foda_cruzado WHERE empresa_id={empresa_id}", conn)
+            df_estrategias_existentes = pd.read_sql(f"SELECT * FROM estrategias_generadas WHERE empresa_id={empresa_id}", conn)
+
+        if df_foda_final.empty:
+            st.warning("Primero debe completar el Análisis FODA Cruzado en la pestaña de Diagnóstico Situacional.")
+        else:
+            if st.button("🤖 Generar 12 Estrategias Maestras con IA"):
+                with st.spinner("La IA está diseñando las estrategias y actividades..."):
+                    client = get_ia_client()
+                    contexto_foda = df_foda_final.to_string()
+                    prompt_est = f"""Actúa como un Director de Estrategia (CSO). Basado en este FODA Cruzado:
+                    {contexto_foda}
+                    Genera exactamente 12 estrategias (3 para cada cuadrante: FO, FA, DO, DA).
+                    Para cada estrategia, define 5 actividades concretas para su cumplimiento.
+                    Clasifica la importancia de cada estrategia según su impacto en el FODA.
+                    
+                    Responde ÚNICAMENTE en formato CSV con este encabezado exacto:
+                    cuadrante|estrategia|importancia|actividades
+                    Usa '|' como separador. En actividades, separa las 5 actividades con ';'.
+                    Las importancias deben ser: 'Alta', 'Media Alta', 'Media Baja' o 'Baja'."""
+                    
+                    resultado_ia = generar_analisis(prompt_est, client)
+                    try:
+                        csv_data = resultado_ia.strip()
+                        if "```csv" in csv_data:
+                            csv_data = csv_data.split("```csv")[1].split("```")[0].strip()
+                        elif "```" in csv_data:
+                            csv_data = csv_data.split("```")[1].split("```")[0].strip()
+                        
+                        df_nuevas_est = pd.read_csv(StringIO(csv_data), sep='|')
+                        df_nuevas_est['empresa_id'] = empresa_id
+                        
+                        with get_connection() as conn:
+                            conn.execute("DELETE FROM estrategias_generadas WHERE empresa_id=?", (empresa_id,))
+                            df_nuevas_est.to_sql('estrategias_generadas', conn, if_exists='append', index=False)
+                        st.success("¡12 Estrategias generadas y guardadas exitosamente!"); st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al procesar las estrategias de la IA: {e}")
+                        st.code(resultado_ia)
+
+            if not df_estrategias_existentes.empty:
+                for cuadrante in ['FO', 'FA', 'DO', 'DA']:
+                    st.subheader(f"Cuadrante {cuadrante}")
+                    df_q = df_estrategias_existentes[df_estrategias_existentes['cuadrante'] == cuadrante]
+                    for _, row in df_q.iterrows():
+                        with st.expander(f"**{row['estrategia']}** (Importancia: {row['importancia']})"):
+                            actividades = row['actividades'].split(';')
+                            for i, act in enumerate(actividades, 1):
+                                st.write(f"{i}. {act.strip()}")
+                
+                if st.button("🚀 Enviar Estrategias a Operativización"):
+                    with get_connection() as conn:
+                        for _, row in df_estrategias_existentes.iterrows():
+                            actividades = row['actividades'].split(';')
+                            for act in actividades:
+                                conn.execute(\"\"\"INSERT INTO operativizacion 
+                                    (empresa_id, plan, estrategia, actividades, plazo, responsable, recurso, costo) 
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)\"\"\",
+                                    (empresa_id, "Estratégico", row['estrategia'], act.strip(), "Por definir", "Por definir", "Por definir", 0.0))
+                    st.success("Estrategias y actividades enviadas a la pestaña de Operativización.")
+
     with tab3:
         st.header("Planes Estratégicos")
         if st.button("⚙️ Generar Borrador de Planes"):
@@ -876,8 +960,3 @@ def main():
 if __name__ == "__main__":
     init_db()
     main()
-
-
-
-
-
