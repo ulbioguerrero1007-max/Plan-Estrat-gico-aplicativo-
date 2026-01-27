@@ -869,8 +869,9 @@ def aplicacion_principal():
                                 st.rerun()
 
                             except Exception as e:
-                                st.error(f"Error al transferir a operativización: {str(e)}")        else:
-                            st.warning("No hay datos para enviar.")
+                                st.error(f"Error al transferir a operativización: {str(e)}")        
+                            else:
+                                st.warning("No hay datos para enviar.")
         with tab3:
             st.header("Planes Estratégicos")
             with st.form("form_planes"):
@@ -1072,5 +1073,6 @@ def main():
 if __name__ == "__main__":
     init_db()
     main()
+
 
 
