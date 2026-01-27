@@ -20,18 +20,116 @@ from supabase import create_client, Client
 
 # ========== CAMBIO PRINCIPAL: FUNCIÓN DE CLIENTE DEEPSEEK ==========
 def get_ia_client():
-    # Cambiado de GROQ_API_KEY a DEEPSEEK_API_KEY
-    api_key = st.secrets.get("DEEPSEEK_API_KEY")
+    """Obtiene cliente de DeepSeek con manejo robusto de errores"""
+    try:
+        # 1. Intentar desde secrets
+        api_key = st.secrets.get("DEEPSEEK_API_KEY", "")
+        
+        # 2. Si no está en secrets, pedirla
+        if not api_key or api_key.strip() == "":
+            st.sidebar.warning("⚠️ API Key no configurada en secrets")
+            with st.sidebar.expander("🔑 Configurar API Key Manualmente"):
+                api_key = st.text_input(
+                    "Ingresa tu API Key de DeepSeek",
+                    type="password",
+                    help="Obtén una gratuita en https://platform.deepseek.com"
+                )
+                if api_key:
+                    st.success("✅ API Key configurada temporalmente")
+                else:
+                    st.info("💡 Puedes configurarla permanentemente en secrets.toml")
+        
+        if not api_key or api_key.strip() == "":
+            st.error("""
+            ❌ API Key de DeepSeek no configurada
+            
+            **Solución:**
+            1. Ve a https://platform.deepseek.com
+            2. Regístrate/inicia sesión
+            3. Crea una API Key en "API Keys"
+            4. Configura en secrets.toml como:
+            
+            ```toml
+            DEEPSEEK_API_KEY = "tu-key-aquí"
+            ```
+            
+            **¡Es completamente GRATUITO para uso personal!**
+            """)
+            st.stop()
+        
+        # Configurar cliente
+        client = OpenAI(
+            api_key=api_key.strip(),
+            base_url="https://api.deepseek.com",  # Sin /v1, DeepSeek lo maneja
+        )
+        
+        # Probar conexión rápida
+        test_response = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": "Hola"}],
+            max_tokens=5,
+            timeout=5
+        )
+        
+        return client
+        
+    except Exception as e:
+        st.error(f"❌ Error configurando DeepSeek: {str(e)}")
+        st.info("""
+        **Pasos para solucionar:**
+        1. Verifica que tu API Key sea correcta
+        2. Asegúrate de no tener espacios al principio/final
+        3. Prueba crear una nueva API Key
+        4. Verifica tu saldo en https://platform.deepseek.com/console
+        """)
+        return None
 
-    if not api_key:
-        st.error("❌ No se encontró la API Key de DeepSeek en st.secrets")
-        st.stop()
-
-    return OpenAI(
-        # Cambiado el endpoint a DeepSeek
-        base_url="https://api.deepseek.com",
-        api_key=api_key,
-    )
+def generar_analisis(prompt, client):
+    """Genera análisis con manejo robusto de errores"""
+    if not client:
+        return "Error: Cliente de IA no configurado correctamente."
+    
+    try:
+        response = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[
+                {"role": "system", "content": "Eres un analista estratégico empresarial experto. Proporciona análisis detallados, estructurados y prácticos."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3,  # Más analítico, menos creativo
+            max_tokens=2000,
+            timeout=30
+        )
+        return response.choices[0].message.content
+        
+    except Exception as e:
+        error_msg = str(e)
+        
+        # Manejo específico de errores comunes
+        if "Insufficient Balance" in error_msg or "402" in error_msg:
+            return f"""
+            ⚠️ **Error de saldo insuficiente en DeepSeek**
+            
+            **Posibles causas:**
+            1. Tu cuenta no tiene créditos gratuitos
+            2. Has excedido el límite temporal
+            
+            **Soluciones:**
+            1. Verifica tu saldo en: https://platform.deepseek.com/console
+            2. Crea una nueva cuenta si es necesario
+            3. Contacta con soporte de DeepSeek
+            
+            **Alternativa temporal:** Puedes continuar usando el análisis manual.
+            """
+        
+        elif "401" in error_msg or "Unauthorized" in error_msg:
+            return "❌ API Key inválida o expirada. Por favor, genera una nueva en https://platform.deepseek.com"
+        
+        elif "timeout" in error_msg.lower():
+            return "⏱️ Timeout: La IA está tardando demasiado. Intenta nuevamente o usa análisis manual."
+        
+        else:
+            return f"⚠️ Error al conectar con DeepSeek: {error_msg}. Por favor, intenta nuevamente o usa análisis manual."
 
 def generar_analisis_ia(tipo_matriz, datos_contexto):
     client = get_ia_client()
@@ -978,3 +1076,4 @@ def main():
 if __name__ == "__main__":
     init_db()
     main()
+
