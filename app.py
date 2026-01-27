@@ -734,35 +734,35 @@ def aplicacion_principal():
                         contexto_reducido = df_foda_final[["cuadrante", "factor_fila", "factor_columna"]].to_string(index=False)
                         
                         prompt_est = f"""Actúa como Director de Estrategia. Basado en este FODA Cruzado:
-	                        {contexto_reducido}
-	                        Genera 12 estrategias (3 por cuadrante: FO, FA, DO, DA).
-	                        Para cada una, define 5 actividades cortas y asígnale un PLAN (Administrativo, Mejora, Contingencia, Tecnológico, Operativo, Financiero).
-	                        Formato: CUADRANTE|ESTRATEGIA|IMPORTANCIA|ACT1;ACT2;ACT3;ACT4;ACT5|PLAN
-	                        No incluyas nada más que las 12 líneas de texto."""
-	                        
-	                        resultado_ia = generar_analisis(prompt_est, client)
-	                        
-	                        nuevas_filas = []
-	                        for line in resultado_ia.strip().split("\n"):
-	                            partes = line.split("|")
-	                            if len(partes) >= 5:
-	                                nuevas_filas.append({
-	                                    "cuadrante": partes[0].strip().upper(),
-	                                    "estrategia": partes[1].strip(),
-	                                    "importancia": partes[2].strip(),
-	                                    "actividades": partes[3].strip(),
-	                                    "plan_asignado": partes[4].strip(),
-	                                    "empresa_id": empresa_id
-	                                })
-	                            elif len(partes) == 4:
-	                                nuevas_filas.append({
-	                                    "cuadrante": partes[0].strip().upper(),
-	                                    "estrategia": partes[1].strip(),
-	                                    "importancia": partes[2].strip(),
-	                                    "actividades": partes[3].strip(),
-	                                    "plan_asignado": "Estratégico",
-	                                    "empresa_id": empresa_id
-	                                })
+                        {contexto_reducido}
+                        Genera 12 estrategias (3 por cuadrante: FO, FA, DO, DA).
+                        Para cada una, define 5 actividades cortas y asígnale un PLAN (Administrativo, Mejora, Contingencia, Tecnológico, Operativo, Financiero).
+                        Formato: CUADRANTE|ESTRATEGIA|IMPORTANCIA|ACT1;ACT2;ACT3;ACT4;ACT5|PLAN
+                        No incluyas nada más que las 12 líneas de texto."""
+                        
+                        resultado_ia = generar_analisis(prompt_est, client)
+                        
+                        nuevas_filas = []
+                        for line in resultado_ia.strip().split("\n"):
+                            partes = line.split("|")
+                            if len(partes) >= 5:
+                                nuevas_filas.append({
+                                    "cuadrante": partes[0].strip().upper(),
+                                    "estrategia": partes[1].strip(),
+                                    "importancia": partes[2].strip(),
+                                    "actividades": partes[3].strip(),
+                                    "plan_asignado": partes[4].strip(),
+                                    "empresa_id": empresa_id
+                                })
+                            elif len(partes) == 4:
+                                nuevas_filas.append({
+                                    "cuadrante": partes[0].strip().upper(),
+                                    "estrategia": partes[1].strip(),
+                                    "importancia": partes[2].strip(),
+                                    "actividades": partes[3].strip(),
+                                    "plan_asignado": "Estratégico",
+                                    "empresa_id": empresa_id
+                                })
                         
                         if nuevas_filas:
                             df_nuevas = pd.DataFrame(nuevas_filas)
