@@ -815,59 +815,61 @@ def aplicacion_principal():
                         with get_connection() as conn:
                             conn.execute("DELETE FROM estrategias_generadas WHERE empresa_id=?", (empresa_id,))
                             df_to_save = edited_df.copy()
-                            if "id" in df_to_save.columns: df_to_save = df_to_save.drop(columns=["id"])
+                            if "id" in df_to_save.columns:
+                                df_to_save = df_to_save.drop(columns=["id"])
                             df_to_save["empresa_id"] = empresa_id
                             df_to_save.to_sql("estrategias_generadas", conn, if_exists="append", index=False)
-                            st.session_state.df_estrategias_temp = df_to_save
-                        st.success("Guardado."); st.rerun()
-                
-               with col2:
-    if st.button("🚀 Enviar a Operativización"):
-        if edited_df.empty:
-            st.warning("No hay estrategias para enviar.")
-        else:
-            with get_connection() as conn:
-                # 1. BORRAMOS TODA la operativización anterior de esta empresa
-                conn.execute(
-                    "DELETE FROM operativizacion WHERE empresa_id = ?",
-                    (empresa_id,)
-                )
-                
-                # 2. Insertamos SOLO lo que hay ahora en la tabla editada
-                filas_insertadas = 0
-                for _, row in edited_df.iterrows():
-                    lista_actividades = str(row.get("actividades", "")).split(";")
-                    plan_final = row.get("plan_asignado", "Sin plan asignado").strip()
-                    estrategia_texto = row.get("estrategia", "").strip()
-                    
-                    for actividad in lista_actividades:
-                        actividad = actividad.strip()
-                        if actividad:
-                            conn.execute("""
-                                INSERT INTO operativizacion 
-                                (empresa_id, plan, estrategia, actividades, plazo, responsable, recurso, costo)
-                                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                            """, (
-                                empresa_id,
-                                plan_final,
-                                estrategia_texto,
-                                actividad,
-                                "Por definir",   # plazo
-                                "Por definir",   # responsable
-                                "Por definir",   # recurso
-                                0.0              # costo inicial
-                            ))
-                            filas_insertadas += 1
-                
-                conn.commit()
-            
-            if filas_insertadas > 0:
-                st.success(f"Operativización actualizada correctamente con {filas_insertadas} actividades.")
-            else:
-                st.info("No se insertaron actividades (revisa que haya contenido en 'actividades').")
-            
-            st.rerun()   # ← opcional, pero ayuda a que la otra pestaña vea los cambios rápido
+                        st.success("Estrategias guardadas.")
+                        st.rerun()
+
+                with col2:
+                    if st.button("🚀 Enviar a Operativización"):
+                        if edited_df.empty:
+                            st.warning("No hay estrategias para enviar.")
                         else:
+                            try:
+                                with get_connection() as conn:
+                                    # 1. Borramos TODO lo anterior de esta empresa
+                                    conn.execute("DELETE FROM operativizacion WHERE empresa_id = ?", (empresa_id,))
+
+                                    # 2. Insertamos solo lo que hay ahora
+                                    filas_insertadas = 0
+                                    for _, row in edited_df.iterrows():
+                                        plan = row.get("plan_asignado", "Sin asignar").strip()
+                                        estrategia = row.get("estrategia", "").strip()
+                                        actividades_str = str(row.get("actividades", "")).strip()
+
+                                        if not actividades_str:
+                                            continue
+
+                                        for act in [a.strip() for a in actividades_str.split(";") if a.strip()]:
+                                            conn.execute("""
+                                                INSERT INTO operativizacion 
+                                                (empresa_id, plan, estrategia, actividades, plazo, responsable, recurso, costo)
+                                                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                                            """, (
+                                                empresa_id,
+                                                plan,
+                                                estrategia,
+                                                act,
+                                                "Por definir",
+                                                "Por definir",
+                                                "Por definir",
+                                                0.0
+                                            ))
+                                            filas_insertadas += 1
+
+                                    conn.commit()
+
+                                if filas_insertadas > 0:
+                                    st.success(f"Operativización actualizada con {filas_insertadas} actividades.")
+                                else:
+                                    st.info("No se insertaron actividades (verifica la columna 'actividades').")
+
+                                st.rerun()
+
+                            except Exception as e:
+                                st.error(f"Error al transferir a operativización: {str(e)}")        else:
                             st.warning("No hay datos para enviar.")
         with tab3:
             st.header("Planes Estratégicos")
@@ -1070,4 +1072,5 @@ def main():
 if __name__ == "__main__":
     init_db()
     main()
+
 
