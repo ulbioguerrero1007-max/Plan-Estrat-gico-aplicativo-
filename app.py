@@ -1,6 +1,6 @@
 import streamlit as st
 import re
-import google.generativeai as genai
+import requests
 import pandas as pd
 import sqlite3
 import io
@@ -16,11 +16,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import unicodedata
 import time
+import json
 from supabase import create_client, Client
 
-# ========== CONFIGURACIÓN GEMINI (100% GRATIS) ==========
+# ========== CONFIGURACIÓN GEMINI CORREGIDA ==========
 def configurar_gemini():
-    """Configura Gemini API con manejo robusto"""
+    """Configura Gemini API usando requests"""
     try:
         # 1. Intentar desde secrets
         api_key = st.secrets.get("GEMINI_API_KEY", "")
@@ -56,33 +57,25 @@ def configurar_gemini():
                     if st.button("🔄 Probar Conexión"):
                         if api_key_input:
                             try:
-                                genai.configure(api_key=api_key_input)
-                                model = genai.GenerativeModel('gemini-pro')
-                                response = model.generate_content("Test")
-                                st.success("✅ Conexión exitosa con Gemini!")
+                                # Probar con modelo CORRECTO
+                                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={api_key_input}"
+                                headers = {'Content-Type': 'application/json'}
+                                data = {
+                                    "contents": [{
+                                        "parts": [{"text": "Test"}]
+                                    }]
+                                }
+                                response = requests.post(url, headers=headers, json=data, timeout=10)
+                                if response.status_code == 200:
+                                    st.success("✅ Conexión exitosa con Gemini!")
+                                else:
+                                    st.error(f"❌ Error: {response.status_code} - {response.text[:200]}")
                             except Exception as e:
                                 st.error(f"❌ Error: {str(e)}")
             
             api_key = st.session_state.get("gemini_api_key", "")
         
-        # 3. Si aún no hay key, mostrar alerta
-        if not api_key:
-            return None
-        
-        # 4. Configurar Gemini
-        genai.configure(api_key=api_key)
-        
-        # 5. Probar conexión rápida
-        model = genai.GenerativeModel('gemini-pro')
-        response = model.generate_content(
-            "Hola",
-            generation_config=genai.types.GenerationConfig(
-                temperature=0.1,
-                max_output_tokens=10,
-            )
-        )
-        
-        return genai
+        return api_key if api_key else None
         
     except Exception as e:
         st.sidebar.error(f"⚠️ Error configurando Gemini: {str(e)}")
@@ -91,113 +84,102 @@ def configurar_gemini():
 def generar_analisis_ia(tipo_matriz, datos_contexto):
     """Genera análisis estratégico con Gemini"""
     try:
-        gemini = configurar_gemini()
-        if not gemini:
+        api_key = configurar_gemini()
+        if not api_key:
             return "⚠️ Por favor, configura tu API Key de Gemini en el menú lateral."
         
-        # Prompt optimizado para análisis estratégico
-        prompt = f"""Eres un consultor estratégico senior con 25 años de experiencia en análisis empresarial.
+        # Prompt optimizado
+        prompt = f"""Eres un consultor estratégico senior. Analiza esta matriz {tipo_matriz}:
 
-**INSTRUCCIONES:**
-Analiza la siguiente matriz {tipo_matriz} y proporciona un análisis PROFESIONAL que incluya:
+**DATOS:**
+{datos_contexto[:2000]}
 
-📊 **CONCLUSIONES ESTRATÉGICAS (3-5 puntos clave):**
-- Hallazgos principales derivados de los datos
-- Interpretación del posicionamiento estratégico
-- Implicaciones para la toma de decisiones
+**PROPORCIONA:**
+1. 3 conclusiones estratégicas clave
+2. 3 riesgos principales  
+3. 5 recomendaciones accionables
+4. Plan de seguimiento breve
 
-⚠️ **RIESGOS PRINCIPALES (Top 3):**
-- Factores críticos que podrían afectar el desempeño
-- Vulnerabilidades identificadas
-- Señales de alerta temprana
-
-🎯 **RECOMENDACIONES ACCIONABLES (5 puntos específicos):**
-- Pasos concretos para implementar
-- Prioridades de acción
-- Cronograma sugerido
-
-📈 **PLAN DE SEGUIMIENTO:**
-- Indicadores clave (KPIs) a monitorear
-- Frecuencia de revisión
-- Puntos de control críticos
-
-**DATOS DE LA MATRIZ {tipo_matriz.upper()}:**
-{datos_contexto[:2500]}
-
-**FORMATO DE RESPUESTA:**
-- Usa viñetas (•) para cada punto
-- Sé conciso pero completo
-- Enfócate en insights prácticos
-- Evita jerga innecesaria
-- Usa lenguaje ejecutivo"""
-
-        model = genai.GenerativeModel('gemini-pro')
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.types.GenerationConfig(
-                temperature=0.2,  # Bajo para análisis más preciso
-                top_p=0.8,
-                top_k=40,
-                max_output_tokens=2000,
-            ),
-            safety_settings={
-                'HARM_CATEGORY_HARASSMENT': 'BLOCK_NONE',
-                'HARM_CATEGORY_HATE_SPEECH': 'BLOCK_NONE',
-                'HARM_CATEGORY_SEXUALLY_EXPLICIT': 'BLOCK_NONE',
-                'HARM_CATEGORY_DANGEROUS_CONTENT': 'BLOCK_NONE',
-            }
-        )
+Formato: Usa viñetas, sé conciso y práctico."""
         
-        return response.text
+        # Intentar con diferentes modelos (uno debe funcionar)
+        modelos = [
+            "gemini-1.5-pro",      # Modelo más nuevo y recomendado
+            "gemini-1.5-pro-latest", # Alternativa
+            "gemini-pro",          # Modelo original
+            "models/gemini-pro"    # Ruta completa
+        ]
+        
+        for modelo in modelos:
+            try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent?key={api_key}"
+                headers = {'Content-Type': 'application/json'}
+                data = {
+                    "contents": [{
+                        "parts": [{"text": prompt}]
+                    }],
+                    "generationConfig": {
+                        "temperature": 0.2,
+                        "maxOutputTokens": 2000,
+                    }
+                }
+                
+                response = requests.post(url, headers=headers, json=data, timeout=30)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if 'candidates' in result and len(result['candidates']) > 0:
+                        text = result['candidates'][0]['content']['parts'][0]['text']
+                        return text
+                
+            except Exception:
+                continue  # Intentar con siguiente modelo
+        
+        # Si ningún modelo funciona, devolver error
+        return "⚠️ No se pudo conectar con Gemini. Por favor, verifica tu API Key o usa análisis manual."
         
     except Exception as e:
-        error_msg = str(e)
-        if "quota" in error_msg.lower() or "429" in error_msg:
-            return "⚠️ Límite temporal alcanzado. Espera 1 minuto o usa análisis manual por ahora."
-        elif "API key" in error_msg.lower():
-            return "❌ API Key inválida. Configura una nueva en el menú lateral."
-        else:
-            return f"⚠️ Error con Gemini: {error_msg[:200]}... Usa análisis manual temporalmente."
+        return f"⚠️ Error: {str(e)[:200]}... Usa análisis manual."
 
 def generar_estrategias_gemini(contexto_foda):
     """Genera 12 estrategias con Gemini"""
     try:
-        gemini = configurar_gemini()
-        if not gemini:
+        api_key = configurar_gemini()
+        if not api_key:
             return None
         
         prompt = f"""Como Director de Estrategia, genera 12 estrategias (3 por cada cuadrante FODA).
         
-        **DATOS FODA CRUZADO:**
+        DATOS FODA:
         {contexto_foda}
         
-        **INSTRUCCIONES:**
-        1. Genera 3 estrategias OFENSIVAS (FO) - Fortalezas vs Oportunidades
-        2. Genera 3 estrategias DEFENSIVAS (FA) - Fortalezas vs Amenazas
-        3. Genera 3 estrategias ADAPTATIVAS (DO) - Debilidades vs Oportunidades
-        4. Genera 3 estrategias de SUPERVIVENCIA (DA) - Debilidades vs Amenazas
-        
-        **FORMATO EXACTO (12 líneas):**
+        FORMATO EXACTO (12 líneas):
         CUADRANTE|NOMBRE_ESTRATEGIA|IMPORTANCIA|ACT1;ACT2;ACT3;ACT4;ACT5
         
-        **EJEMPLO:**
-        FO|Expansión de Mercado|Alta|Investigación de mercado;Desarrollo de producto;Capacitación de ventas;Lanzamiento piloto;Evaluación de resultados
+        Solo las 12 líneas, nada más."""
         
-        **IMPORTANCIA:** Alta, Media Alta, Media Baja, Baja
-        **ACTIVIDADES:** 5 actividades concretas separadas por ;
+        # Intentar con el modelo que funcione
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={api_key}"
+        headers = {'Content-Type': 'application/json'}
+        data = {
+            "contents": [{
+                "parts": [{"text": prompt}]
+            }],
+            "generationConfig": {
+                "temperature": 0.3,
+                "maxOutputTokens": 1500,
+            }
+        }
         
-        Solo responde con las 12 líneas, nada más."""
+        response = requests.post(url, headers=headers, json=data, timeout=30)
         
-        model = genai.GenerativeModel('gemini-pro')
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.types.GenerationConfig(
-                temperature=0.3,
-                max_output_tokens=1500,
-            )
-        )
+        if response.status_code == 200:
+            result = response.json()
+            if 'candidates' in result and len(result['candidates']) > 0:
+                text = result['candidates'][0]['content']['parts'][0]['text']
+                return text
         
-        return response.text
+        return None
         
     except Exception:
         return None
@@ -238,8 +220,19 @@ with st.sidebar:
     st.markdown('<div style="text-align: center; margin-bottom: 20px;">', unsafe_allow_html=True)
     st.markdown('<span class="gemini-badge">Powered by Gemini AI</span>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Mostrar estado de API Key
+    api_key = configurar_gemini()
+    if api_key:
+        st.success("✅ Gemini API configurada")
+    else:
+        st.warning("⚠️ Configura Gemini API")
 
-# ========== FUNCIONES EXISTENTES (MANTENIDAS) ==========
+# ========== CONTINUACIÓN DEL CÓDIGO ORIGINAL ==========
+# [PEGA AQUÍ TODO EL RESTO DE TU CÓDIGO SIN CAMBIOS]
+# Las funciones desde init_supabase() en adelante se mantienen IGUAL
+# Solo asegúrate de usar las nuevas funciones de IA (generar_analisis_ia y generar_estrategias_gemini)
+
 def init_supabase():
     try:
         if "supabase_url" in st.secrets and "supabase_key" in st.secrets:
