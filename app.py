@@ -1,6 +1,6 @@
 import streamlit as st
 import re
-from openai import OpenAI
+import google.generativeai as genai
 import pandas as pd
 import sqlite3
 import io
@@ -18,166 +18,228 @@ import unicodedata
 import time
 from supabase import create_client, Client
 
-# ========== CAMBIO PRINCIPAL: FUNCIÓN DE CLIENTE DEEPSEEK ==========
-def get_ia_client():
-    """Obtiene cliente de DeepSeek con manejo robusto de errores"""
+# ========== CONFIGURACIÓN GEMINI (100% GRATIS) ==========
+def configurar_gemini():
+    """Configura Gemini API con manejo robusto"""
     try:
         # 1. Intentar desde secrets
-        api_key = st.secrets.get("DEEPSEEK_API_KEY", "")
+        api_key = st.secrets.get("GEMINI_API_KEY", "")
         
-        # 2. Si no está en secrets, pedirla
-        if not api_key or api_key.strip() == "":
-            st.sidebar.warning("⚠️ API Key no configurada en secrets")
-            with st.sidebar.expander("🔑 Configurar API Key Manualmente"):
-                api_key = st.text_input(
-                    "Ingresa tu API Key de DeepSeek",
+        # 2. Si no hay en secrets, mostrar opción para ingresarla
+        if not api_key:
+            if "gemini_api_key" not in st.session_state:
+                st.session_state.gemini_api_key = ""
+            
+            with st.sidebar.expander("🔑 Configurar Gemini API (GRATIS)", expanded=False):
+                st.markdown("""
+                **¡Obtén tu API Key GRATIS en 2 minutos!**
+                1. Ve a: [makersuite.google.com/app/apikey](https://makersuite.google.com/app/apikey)
+                2. Inicia sesión con Google
+                3. Haz clic en **"Create API Key"**
+                4. Copia y pega aquí
+                """)
+                
+                api_key_input = st.text_input(
+                    "Pega tu API Key de Gemini:",
                     type="password",
-                    help="Obtén una gratuita en https://platform.deepseek.com"
+                    value=st.session_state.get("gemini_api_key", ""),
+                    help="Es 100% gratis, sin tarjeta de crédito"
                 )
-                if api_key:
-                    st.success("✅ API Key configurada temporalmente")
-                else:
-                    st.info("💡 Puedes configurarla permanentemente en secrets.toml")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("💾 Guardar Key"):
+                        st.session_state.gemini_api_key = api_key_input
+                        st.success("¡Key guardada! Recarga la página")
+                        st.rerun()
+                with col2:
+                    if st.button("🔄 Probar Conexión"):
+                        if api_key_input:
+                            try:
+                                genai.configure(api_key=api_key_input)
+                                model = genai.GenerativeModel('gemini-pro')
+                                response = model.generate_content("Test")
+                                st.success("✅ Conexión exitosa con Gemini!")
+                            except Exception as e:
+                                st.error(f"❌ Error: {str(e)}")
+            
+            api_key = st.session_state.get("gemini_api_key", "")
         
-        if not api_key or api_key.strip() == "":
-            st.error("""
-            ❌ API Key de DeepSeek no configurada
-            
-            **Solución:**
-            1. Ve a https://platform.deepseek.com
-            2. Regístrate/inicia sesión
-            3. Crea una API Key en "API Keys"
-            4. Configura en secrets.toml como:
-            
-            ```toml
-            DEEPSEEK_API_KEY = "tu-key-aquí"
-            ```
-            
-            **¡Es completamente GRATUITO para uso personal!**
-            """)
-            st.stop()
+        # 3. Si aún no hay key, mostrar alerta
+        if not api_key:
+            return None
         
-        # Configurar cliente
-        client = OpenAI(
-            api_key=api_key.strip(),
-            base_url="https://api.deepseek.com",  # Sin /v1, DeepSeek lo maneja
+        # 4. Configurar Gemini
+        genai.configure(api_key=api_key)
+        
+        # 5. Probar conexión rápida
+        model = genai.GenerativeModel('gemini-pro')
+        response = model.generate_content(
+            "Hola",
+            generation_config=genai.types.GenerationConfig(
+                temperature=0.1,
+                max_output_tokens=10,
+            )
         )
         
-        # Probar conexión rápida
-        test_response = client.chat.completions.create(
-            model="deepseek-chat",
-            messages=[{"role": "user", "content": "Hola"}],
-            max_tokens=5,
-            timeout=5
-        )
-        
-        return client
+        return genai
         
     except Exception as e:
-        st.error(f"❌ Error configurando DeepSeek: {str(e)}")
-        st.info("""
-        **Pasos para solucionar:**
-        1. Verifica que tu API Key sea correcta
-        2. Asegúrate de no tener espacios al principio/final
-        3. Prueba crear una nueva API Key
-        4. Verifica tu saldo en https://platform.deepseek.com/console
-        """)
+        st.sidebar.error(f"⚠️ Error configurando Gemini: {str(e)}")
         return None
 
-def generar_analisis(prompt, client):
-    """Genera análisis con manejo robusto de errores"""
-    if not client:
-        return "Error: Cliente de IA no configurado correctamente."
-    
+def generar_analisis_ia(tipo_matriz, datos_contexto):
+    """Genera análisis estratégico con Gemini"""
     try:
-        response = client.chat.completions.create(
-            model="deepseek-chat",
-            messages=[
-                {"role": "system", "content": "Eres un analista estratégico empresarial experto. Proporciona análisis detallados, estructurados y prácticos."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.3,  # Más analítico, menos creativo
-            max_tokens=2000,
-            timeout=30
+        gemini = configurar_gemini()
+        if not gemini:
+            return "⚠️ Por favor, configura tu API Key de Gemini en el menú lateral."
+        
+        # Prompt optimizado para análisis estratégico
+        prompt = f"""Eres un consultor estratégico senior con 25 años de experiencia en análisis empresarial.
+
+**INSTRUCCIONES:**
+Analiza la siguiente matriz {tipo_matriz} y proporciona un análisis PROFESIONAL que incluya:
+
+📊 **CONCLUSIONES ESTRATÉGICAS (3-5 puntos clave):**
+- Hallazgos principales derivados de los datos
+- Interpretación del posicionamiento estratégico
+- Implicaciones para la toma de decisiones
+
+⚠️ **RIESGOS PRINCIPALES (Top 3):**
+- Factores críticos que podrían afectar el desempeño
+- Vulnerabilidades identificadas
+- Señales de alerta temprana
+
+🎯 **RECOMENDACIONES ACCIONABLES (5 puntos específicos):**
+- Pasos concretos para implementar
+- Prioridades de acción
+- Cronograma sugerido
+
+📈 **PLAN DE SEGUIMIENTO:**
+- Indicadores clave (KPIs) a monitorear
+- Frecuencia de revisión
+- Puntos de control críticos
+
+**DATOS DE LA MATRIZ {tipo_matriz.upper()}:**
+{datos_contexto[:2500]}
+
+**FORMATO DE RESPUESTA:**
+- Usa viñetas (•) para cada punto
+- Sé conciso pero completo
+- Enfócate en insights prácticos
+- Evita jerga innecesaria
+- Usa lenguaje ejecutivo"""
+
+        model = genai.GenerativeModel('gemini-pro')
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.types.GenerationConfig(
+                temperature=0.2,  # Bajo para análisis más preciso
+                top_p=0.8,
+                top_k=40,
+                max_output_tokens=2000,
+            ),
+            safety_settings={
+                'HARM_CATEGORY_HARASSMENT': 'BLOCK_NONE',
+                'HARM_CATEGORY_HATE_SPEECH': 'BLOCK_NONE',
+                'HARM_CATEGORY_SEXUALLY_EXPLICIT': 'BLOCK_NONE',
+                'HARM_CATEGORY_DANGEROUS_CONTENT': 'BLOCK_NONE',
+            }
         )
-        return response.choices[0].message.content
+        
+        return response.text
         
     except Exception as e:
         error_msg = str(e)
-        
-        # Manejo específico de errores comunes
-        if "Insufficient Balance" in error_msg or "402" in error_msg:
-            return f"""
-            ⚠️ **Error de saldo insuficiente en DeepSeek**
-            
-            **Posibles causas:**
-            1. Tu cuenta no tiene créditos gratuitos
-            2. Has excedido el límite temporal
-            
-            **Soluciones:**
-            1. Verifica tu saldo en: https://platform.deepseek.com/console
-            2. Crea una nueva cuenta si es necesario
-            3. Contacta con soporte de DeepSeek
-            
-            **Alternativa temporal:** Puedes continuar usando el análisis manual.
-            """
-        
-        elif "401" in error_msg or "Unauthorized" in error_msg:
-            return "❌ API Key inválida o expirada. Por favor, genera una nueva en https://platform.deepseek.com"
-        
-        elif "timeout" in error_msg.lower():
-            return "⏱️ Timeout: La IA está tardando demasiado. Intenta nuevamente o usa análisis manual."
-        
+        if "quota" in error_msg.lower() or "429" in error_msg:
+            return "⚠️ Límite temporal alcanzado. Espera 1 minuto o usa análisis manual por ahora."
+        elif "API key" in error_msg.lower():
+            return "❌ API Key inválida. Configura una nueva en el menú lateral."
         else:
-            return f"⚠️ Error al conectar con DeepSeek: {error_msg}. Por favor, intenta nuevamente o usa análisis manual."
+            return f"⚠️ Error con Gemini: {error_msg[:200]}... Usa análisis manual temporalmente."
 
-def generar_analisis_ia(tipo_matriz, datos_contexto):
-    client = get_ia_client()
-    if not client:
-        return "Error: No se encontró la API Key de DeepSeek en st.secrets."
-    
-    prompt = f"Actúa como un consultor senior de estrategia. Analiza la siguiente matriz {tipo_matriz} y proporciona conclusiones estratégicas clave, riesgos y recomendaciones. Datos: {datos_contexto}"
-    
-    return generar_analisis(prompt, client)
-
-def generar_analisis(prompt, client):
-    # Cambiado los modelos de Groq por modelo de DeepSeek
-    # DeepSeek tiene solo un modelo principal para chat
-    modelos_deepseek = [
-        "deepseek-chat",  # Modelo principal de DeepSeek
-    ]
-    
-    errores = []
-    for modelo in modelos_deepseek:
-        try:
-            response = client.chat.completions.create(
-                model=modelo,
-                messages=[{"role": "system", "content": "Eres un analista estratégico empresarial."},
-                {"role": "user", "content": prompt}],
-                timeout=30  # Aumentado timeout para DeepSeek
+def generar_estrategias_gemini(contexto_foda):
+    """Genera 12 estrategias con Gemini"""
+    try:
+        gemini = configurar_gemini()
+        if not gemini:
+            return None
+        
+        prompt = f"""Como Director de Estrategia, genera 12 estrategias (3 por cada cuadrante FODA).
+        
+        **DATOS FODA CRUZADO:**
+        {contexto_foda}
+        
+        **INSTRUCCIONES:**
+        1. Genera 3 estrategias OFENSIVAS (FO) - Fortalezas vs Oportunidades
+        2. Genera 3 estrategias DEFENSIVAS (FA) - Fortalezas vs Amenazas
+        3. Genera 3 estrategias ADAPTATIVAS (DO) - Debilidades vs Oportunidades
+        4. Genera 3 estrategias de SUPERVIVENCIA (DA) - Debilidades vs Amenazas
+        
+        **FORMATO EXACTO (12 líneas):**
+        CUADRANTE|NOMBRE_ESTRATEGIA|IMPORTANCIA|ACT1;ACT2;ACT3;ACT4;ACT5
+        
+        **EJEMPLO:**
+        FO|Expansión de Mercado|Alta|Investigación de mercado;Desarrollo de producto;Capacitación de ventas;Lanzamiento piloto;Evaluación de resultados
+        
+        **IMPORTANCIA:** Alta, Media Alta, Media Baja, Baja
+        **ACTIVIDADES:** 5 actividades concretas separadas por ;
+        
+        Solo responde con las 12 líneas, nada más."""
+        
+        model = genai.GenerativeModel('gemini-pro')
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.types.GenerationConfig(
+                temperature=0.3,
+                max_output_tokens=1500,
             )
-            return response.choices[0].message.content
-        except Exception as e:
-            err_msg = str(e)
-            errores.append(f"{modelo}: {err_msg}")
-            continue
-            
-    return f"No se pudo generar el análisis. DeepSeek no está disponible en este momento. Por favor, intenta de nuevo en unos instantes. (Error: {', '.join(errores)})"
+        )
+        
+        return response.text
+        
+    except Exception:
+        return None
 
-st.set_page_config( page_title="Estratega Pro | Business Intelligence", page_icon="♟️", layout="wide",
-    initial_sidebar_state="expanded")
+# ========== CONFIGURACIÓN STREAMLIT ==========
+st.set_page_config(
+    page_title="Estratega Pro | Business Intelligence", 
+    page_icon="♟️", 
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 st.markdown("""
     <style>
-    .main { background-color:
-    .stButton>button { width: 100%;
+    .main { background-color: #f8f9fa; }
+    .stButton>button { 
+        width: 100%;
         border-radius: 5px;
         height: 3em;
-        background-color:
+        background-color: #1e88e5;
         color: white;
-        border: none;}
-    h1, h2, h3 { color:
+        border: none;
+    }
+    h1, h2, h3 { color: #1a237e; }
+    .gemini-badge {
+        background-color: #4285f4;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 0.8em;
+        margin-left: 10px;
+    }
     </style>
     """, unsafe_allow_html=True)
+
+# Badge Gemini en sidebar
+with st.sidebar:
+    st.markdown('<div style="text-align: center; margin-bottom: 20px;">', unsafe_allow_html=True)
+    st.markdown('<span class="gemini-badge">Powered by Gemini AI</span>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ========== FUNCIONES EXISTENTES (MANTENIDAS) ==========
 def init_supabase():
     try:
         if "supabase_url" in st.secrets and "supabase_key" in st.secrets:
@@ -187,9 +249,12 @@ def init_supabase():
         return None
     except Exception:
         return None
+
 supabase = init_supabase()
+
 def get_connection():
     return sqlite3.connect('strategic_plan.db', timeout=10)
+
 def init_db():
     with get_connection() as conn:
         cursor = conn.cursor()
@@ -242,18 +307,20 @@ def init_db():
             if col not in columnas_existentes:
                 cursor.execute(f"ALTER TABLE empresas ADD COLUMN {col} TEXT")
         conn.commit()
+
 def get_empresas():
     with get_connection() as conn:
         return pd.read_sql("SELECT id, nombre FROM empresas", conn)
+
 def save_image(uploaded_file):
     if uploaded_file:
         return uploaded_file.getvalue()
     return None
+
 def analizar_foda(df_foda):
     if df_foda.empty: return None, None, None, pd.Series(dtype='float64')
     estrategias = {'FO': 'Ofensiva (F+O)', 'FA': 'Defensiva (F+A)', 'DO': 'Adaptativa (D+O)', 'DA': 'Supervivencia (D+A)'}
     puntajes = df_foda.groupby('cuadrante')['impacto'].sum().reindex(estrategias.keys(), fill_value=0)
-    # Ordenar puntajes de mayor a menor para el radar y el análisis
     puntajes_ordenados = puntajes.sort_values(ascending=False)
     analisis_df = pd.DataFrame({
         'Estrategia': [estrategias[c] for c in puntajes_ordenados.index],
@@ -262,11 +329,13 @@ def analizar_foda(df_foda):
     estrategia_principal = analisis_df.iloc[0]['Estrategia']
     resumen = f"La estrategia principal recomendada es **{analisis_df.iloc[0]['Estrategia']}** ({analisis_df.iloc[0]['Puntaje Total']} puntos), seguida por **{analisis_df.iloc[1]['Estrategia']}** ({analisis_df.iloc[1]['Puntaje Total']} puntos)."
     return analisis_df, resumen, estrategia_principal, puntajes_ordenados
+
 def generar_planes_por_plantilla(estrategia_foda, pest_total):
     planes = {}
     intro = "El plan administrativo se enfocará en fortalecer la base de la organización y fomentar la innovación continua."
     obj = "Implementar un programa de formación en liderazgo y gestión de proyectos para los mandos medios en los próximos 6 meses."
     planes['Administrativo'] = {'introduccion': intro, 'objetivo': obj}
+    
     if "Ofensiva" in estrategia_foda:
         intro = "La posición estratégica es Ofensiva. El plan debe centrarse en usar las fortalezas para capitalizar al máximo las oportunidades de mercado."
         obj = "Lanzar una nueva línea de producto/servicio que explote nuestras fortalezas en los próximos 12 meses, para capturar un 5% más de cuota de mercado."
@@ -277,6 +346,7 @@ def generar_planes_por_plantilla(estrategia_foda, pest_total):
         intro = "La estrategia es Defensiva/Supervivencia. La prioridad es proteger la posición actual, usando fortalezas para mitigar amenazas."
         obj = "Implementar un plan de retención de clientes clave en los próximos 6 meses, para reducir la tasa de abandono en un 10%."
     planes['Mejora'] = {'introduccion': intro, 'objetivo': obj}
+    
     if pest_total < 2.5:
         intro = f"El análisis del entorno (PEST: {pest_total:.2f}) revela vulnerabilidad a factores externos. Es crucial desarrollar planes para mitigar riesgos."
         obj = "Formar un comité de gestión de riesgos que, en 2 meses, identifique los 3 principales riesgos externos y desarrolle un plan de respuesta específico."
@@ -284,6 +354,7 @@ def generar_planes_por_plantilla(estrategia_foda, pest_total):
         intro = f"La empresa muestra buena respuesta al entorno (PEST: {pest_total:.2f}). El plan se enfocará en la monitorización proactiva de eventos inesperados."
         obj = "Establecer un sistema de vigilancia del entorno trimestral y realizar un simulacro de crisis anual."
     planes['Contingencia'] = {'introduccion': intro, 'objetivo': obj}
+    
     if "Ofensiva" in estrategia_foda or "Adaptativa" in estrategia_foda:
         intro = "La estrategia de crecimiento requiere un apalancamiento tecnológico. Se debe invertir en innovación para ganar ventaja competitiva."
         obj = "Evaluar e implementar una nueva herramienta de CRM o ERP en los próximos 9 meses para mejorar la relación con clientes y la eficiencia operativa."
@@ -291,9 +362,11 @@ def generar_planes_por_plantilla(estrategia_foda, pest_total):
         intro = "La tecnología debe usarse para robustecer la operación y defender la posición actual. La prioridad es la seguridad y la estabilidad."
         obj = "Realizar una auditoría de ciberseguridad completa en el próximo trimestre y actualizar los sistemas críticos para mitigar vulnerabilidades."
     planes['Tecnológico'] = {'introduccion': intro, 'objetivo': obj}
+    
     intro = "El plan operativo se enfocará en optimizar la cadena de valor y escalar las operaciones de manera eficiente para soportar el crecimiento."
     obj = "Desarrollar un plan de escalabilidad operativa para aumentar la capacidad de producción/servicio en un 20% en el próximo año, sin sacrificar la calidad."
     planes['Operativo'] = {'introduccion': intro, 'objetivo': obj}
+    
     if "Ofensiva" in estrategia_foda or "Adaptativa" in estrategia_foda:
         intro = "Dado que la estrategia implica nuevas iniciativas y crecimiento, se requiere un sistema de monitoreo ágil y riguroso para asegurar que los objetivos se cumplan."
         obj = "Implementar un dashboard de KPIs (Indicadores Clave) en tiempo real para los nuevos proyectos y establecer un ciclo de revisión estratégica mensual."
@@ -301,6 +374,7 @@ def generar_planes_por_plantilla(estrategia_foda, pest_total):
         intro = "El monitoreo debe centrarse en indicadores de alerta temprana y en el control de los factores críticos para la supervivencia del negocio."
         obj = "Definir 5 indicadores de riesgo clave (KRIs) y establecer un sistema de alertas automáticas para la alta dirección, con revisión semanal."
     planes['Monitoreo y control'] = {'introduccion': intro, 'objetivo': obj}
+    
     if "Ofensiva" in estrategia_foda or "Adaptativa" in estrategia_foda:
         intro = "El entorno es favorable y la estrategia es de crecimiento. El plan financiero debe enfocarse en asegurar los fondos para la expansión."
         obj = "Preparar un caso de negocio y una ronda de financiación (o asegurar una línea de crédito) en los próximos 6 meses para financiar las nuevas iniciativas estratégicas."
@@ -308,7 +382,9 @@ def generar_planes_por_plantilla(estrategia_foda, pest_total):
         intro = "La situación financiera debe ser gestionada con prudencia. La prioridad es la optimización de costos, la gestión de la liquidez y la maximización de la rentabilidad actual."
         obj = "Implementar un plan de reducción de costos no esenciales para mejorar el margen de beneficio neto en un 2% en los próximos 6 meses, sin afectar la operación crítica."
     planes['Financiero'] = {'introduccion': intro, 'objetivo': obj}
+    
     return planes
+
 def generar_cuadro_de_mando(planes):
     cmi_data = []
     for nombre_plan, datos_plan in planes.items():
@@ -324,10 +400,12 @@ def generar_cuadro_de_mando(planes):
         meta = "Por definir"
         iniciativa = f"Proyecto derivado del Plan {nombre_plan}"
         cmi_data.append([perspectiva, datos_plan['objetivo'], kpi, meta, iniciativa])
+    
     df_cmi = pd.DataFrame(cmi_data, columns=['Perspectiva', 'Objetivo Estratégico', 'KPI (Indicador)', 'Meta', 'Iniciativa'])
     perspectiva_orden = ['Financiera', 'Clientes', 'Procesos Internos', 'Aprendizaje y Crecimiento']
     df_cmi['Perspectiva'] = pd.Categorical(df_cmi['Perspectiva'], categories=perspectiva_orden, ordered=True)
     return df_cmi.sort_values(by='Perspectiva').reset_index(drop=True)
+
 def generar_grafico_foda_radar(puntajes):
     if puntajes is None or puntajes.empty: return None
     labels = np.array(['Ofensiva\n(FO)', 'Defensiva\n(FA)', 'Adaptativa\n(DO)', 'Supervivencia\n(DA)'])
@@ -347,6 +425,7 @@ def generar_grafico_foda_radar(puntajes):
     plt.close(fig)
     buf.seek(0)
     return buf
+
 def generar_grafico_pest_bar(df_pest):
     if df_pest.empty: return None
     pest_scores = df_pest.groupby('categoria')['valor_ponderado'].sum()
@@ -359,6 +438,7 @@ def generar_grafico_pest_bar(df_pest):
     plt.close(fig)
     buf.seek(0)
     return buf
+
 def encabezado_pie_pagina(canvas, doc, logo_bytes, nombre_empresa, version, coordinador):
     canvas.saveState()
     canvas.setFont('Helvetica-Bold', 14)
@@ -377,21 +457,25 @@ def encabezado_pie_pagina(canvas, doc, logo_bytes, nombre_empresa, version, coor
     canvas.drawCentredString(doc.width/2 + doc.leftMargin, 0.5*inch, f"Revisado por: {coordinador}")
     canvas.drawRightString(doc.width + doc.leftMargin, 0.5*inch, "Aprobado por: Ing. Monica Legarda")
     canvas.restoreState()
+
 def get_apa_styles():
     styles = getSampleStyleSheet()
     styles.add(ParagraphStyle(name='APA_Body', fontName='Times-Roman', fontSize=12, leading=24, alignment=TA_JUSTIFY))
     styles.add(ParagraphStyle(name='APA_H1', parent=styles['APA_Body'], fontName='Times-Bold', fontSize=14, alignment=TA_CENTER, spaceAfter=12))
     styles.add(ParagraphStyle(name='APA_H2', parent=styles['APA_Body'], fontName='Times-Bold', alignment=TA_LEFT, spaceBefore=12, spaceAfter=6))
     return styles
+
 def generar_pdf_completo(empresa_id, version, coordinador):
     with get_connection() as conn:
         empresa = pd.read_sql(f"SELECT * FROM empresas WHERE id={empresa_id}", conn).iloc[0]
         df_pest = pd.read_sql(f"SELECT categoria, factor, tipo_foda, puntaje, importancia, valor_ponderado FROM matrices WHERE empresa_id={empresa_id} AND tipo_matriz='PEST'", conn)
         df_foda = pd.read_sql(f"SELECT cuadrante, factor_fila, factor_columna, impacto FROM foda_cruzado WHERE empresa_id={empresa_id}", conn)
+    
     pdf_buffer = BytesIO()
     doc = SimpleDocTemplate(pdf_buffer, pagesize=A4, leftMargin=1*inch, rightMargin=1*inch, topMargin=1*inch, bottomMargin=1*inch)
     styles = get_apa_styles()
     story = []
+    
     story.append(Spacer(1, 2*inch))
     story.append(Paragraph("Plan Estratégico", styles['APA_H1']))
     story.append(Spacer(1, 0.2*inch))
@@ -400,41 +484,54 @@ def generar_pdf_completo(empresa_id, version, coordinador):
     story.append(Paragraph(f"Versión: {version}", styles['APA_Body']))
     story.append(Paragraph(f"Fecha: {pd.Timestamp.now().strftime('%Y-%m-%d')}", styles['APA_Body']))
     story.append(PageBreak())
+    
     story.append(Paragraph("Resumen Ejecutivo", styles['APA_H1']))
     story.append(Paragraph("Este resumen presenta los hallazgos y recomendaciones clave del diagnóstico estratégico. Está diseñado para proporcionar una visión general rápida y comprensible para la alta dirección, facilitando la toma de decisiones informadas.", styles['APA_Body']))
     story.append(Spacer(1, 24))
+    
     analisis_foda_df, resumen_foda, estrategia_principal, puntajes_foda = analizar_foda(df_foda)
     pest_total = df_pest['valor_ponderado'].sum() if not df_pest.empty else 0
+    
     story.append(Paragraph("Diagnóstico Estratégico General", styles['APA_H2']))
     story.append(Paragraph(f"La estrategia principal recomendada, basada en el análisis FODA cruzado, es la <b>{estrategia_principal}</b>. Esto indica la postura que la empresa debería adoptar prioritariamente. El siguiente gráfico de radar ilustra la ponderación de las cuatro posibles estrategias.", styles['APA_Body']))
+    
     grafico_foda = generar_grafico_foda_radar(puntajes_foda)
     if grafico_foda: story.append(Image(grafico_foda, width=5*inch, height=5*inch))
     story.append(PageBreak())
+    
     story.append(Paragraph("Factores Críticos de Éxito", styles['APA_H2']))
     story.append(Paragraph("A continuación, se destacan los factores más influyentes del análisis PEST, que representan las mayores oportunidades y amenazas del entorno.", styles['APA_Body']))
+    
     if not df_pest.empty:
         pest_criticos = df_pest.sort_values(by='valor_ponderado', ascending=False).head(5)
         pest_data = [pest_criticos.columns.tolist()] + pest_criticos.values.tolist()
         pest_table = Table(pest_data, colWidths=[1.2*inch, 2*inch, 1*inch, 0.8*inch, 1*inch, 1*inch])
         pest_table.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), '#CCCCCC'), ('GRID', (0,0), (-1,-1), 1, '#000000')]))
         story.append(pest_table)
+    
     story.append(Spacer(1, 24))
     story.append(PageBreak())
+    
     story.append(Paragraph("Objetivos Estratégicos Propuestos", styles['APA_H2']))
     story.append(Paragraph("Derivado del diagnóstico, se proponen los siguientes objetivos macro para cada área de planificación. Estos objetivos forman la base del Cuadro de Mando Integral.", styles['APA_Body']))
+    
     planes = generar_planes_por_plantilla(estrategia_principal, pest_total)
     for nombre_plan, datos_plan in planes.items():
         story.append(Paragraph(f"<b>{nombre_plan}:</b> {datos_plan['objetivo']}", styles['APA_Body']))
         story.append(Spacer(1, 6))
+    
     story.append(PageBreak())
+    
     story.append(Paragraph("Conclusiones y Próximos Pasos", styles['APA_H2']))
     story.append(Paragraph(f"<b>Conclusión General:</b> La empresa se encuentra en una posición estratégica <b>{estrategia_principal}</b>. Es imperativo actuar sobre los planes propuestos para capitalizar las ventajas y mitigar los riesgos.", styles['APA_Body']))
     story.append(Spacer(1, 12))
+    
     story.append(Paragraph("<b>Recomendaciones Inmediatas:</b>", styles['APA_Body']))
     story.append(Paragraph("1. Revisar y aprobar el presente plan estratégico.", styles['APA_Body']))
     story.append(Paragraph("2. Asignar responsables y recursos para cada iniciativa del Cuadro de Mando Integral.", styles['APA_Body']))
     story.append(Paragraph("3. Establecer el ciclo de reuniones de monitoreo y control (recomendado: trimestral).", styles['APA_Body']))
     story.append(PageBreak())
+    
     story.append(Paragraph("Anexos: Detalles del Plan Estratégico", styles['APA_H1']))
     story.append(Paragraph("Anexo A: Introducción y Cultura Organizacional", styles['APA_H2']))
     story.append(Paragraph(f"<b>Nombre de la Empresa:</b> {empresa.get('nombre', 'N/A')}", styles['APA_Body']))
@@ -443,42 +540,54 @@ def generar_pdf_completo(empresa_id, version, coordinador):
     story.append(Paragraph(f"<b>Visión:</b> {empresa.get('vision', 'N/A')}", styles['APA_Body']))
     story.append(Paragraph(f"<b>Valores y Principios:</b> {empresa.get('valores', 'N/A')}", styles['APA_Body']))
     story.append(PageBreak())
+    
     story.append(Paragraph("Anexo B: Diagnóstico Situacional Detallado", styles['APA_H2']))
     story.append(Paragraph("<b>Matriz PEST Completa</b>", styles['APA_Body']))
+    
     if not df_pest.empty:
         pest_data_full = [df_pest.columns.tolist()] + df_pest.values.tolist()
         pest_table_full = Table(pest_data_full, colWidths=[1.2*inch, 2*inch, 1*inch, 0.8*inch, 1*inch, 1*inch])
         pest_table_full.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), '#CCCCCC'), ('GRID', (0,0), (-1,-1), 1, '#000000')]))
         story.append(pest_table_full)
+    
     story.append(PageBreak())
     story.append(Paragraph("<b>Matriz FODA Cruzado Completa</b>", styles['APA_Body']))
+    
     if not df_foda.empty:
         foda_data_full = [df_foda.columns.tolist()] + df_foda.values.tolist()
         foda_table_full = Table(foda_data_full, colWidths=[1.2*inch, 2*inch, 2*inch, 1*inch])
         foda_table_full.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), '#CCCCCC'), ('GRID', (0,0), (-1,-1), 1, '#000000')]))
         story.append(foda_table_full)
+    
     story.append(PageBreak())
     story.append(Paragraph("Anexo C: Planes Estratégicos y Cuadro de Mando", styles['APA_H2']))
     story.append(Paragraph("<b>Cuadro de Mando Integral (CMI)</b>", styles['APA_Body']))
+    
     df_cmi = generar_cuadro_de_mando(planes)
     cmi_data = [df_cmi.columns.tolist()] + df_cmi.values.tolist()
     cmi_table = Table(cmi_data, colWidths=[1.5*inch, 2.5*inch, 1*inch, 1*inch, 1.5*inch])
     cmi_table.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), '#CCCCCC'), ('GRID', (0,0), (-1,-1), 1, '#000000'), ('VALIGN', (0,0), (-1,-1), 'TOP')]))
     story.append(cmi_table)
     story.append(PageBreak())
+    
     logo_bytes = BytesIO(empresa['logo']) if empresa['logo'] else None
     doc.build(story, onFirstPage=lambda c, d: encabezado_pie_pagina(c, d, logo_bytes, empresa['nombre'], version, coordinador), 
                      onLaterPages=lambda c, d: encabezado_pie_pagina(c, d, logo_bytes, empresa['nombre'], version, coordinador))
     pdf_buffer.seek(0)
     return pdf_buffer
+
+# ========== APLICACIÓN PRINCIPAL ==========
 def aplicacion_principal():
     init_db()
+    
     with st.sidebar:
         st.header("Gestión de Empresas")
         empresas_df = get_empresas()
         empresa_seleccionada = st.selectbox("Selecciona una Empresa", empresas_df['nombre'], index=None, placeholder="Elige una opción")
         empresa_id = int(empresas_df[empresas_df['nombre'] == empresa_seleccionada]['id'].iloc[0]) if empresa_seleccionada else None
+        
         st.divider()
+        
         with st.expander("➕ Crear Nueva Empresa"):
             with st.form("new_empresa_form"):
                 new_empresa_name = st.text_input("Nombre de la nueva empresa")
@@ -493,26 +602,41 @@ def aplicacion_principal():
                             st.error(f"La empresa '{new_empresa_name}' ya existe.")
                     else:
                         st.warning("El nombre no puede estar vacío.")
+        
         if empresa_id and st.button("❌ Eliminar Empresa Seleccionada", type="primary"):
             with get_connection() as conn:
                 conn.execute("DELETE FROM empresas WHERE id=?", (empresa_id,))
             st.success(f"Empresa '{empresa_seleccionada}' eliminada.")
             st.rerun()
+    
     if not empresa_id:
         st.info("👈 Por favor, selecciona o crea una empresa en el menú lateral para comenzar.")
         st.stop()
-    tab1, tab2, tab_est, tab3, tab4, tab5, tab6 = st.tabs(["1. Introducción", "2. Diagnóstico Situacional", "3. Estrategia", "4. Planes Estratégicos", "5. CMI/Indicadores", "6. Operativización/Presupuesto", "7. Resumen y Conclusiones"])
+    
+    tab1, tab2, tab_est, tab3, tab4, tab5, tab6 = st.tabs([
+        "1. Introducción", 
+        "2. Diagnóstico Situacional", 
+        "3. Estrategia", 
+        "4. Planes Estratégicos", 
+        "5. CMI/Indicadores", 
+        "6. Operativización/Presupuesto", 
+        "7. Resumen y Conclusiones"
+    ])
+    
     with tab1:
         st.header("Introducción y Cultura Organizacional")
         with get_connection() as conn:
             empresa_data = pd.read_sql(f"SELECT * FROM empresas WHERE id={empresa_id}", conn).iloc[0]
+        
         with st.form("form_intro"):
             st.subheader("Datos Generales")
             nombre = st.text_input("Nombre de la Empresa", empresa_data['nombre'])
             giro = st.text_input("Giro del Negocio", empresa_data['giro'])
             logo_file = st.file_uploader("Subir Logo", type=['png', 'jpg', 'jpeg'])
+            
             if empresa_data['logo']:
                 st.image(BytesIO(empresa_data['logo']), width=150)
+            
             st.divider()
             st.subheader("Cultura Organizacional")
             objetivo_plan = st.text_area("Objetivo del Plan Estratégico", empresa_data.get('objetivo_plan', ''))
@@ -523,78 +647,119 @@ def aplicacion_principal():
             politicas = st.text_area("Políticas de la Empresa", empresa_data['politicas'])
             valores = st.text_area("Valores y Principios", empresa_data['valores'])
             organigrama_file = st.file_uploader("Subir Organigrama", type=['png', 'jpg', 'jpeg'])
+            
             if empresa_data['organigrama']:
                 st.image(BytesIO(empresa_data['organigrama']))
+            
             if st.form_submit_button("Guardar Introducción"):
                 logo_bytes = save_image(logo_file) if logo_file else empresa_data['logo']
                 org_bytes = save_image(organigrama_file) if organigrama_file else empresa_data['organigrama']
+                
                 with get_connection() as conn:
                     conn.execute('''UPDATE empresas SET 
                                     nombre=?, giro=?, logo=?, objetivo_plan=?, mision=?, vision=?, 
                                     obj_general=?, obj_especificos=?, politicas=?, valores=?, organigrama=?
-                                    WHERE id=?''', (nombre, giro, logo_bytes, objetivo_plan, mision, vision,
-                                  obj_gen, obj_esp, politicas, valores, org_bytes, empresa_id))
-                st.success("Datos de introducción guardados."); st.rerun()
+                                    WHERE id=?''', 
+                                (nombre, giro, logo_bytes, objetivo_plan, mision, vision,
+                                 obj_gen, obj_esp, politicas, valores, org_bytes, empresa_id))
+                st.success("Datos de introducción guardados.")
+                st.rerun()
+    
     with tab2:
         st.header("Diagnóstico Situacional (Análisis de Matrices)")
+        
         with get_connection() as conn:
             analisis_data = pd.read_sql(f"SELECT analisis_made, analisis_madi, analisis_posicionamiento, analisis_pest, analisis_foda FROM empresas WHERE id={empresa_id}", conn).iloc[0]
+        
         def procesar_made_madi(data_str, tipo):
             if isinstance(data_str, pd.DataFrame):
                 data_str = data_str.to_csv(sep='\t', index=False)
+            
             df = pd.read_csv(StringIO(data_str), sep='\t', header=0)
+            
             def normalize_text(text):
                 if text is None: return ""
                 return unicodedata.normalize('NFKD', str(text)).encode('ascii', 'ignore').decode('utf-8').lower().replace(' ', '_').replace('%', '_percent')
+            
             df.columns = [normalize_text(col) for col in df.columns]
-            column_mapping = { 'n': 'N', 'variable': 'Variable', 'factor': 'Factor', 'producto': 'Producto',
-                'precio': 'Precio', 'plaza': 'Plaza', 'promocion': 'Promocion',
-                'rating': 'Rating', 'weight__percent': 'Weight %', 'weight_percent': 'Weight %'}
+            
+            column_mapping = { 
+                'n': 'N', 
+                'variable': 'Variable', 
+                'factor': 'Factor', 
+                'producto': 'Producto',
+                'precio': 'Precio', 
+                'plaza': 'Plaza', 
+                'promocion': 'Promocion',
+                'rating': 'Rating', 
+                'weight__percent': 'Weight %', 
+                'weight_percent': 'Weight %'
+            }
+            
             df.rename(columns=column_mapping, inplace=True)
+            
             p_cols = ['Producto', 'Precio', 'Plaza', 'Promocion']
             for col in p_cols:
                 if col not in df.columns:
                     df[col] = "no"
                 else:
                     df[col] = df[col].astype(str).str.lower()
+            
             df['Total'] = df[p_cols].apply(lambda row: row.str.contains('si', na=False)).sum(axis=1)
+            
             numeric_cols = ['Rating', 'Weight %']
             for col in numeric_cols:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
+            
             df['Valor'] = df.get('Rating', 0) * (df.get('Weight %', 0) / 100.0)
             df['empresa_id'] = empresa_id
             df['tipo_matriz'] = tipo
+            
             df_to_db = df.rename(columns={
-                'Variable': 'variable', 'Factor': 'factor', 'Producto': 'producto', 'Precio': 'precio',
-                'Plaza': 'plaza', 'Promocion': 'promocion', 'Rating': 'rating', 'Weight %': 'weight_percent',
-                'Valor': 'valor', 'Total': 'total'
+                'Variable': 'variable', 'Factor': 'factor', 'Producto': 'producto', 
+                'Precio': 'precio', 'Plaza': 'plaza', 'Promocion': 'promocion', 
+                'Rating': 'rating', 'Weight %': 'weight_percent', 'Valor': 'valor', 
+                'Total': 'total'
             })
-            columnas_bd = ['empresa_id', 'tipo_matriz', 'variable', 'factor', 'producto', 'precio', 'plaza', 'promocion', 'rating', 'weight_percent', 'valor', 'total']
+            
+            columnas_bd = ['empresa_id', 'tipo_matriz', 'variable', 'factor', 'producto', 
+                          'precio', 'plaza', 'promocion', 'rating', 'weight_percent', 
+                          'valor', 'total']
             columnas_presentes = [col for col in columnas_bd if col in df_to_db.columns]
             df_to_db = df_to_db[columnas_presentes]
+            
             return df_to_db
+        
         def display_and_edit_matrix(tipo_matriz, analisis_propio_data):
             with get_connection() as conn:
                 df_db = pd.read_sql(f"SELECT * FROM matriz_marketing WHERE empresa_id=? AND tipo_matriz='{tipo_matriz}'", conn, params=(empresa_id,))
+            
             if not df_db.empty:
                 st.info("Puedes editar los datos directamente en la tabla.")
                 df_display = df_db.rename(columns={
-                    'variable': 'Variable', 'factor': 'Factor', 'producto': 'Producto', 'precio': 'Precio',
-                    'plaza': 'Plaza', 'promocion': 'Promoción', 'rating': 'Rating', 'weight_percent': 'Weight %',
-                    'valor': 'Valor', 'total': 'Total'
+                    'variable': 'Variable', 'factor': 'Factor', 'producto': 'Producto', 
+                    'precio': 'Precio', 'plaza': 'Plaza', 'promocion': 'Promoción', 
+                    'rating': 'Rating', 'weight_percent': 'Weight %', 'valor': 'Valor', 
+                    'total': 'Total'
                 })
+                
                 edited_df = st.data_editor(
-                    df_display, key=f"editor_{tipo_matriz}", num_rows="dynamic", use_container_width=True,
-                    disabled=['id', 'empresa_id', 'tipo_matriz', 'Valor', 'Total'])
+                    df_display, key=f"editor_{tipo_matriz}", num_rows="dynamic", 
+                    use_container_width=True, disabled=['id', 'empresa_id', 'tipo_matriz', 'Valor', 'Total']
+                )
+                
                 if st.button(f"💾 Guardar Cambios en {tipo_matriz}"):
                     with get_connection() as conn:
                         conn.execute(f"DELETE FROM matriz_marketing WHERE empresa_id=? AND tipo_matriz='{tipo_matriz}'", (empresa_id,))
                         df_to_save = procesar_made_madi(edited_df, tipo_matriz)
                         df_to_save.to_sql('matriz_marketing', conn, if_exists='append', index=False)
-                    st.success(f"Cambios en {tipo_matriz} guardados."); st.rerun()
+                    st.success(f"Cambios en {tipo_matriz} guardados.")
+                    st.rerun()
+                
                 total_score = df_db['total'].sum()
                 st.metric(f"Puntaje Total {tipo_matriz}", f"{total_score}")
+                
                 st.subheader("Análisis Automático Sugerido")
                 if tipo_matriz == 'MADE':
                     if total_score >= 3.5:
@@ -613,26 +778,37 @@ def aplicacion_principal():
                 
                 with st.form(f"form_analisis_{tipo_matriz.lower()}"):
                     st.subheader("Análisis Estratégico")
-                    if st.form_submit_button("🤖 Generar Análisis con IA"):
-                        with st.spinner("La IA está analizando los datos..."):
-                            contexto = df_db.to_string()
-                            analisis_ia = generar_analisis_ia(tipo_matriz, contexto)
-                            st.session_state[f"ia_analisis_{tipo_matriz}"] = analisis_ia
+                    
+                    col1, col2 = st.columns([1, 3])
+                    with col1:
+                        if st.form_submit_button("🤖 Generar con Gemini"):
+                            with st.spinner("Gemini está analizando los datos..."):
+                                contexto = df_db.to_string()
+                                analisis_ia = generar_analisis_ia(tipo_matriz, contexto)
+                                st.session_state[f"ia_analisis_{tipo_matriz}"] = analisis_ia
                     
                     current_analisis = st.session_state.get(f"ia_analisis_{tipo_matriz}", analisis_propio_data)
-                    analisis_propio = st.text_area(f"Conclusiones sobre la matriz {tipo_matriz}.", value=current_analisis, height=300)
+                    analisis_propio = st.text_area(
+                        f"Conclusiones sobre la matriz {tipo_matriz}.", 
+                        value=current_analisis, 
+                        height=300
+                    )
+                    
                     if st.form_submit_button("Guardar Análisis"):
-
                         with get_connection() as conn:
                             conn.execute(f"UPDATE empresas SET analisis_{tipo_matriz.lower()}=? WHERE id=?", (analisis_propio, empresa_id))
-                        st.success(f"Análisis de {tipo_matriz} guardado."); st.rerun()
+                        st.success(f"Análisis de {tipo_matriz} guardado.")
+                        st.rerun()
             else:
                 st.info(f"Aún no hay datos para la Matriz {tipo_matriz}. Pega los datos desde Excel para comenzar.")
+        
         diag_tab1, diag_tab2, diag_tab3, diag_tab4, diag_tab5 = st.tabs([
             "Matriz MADE", "Matriz MADI", "Matriz de Posicionamiento", "Matriz PEST", "Matriz FODA Numérico"
         ])
+        
         with diag_tab1:
             st.subheader("Análisis de Marketing Interno (MADE)")
+            
             with st.expander("📋 Pegar datos de MADE desde Excel"):
                 made_paste_data = st.text_area("Pega tus datos de MADE aquí", height=200, key="paste_MADE")
                 if st.button("Procesar y Reemplazar Datos de MADE", key="process_made"):
@@ -641,12 +817,16 @@ def aplicacion_principal():
                         with get_connection() as conn:
                             conn.execute("DELETE FROM matriz_marketing WHERE empresa_id=? AND tipo_matriz='MADE'", (empresa_id,))
                             df_made.to_sql('matriz_marketing', conn, if_exists='append', index=False)
-                        st.success(f"¡{len(df_made)} filas importadas a MADE exitosamente!"); st.rerun()
+                        st.success(f"¡{len(df_made)} filas importadas a MADE exitosamente!")
+                        st.rerun()
                     except Exception as e:
                         st.error(f"Error al procesar datos de MADE: {e}")
+            
             display_and_edit_matrix('MADE', analisis_data.get('analisis_made', ''))
+        
         with diag_tab2:
             st.subheader("Análisis de Marketing Externo (MADI)")
+            
             with st.expander("📋 Pegar datos de MADI desde Excel"):
                 madi_paste_data = st.text_area("Pega tus datos de MADI aquí", height=200, key="paste_MADI")
                 if st.button("Procesar y Reemplazar Datos de MADI", key="process_madi"):
@@ -655,27 +835,39 @@ def aplicacion_principal():
                         with get_connection() as conn:
                             conn.execute("DELETE FROM matriz_marketing WHERE empresa_id=? AND tipo_matriz='MADI'", (empresa_id,))
                             df_madi.to_sql('matriz_marketing', conn, if_exists='append', index=False)
-                        st.success(f"¡{len(df_madi)} filas importadas a MADI exitosamente!"); st.rerun()
+                        st.success(f"¡{len(df_madi)} filas importadas a MADI exitosamente!")
+                        st.rerun()
                     except Exception as e:
                         st.error(f"Error al procesar datos de MADI: {e}")
+            
             display_and_edit_matrix('MADI', analisis_data.get('analisis_madi', ''))
+        
         with diag_tab3:
             st.subheader("Matriz de Posicionamiento")
+            
             with get_connection() as conn:
                 pos_data = pd.read_sql("SELECT posicionamiento_x, posicionamiento_y FROM empresas WHERE id=?", conn, params=(empresa_id,)).iloc[0]
+            
             with st.form("form_posicionamiento"):
                 coord_x = st.number_input("Coordenada X", value=float(pos_data.get('posicionamiento_x') or 0))
                 coord_y = st.number_input("Coordenada Y", value=float(pos_data.get('posicionamiento_y') or 0))
+                
                 if st.form_submit_button("Guardar y Generar Gráfico"):
                     with get_connection() as conn:
                         conn.execute("UPDATE empresas SET posicionamiento_x=?, posicionamiento_y=? WHERE id=?", (coord_x, coord_y, empresa_id))
-                    st.success("Coordenadas guardadas."); st.rerun()
+                    st.success("Coordenadas guardadas.")
+                    st.rerun()
+            
             fig, ax = plt.subplots()
-            ax.axhline(0, color='gray', lw=1); ax.axvline(0, color='gray', lw=1)
+            ax.axhline(0, color='gray', lw=1)
+            ax.axvline(0, color='gray', lw=1)
             ax.plot(coord_x, coord_y, 'ro', markersize=10)
-            ax.set_title("Matriz de Posicionamiento"); ax.set_xlabel("Eje X"); ax.set_ylabel("Eje Y")
+            ax.set_title("Matriz de Posicionamiento")
+            ax.set_xlabel("Eje X")
+            ax.set_ylabel("Eje Y")
             ax.grid(True, which='both', linestyle='--', linewidth=0.5)
             st.pyplot(fig)
+            
             st.subheader("📌 Diagnóstico Estratégico de Posicionamiento")
             interpretaciones = {
                 "Superior Derecho": {"titulo": "Estrategia de Diferenciación Premium", "color": "success", "texto": "La organización se ubica en un cuadrante de alto valor percibido."},
@@ -683,34 +875,51 @@ def aplicacion_principal():
                 "Inferior Izquierdo": {"titulo": "Estrategia de Liderazgo en Costos / Economía", "color": "warning", "texto": "La empresa compite en el segmento de volumen y eficiencia."},
                 "Inferior Derecho": {"titulo": "Zona de Riesgo Estratégico", "color": "error", "texto": "Esta posición es críticamente insostenible."}
             }
-            if coord_x > 0 and coord_y > 0: key = "Superior Derecho"
-            elif coord_x < 0 and coord_y > 0: key = "Superior Izquierdo"
-            elif coord_x < 0 and coord_y < 0: key = "Inferior Izquierdo"
-            elif coord_x > 0 and coord_y < 0: key = "Inferior Derecho"
-            else: key = None
+            
+            if coord_x > 0 and coord_y > 0: 
+                key = "Superior Derecho"
+            elif coord_x < 0 and coord_y > 0: 
+                key = "Superior Izquierdo"
+            elif coord_x < 0 and coord_y < 0: 
+                key = "Inferior Izquierdo"
+            elif coord_x > 0 and coord_y < 0: 
+                key = "Inferior Derecho"
+            else: 
+                key = None
+            
             if key:
                 res = interpretaciones[key]
-                if res['color'] == "success": st.success(f"**{res['titulo']}**")
-                elif res['color'] == "info": st.info(f"**{res['titulo']}**")
-                elif res['color'] == "warning": st.warning(f"**{res['titulo']}**")
-                else: st.error(f"**{res['titulo']}**")
+                if res['color'] == "success": 
+                    st.success(f"**{res['titulo']}**")
+                elif res['color'] == "info": 
+                    st.info(f"**{res['titulo']}**")
+                elif res['color'] == "warning": 
+                    st.warning(f"**{res['titulo']}**")
+                else: 
+                    st.error(f"**{res['titulo']}**")
                 st.write(f"**Análisis Ejecutivo:** {res['texto']}")
+            
             with st.form("form_analisis_pos"):
                 st.subheader("Análisis Estratégico")
-                if st.form_submit_button("🤖 Generar Análisis con IA"):
-                    with st.spinner("La IA está analizando la posición..."):
+                
+                if st.form_submit_button("🤖 Generar Análisis con Gemini"):
+                    with st.spinner("Gemini está analizando la posición..."):
                         contexto_pos = f"Coordenada X: {coord_x}, Coordenada Y: {coord_y}. Cuadrante: {key}. Interpretación: {interpretaciones.get(key, {}).get('texto', '')}"
                         analisis_ia_pos = generar_analisis_ia("Posicionamiento", contexto_pos)
                         st.session_state["ia_analisis_posicionamiento"] = analisis_ia_pos
                 
                 current_analisis_pos = st.session_state.get("ia_analisis_posicionamiento", analisis_data.get('analisis_posicionamiento', ''))
                 analisis_propio_pos = st.text_area("Conclusiones sobre el posicionamiento.", value=current_analisis_pos, height=300)
+                
                 if st.form_submit_button("Guardar Análisis de Posicionamiento"):
                     with get_connection() as conn:
                         conn.execute("UPDATE empresas SET analisis_posicionamiento=? WHERE id=?", (analisis_propio_pos, empresa_id))
-                    st.success("Análisis de Posicionamiento guardado."); st.rerun()
+                    st.success("Análisis de Posicionamiento guardado.")
+                    st.rerun()
+        
         with diag_tab4:
             st.subheader("Análisis PEST")
+            
             with st.expander("📋 Pegar datos desde Excel"):
                 pest_paste_data = st.text_area("Pega tus datos aquí", height=200, key="pest_input_secondary")
                 if st.button("Procesar Datos Pegados de PEST"):
@@ -722,43 +931,58 @@ def aplicacion_principal():
                         df_pasted['valor_ponderado'] = df_pasted['puntaje'] * (df_pasted['importancia'] / 100.0)
                         df_pasted['empresa_id'] = empresa_id
                         df_pasted['tipo_matriz'] = 'PEST'
+                        
                         with get_connection() as conn:
                             conn.execute("DELETE FROM matrices WHERE empresa_id=? AND tipo_matriz='PEST'", (empresa_id,))
                             df_pasted.to_sql('matrices', conn, if_exists='append', index=False)
-                        st.success(f"¡{len(df_pasted)} filas importadas a PEST exitosamente!"); st.rerun()
+                        
+                        st.success(f"¡{len(df_pasted)} filas importadas a PEST exitosamente!")
+                        st.rerun()
                     except Exception as e:
                         st.error(f"Error al procesar los datos: {e}.")
+            
             with get_connection() as conn:
                 df_pest = pd.read_sql(f"SELECT * FROM matrices WHERE empresa_id={empresa_id} AND tipo_matriz='PEST'", conn)
+            
             if not df_pest.empty:
                 edited_pest = st.data_editor(df_pest, num_rows="dynamic", key="editor_pest_v2", use_container_width=True, disabled=['id', 'empresa_id', 'tipo_matriz'])
+                
                 if st.button("💾 Guardar Cambios en PEST"):
                     with get_connection() as conn:
                         conn.execute("DELETE FROM matrices WHERE empresa_id=? AND tipo_matriz='PEST'", (empresa_id,))
                         edited_pest.to_sql('matrices', conn, if_exists='append', index=False)
-                    st.success("Cambios en PEST guardados."); st.rerun()
+                    st.success("Cambios en PEST guardados.")
+                    st.rerun()
+                
                 total_ponderado = df_pest['valor_ponderado'].sum()
                 st.metric("Puntaje Ponderado Total PEST", f"{total_ponderado:.2f}")
+                
                 if total_ponderado > 2.5:
                     st.success(f"**Perfil de Adaptación Proactiva ({total_ponderado:.2f})**")
                 else:
                     st.warning(f"**Perfil de Vulnerabilidad Externa ({total_ponderado:.2f})**")
+            
             with st.form("form_analisis_pest"):
                 st.subheader("Análisis Estratégico")
-                if st.form_submit_button("🤖 Generar Análisis con IA"):
-                    with st.spinner("La IA está analizando el entorno PEST..."):
+                
+                if st.form_submit_button("🤖 Generar Análisis con Gemini"):
+                    with st.spinner("Gemini está analizando el entorno PEST..."):
                         contexto_pest = df_pest.to_string()
                         analisis_ia_pest = generar_analisis_ia("PEST", contexto_pest)
                         st.session_state["ia_analisis_pest"] = analisis_ia_pest
                 
                 current_analisis_pest = st.session_state.get("ia_analisis_pest", analisis_data.get('analisis_pest', ''))
                 analisis_propio_pest = st.text_area("Conclusiones sobre la matriz PEST.", value=current_analisis_pest, height=300)
+                
                 if st.form_submit_button("Guardar Análisis"):
                     with get_connection() as conn:
                         conn.execute("UPDATE empresas SET analisis_pest=? WHERE id=?", (analisis_propio_pest, empresa_id))
-                    st.success("Análisis de PEST guardado."); st.rerun()
+                    st.success("Análisis de PEST guardado.")
+                    st.rerun()
+        
         with diag_tab5:
             st.subheader("Análisis FODA Cruzado (Numérico)")
+            
             with st.expander("📋 Pegar datos de FODA Cruzado desde Excel"):
                 foda_paste_data = st.text_area("Pega tus datos de FODA aquí", height=200, key="foda_paste_area")
                 if st.button("Procesar Datos Pegados de FODA"):
@@ -767,71 +991,78 @@ def aplicacion_principal():
                         df_foda_pasted.columns = ['cuadrante', 'factor_fila', 'factor_columna', 'impacto']
                         df_foda_pasted['impacto'] = pd.to_numeric(df_foda_pasted['impacto'], errors='coerce').fillna(0).astype(int)
                         df_foda_pasted['empresa_id'] = empresa_id
+                        
                         with get_connection() as conn:
                             conn.execute("DELETE FROM foda_cruzado WHERE empresa_id=?", (empresa_id,))
                             df_foda_pasted.to_sql('foda_cruzado', conn, if_exists='append', index=False)
-                        st.success(f"¡{len(df_foda_pasted)} filas importadas a FODA Cruzado!"); st.rerun()
+                        
+                        st.success(f"¡{len(df_foda_pasted)} filas importadas a FODA Cruzado!")
+                        st.rerun()
                     except Exception as e:
                         st.error(f"Error al procesar los datos: {e}.")
+            
             with get_connection() as conn:
                 df_foda = pd.read_sql(f"SELECT * FROM foda_cruzado WHERE empresa_id={empresa_id}", conn)
+            
             if not df_foda.empty:
                 edited_foda = st.data_editor(df_foda, num_rows="dynamic", key="editor_foda", use_container_width=True, disabled=['id', 'empresa_id'])
+                
                 if st.button("💾 Guardar Cambios en FODA"):
                     with get_connection() as conn:
                         conn.execute("DELETE FROM foda_cruzado WHERE empresa_id=?", (empresa_id,))
                         edited_foda.to_sql('foda_cruzado', conn, if_exists='append', index=False)
-                    st.success("Cambios en FODA guardados."); st.rerun()
+                    st.success("Cambios en FODA guardados.")
+                    st.rerun()
+                
                 analisis_df, _, estrategia_principal, puntajes_foda = analizar_foda(df_foda)
                 if analisis_df is not None:
                     st.subheader("🎯 Postura Competitiva Sugerida")
                     st.info(f"Estrategia Principal: {estrategia_principal}")
                     st.dataframe(analisis_df, use_container_width=True)
+                    
                     grafico_foda = generar_grafico_foda_radar(puntajes_foda)
-                    if grafico_foda: st.image(grafico_foda)
+                    if grafico_foda: 
+                        st.image(grafico_foda)
+            
             with st.form("form_analisis_foda"):
                 st.subheader("Análisis Estratégico")
-                if st.form_submit_button("🤖 Generar Análisis con IA"):
-                    with st.spinner("La IA está analizando el FODA Cruzado..."):
+                
+                if st.form_submit_button("🤖 Generar Análisis con Gemini"):
+                    with st.spinner("Gemini está analizando el FODA Cruzado..."):
                         contexto_foda = df_foda.to_string()
                         analisis_ia_foda = generar_analisis_ia("FODA Cruzado", contexto_foda)
                         st.session_state["ia_analisis_foda"] = analisis_ia_foda
                 
                 current_analisis_foda = st.session_state.get("ia_analisis_foda", analisis_data.get('analisis_foda', ''))
                 analisis_propio_foda = st.text_area("Conclusiones sobre la matriz FODA.", value=current_analisis_foda, height=300)
+                
                 if st.form_submit_button("Guardar Análisis"):
                     with get_connection() as conn:
                         conn.execute("UPDATE empresas SET analisis_foda=? WHERE id=?", (analisis_propio_foda, empresa_id))
-                    st.success("Análisis de FODA guardado."); st.rerun()
-
-        with tab_est:
-            st.header("🎯 Formulación de Estrategias")
-            st.info("En esta sección se generan 12 estrategias (3 por cuadrante) basadas en el FODA Cruzado, cada una con 5 actividades específicas.")
-            
-            if "df_estrategias_temp" not in st.session_state:
-                with get_connection() as conn:
-                    st.session_state.df_estrategias_temp = pd.read_sql(f"SELECT * FROM estrategias_generadas WHERE empresa_id={empresa_id}", conn)
-
+                    st.success("Análisis de FODA guardado.")
+                    st.rerun()
+    
+    with tab_est:
+        st.header("🎯 Formulación de Estrategias")
+        st.info("En esta sección se generan 12 estrategias (3 por cuadrante) basadas en el FODA Cruzado, cada una con 5 actividades específicas.")
+        
+        if "df_estrategias_temp" not in st.session_state:
             with get_connection() as conn:
-                df_foda_final = pd.read_sql(f"SELECT cuadrante, factor_fila, factor_columna, impacto FROM foda_cruzado WHERE empresa_id={empresa_id}", conn)
-
-            if df_foda_final.empty:
-                st.warning("Primero debe completar el Análisis FODA Cruzado en la pestaña de Diagnóstico Situacional.")
-            else:
-                if st.button("🤖 Generar 12 Estrategias Maestras con IA"):
-                    with st.spinner("La IA está diseñando las estrategias y actividades..."):
-                        client = get_ia_client()
-                        contexto_reducido = df_foda_final[["cuadrante", "factor_fila", "factor_columna"]].to_string(index=False)
-                        
-                        prompt_est = f"""Actúa como Director de Estrategia. Basado en este FODA Cruzado:
-                        {contexto_reducido}
-                        Genera 12 estrategias (3 por cuadrante: FO, FA, DO, DA).
-                        Para cada una, define 5 actividades cortas.
-                        Formato: CUADRANTE|ESTRATEGIA|IMPORTANCIA|ACT1;ACT2;ACT3;ACT4;ACT5
-                        No incluyas nada más que las 12 líneas de texto."""
-                        
-                        resultado_ia = generar_analisis(prompt_est, client)
-                        
+                st.session_state.df_estrategias_temp = pd.read_sql(f"SELECT * FROM estrategias_generadas WHERE empresa_id={empresa_id}", conn)
+        
+        with get_connection() as conn:
+            df_foda_final = pd.read_sql(f"SELECT cuadrante, factor_fila, factor_columna, impacto FROM foda_cruzado WHERE empresa_id={empresa_id}", conn)
+        
+        if df_foda_final.empty:
+            st.warning("Primero debe completar el Análisis FODA Cruzado en la pestaña de Diagnóstico Situacional.")
+        else:
+            if st.button("🤖 Generar 12 Estrategias Maestras con Gemini"):
+                with st.spinner("Gemini está diseñando las estrategias y actividades..."):
+                    contexto_reducido = df_foda_final[["cuadrante", "factor_fila", "factor_columna"]].to_string(index=False)
+                    
+                    resultado_ia = generar_estrategias_gemini(contexto_reducido)
+                    
+                    if resultado_ia:
                         nuevas_filas = []
                         for line in resultado_ia.strip().split("\n"):
                             partes = line.split("|")
@@ -850,140 +1081,202 @@ def aplicacion_principal():
                                 conn.execute("DELETE FROM estrategias_generadas WHERE empresa_id=?", (empresa_id,))
                                 df_nuevas.to_sql("estrategias_generadas", conn, if_exists="append", index=False)
                             st.session_state.df_estrategias_temp = df_nuevas
-                            st.success("Estrategias generadas."); st.rerun()
+                            st.success("¡12 estrategias generadas con éxito!")
+                            st.rerun()
                         else:
-                            st.error("Error en formato de IA. Revisa la conexión.")
-
-                st.subheader("Edición de Estrategias Generadas")
-                df_editor = st.session_state.df_estrategias_temp.copy()
-                for col in ["cuadrante", "estrategia", "importancia", "actividades"]:
-                    if col not in df_editor.columns: df_editor[col] = ""
-                
-                edited_df = st.data_editor(
-                    df_editor, num_rows="dynamic", key="editor_v5", use_container_width=True,
-                    disabled=["id", "empresa_id"],
-                    column_config={
-                        "cuadrante": st.column_config.SelectboxColumn("Cuadrante", options=["FO", "FA", "DO", "DA"]),
-                        "importancia": st.column_config.SelectboxColumn("Importancia", options=["Alta", "Media Alta", "Media Baja", "Baja"]),
-                    }
-                )
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.button("💾 Guardar Cambios"):
+                            st.error("Error en el formato de respuesta de Gemini.")
+                    else:
+                        st.error("No se pudo generar con Gemini. Configura tu API Key en el menú lateral.")
+            
+            st.subheader("Edición de Estrategias Generadas")
+            df_editor = st.session_state.df_estrategias_temp.copy()
+            
+            for col in ["cuadrante", "estrategia", "importancia", "actividades"]:
+                if col not in df_editor.columns: 
+                    df_editor[col] = ""
+            
+            edited_df = st.data_editor(
+                df_editor, num_rows="dynamic", key="editor_v5", use_container_width=True,
+                disabled=["id", "empresa_id"],
+                column_config={
+                    "cuadrante": st.column_config.SelectboxColumn("Cuadrante", options=["FO", "FA", "DO", "DA"]),
+                    "importancia": st.column_config.SelectboxColumn("Importancia", options=["Alta", "Media Alta", "Media Baja", "Baja"]),
+                }
+            )
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("💾 Guardar Cambios"):
+                    with get_connection() as conn:
+                        conn.execute("DELETE FROM estrategias_generadas WHERE empresa_id=?", (empresa_id,))
+                        df_to_save = edited_df.copy()
+                        if "id" in df_to_save.columns: 
+                            df_to_save = df_to_save.drop(columns=["id"])
+                        df_to_save["empresa_id"] = empresa_id
+                        df_to_save.to_sql("estrategias_generadas", conn, if_exists="append", index=False)
+                        st.session_state.df_estrategias_temp = df_to_save
+                    st.success("¡Estrategias guardadas!")
+                    st.rerun()
+            
+            with col2:
+                if st.button("🚀 Enviar a Operativización"):
+                    if not edited_df.empty:
                         with get_connection() as conn:
-                            conn.execute("DELETE FROM estrategias_generadas WHERE empresa_id=?", (empresa_id,))
-                            df_to_save = edited_df.copy()
-                            if "id" in df_to_save.columns: df_to_save = df_to_save.drop(columns=["id"])
-                            df_to_save["empresa_id"] = empresa_id
-                            df_to_save.to_sql("estrategias_generadas", conn, if_exists="append", index=False)
-                            st.session_state.df_estrategias_temp = df_to_save
-                        st.success("Guardado."); st.rerun()
-                
-                with col2:
-                    if st.button("🚀 Enviar a Operativización"):
-                        if not edited_df.empty:
-                            with get_connection() as conn:
-                                for _, row in edited_df.iterrows():
-                                    lista_actividades = str(row["actividades"]).split(";")
-                                    for act_individual in lista_actividades:
-                                        if act_individual.strip():
-                                            conn.execute("""INSERT INTO operativizacion 
-                                                (empresa_id, plan, estrategia, actividades, plazo, responsable, recurso, costo) 
-                                                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                                                (empresa_id, "Estratégico", row["estrategia"], act_individual.strip(), "Por definir", "Por definir", "Por definir", 0.0))
-                            st.success("¡Desglose completado! Revisa la pestaña de Operativización.")
-                        else:
-                            st.warning("No hay datos para enviar.")
+                            for _, row in edited_df.iterrows():
+                                lista_actividades = str(row["actividades"]).split(";")
+                                for act_individual in lista_actividades:
+                                    if act_individual.strip():
+                                        conn.execute("""INSERT INTO operativizacion 
+                                            (empresa_id, plan, estrategia, actividades, plazo, responsable, recurso, costo) 
+                                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                                            (empresa_id, "Estratégico", row["estrategia"], act_individual.strip(), "Por definir", "Por definir", "Por definir", 0.0))
+                        st.success("¡Desglose completado! Revisa la pestaña de Operativización.")
+                    else:
+                        st.warning("No hay datos para enviar.")
+    
     with tab3:
         st.header("Planes Estratégicos")
+        
         if st.button("⚙️ Generar Borrador de Planes"):
             with st.spinner("Analizando diagnóstico..."):
                 with get_connection() as conn:
                     df_pest = pd.read_sql(f"SELECT valor_ponderado FROM matrices WHERE empresa_id={empresa_id} AND tipo_matriz='PEST'", conn)
                     df_foda = pd.read_sql(f"SELECT cuadrante, impacto FROM foda_cruzado WHERE empresa_id={empresa_id}", conn)
+                
                 pest_total = df_pest['valor_ponderado'].sum() if not df_pest.empty else 0
                 _, _, estrategia_principal, _ = analizar_foda(df_foda)
+                
                 if not estrategia_principal:
                     st.error("Faltan los datos del Análisis FODA Cruzado.")
                 else:
                     st.session_state['generated_plans_dict'] = generar_planes_por_plantilla(estrategia_principal, pest_total)
+                    st.success("¡Planes generados exitosamente!")
+        
         if 'generated_plans_dict' in st.session_state:
             for plan_nombre, plan_datos in st.session_state['generated_plans_dict'].items():
                 with st.expander(f"**Plan {plan_nombre}**"):
                     st.info(plan_datos['introduccion'])
                     st.success(plan_datos['objetivo'])
+    
     with tab4:
         st.header("CMI / Indicadores")
+        
         if 'generated_plans_dict' not in st.session_state:
             st.warning("Primero debes generar los planes en la Pestaña 3.")
         else:
             if st.button("📊 Generar Cuadro de Mando Integral"):
                 df_cmi = generar_cuadro_de_mando(st.session_state['generated_plans_dict'])
                 st.session_state['df_cmi'] = df_cmi
+                st.success("¡Cuadro de Mando Integral generado!")
+            
             if 'df_cmi' in st.session_state:
                 st.dataframe(st.session_state['df_cmi'], use_container_width=True, height=500)
+    
     with tab5:
         st.header("Operativización / Presupuesto")
         st.subheader("📝 Cuadro de Operativización y Presupuesto (Cascada)")
         st.info("Estructura: Plan -> Estrategia -> Actividad. Los costos se suman por actividad.")
+        
         with get_connection() as conn:
             df_oper = pd.read_sql(f"SELECT id, plan, estrategia, actividades, plazo, responsable, recurso, costo FROM operativizacion WHERE empresa_id={empresa_id}", conn)
-        edited_oper = st.data_editor( df_oper, num_rows="dynamic", key="editor_oper_cascada", use_container_width=True,
-            disabled=['id'], column_config={
+        
+        edited_oper = st.data_editor(
+            df_oper, num_rows="dynamic", key="editor_oper_cascada", use_container_width=True,
+            disabled=['id'], 
+            column_config={
                 "plan": st.column_config.SelectboxColumn("Plan", options=["Administrativo", "Mejora", "Contingencia", "Tecnológico", "Operativo", "Monitoreo y control", "Financiero"], help="Seleccione el Plan Maestro"),
                 "estrategia": st.column_config.TextColumn("Estrategia", help="Estrategia específica para el plan"),
                 "actividades": st.column_config.TextColumn("Actividad", help="Actividad para cumplir la estrategia"),
-                "costo": st.column_config.NumberColumn("Costo", format="$%.2f")})
+                "costo": st.column_config.NumberColumn("Costo", format="$%.2f")
+            }
+        )
+        
         if st.button("💾 Guardar Operativización"):
             with get_connection() as conn:
                 conn.execute("DELETE FROM operativizacion WHERE empresa_id=?", (empresa_id,))
                 edited_oper['empresa_id'] = empresa_id
-                if 'id' in edited_oper.columns: edited_oper = edited_oper.drop(columns=['id'])
+                if 'id' in edited_oper.columns: 
+                    edited_oper = edited_oper.drop(columns=['id'])
                 edited_oper.to_sql('operativizacion', conn, if_exists='append', index=False)
-            st.success("Operativización guardada correctamente."); st.rerun()
+            st.success("Operativización guardada correctamente.")
+            st.rerun()
+        
         total_inversion = edited_oper['costo'].sum() if not edited_oper.empty else 0
         st.metric("Inversión Total Requerida (Suma de Actividades)", f"${total_inversion:,.2f}")
+        
         st.divider()
         st.subheader("📊 Estado de Pérdidas y Ganancias (Último Año)")
+        
         with get_connection() as conn:
             df_pg = pd.read_sql(f"SELECT id, anio, ingresos, egresos, resultado FROM perdida_ganancia WHERE empresa_id={empresa_id}", conn)
+        
         if df_pg.empty:
             df_pg = pd.DataFrame([{'anio': '2025', 'ingresos': 0.0, 'egresos': 0.0, 'resultado': 0.0}])
+        
         edited_pg = st.data_editor(df_pg, num_rows="dynamic", key="editor_pg_v2", use_container_width=True, disabled=['id', 'resultado'])
+        
         if st.button("💾 Guardar P&G"):
             edited_pg['resultado'] = edited_pg['ingresos'] - edited_pg['egresos']
             with get_connection() as conn:
                 conn.execute("DELETE FROM perdida_ganancia WHERE empresa_id=?", (empresa_id,))
                 edited_pg['empresa_id'] = empresa_id
-                if 'id' in edited_pg.columns: edited_pg = edited_pg.drop(columns=['id'])
+                if 'id' in edited_pg.columns: 
+                    edited_pg = edited_pg.drop(columns=['id'])
                 edited_pg.to_sql('perdida_ganancia', conn, if_exists='append', index=False)
-            st.success("Datos de P&G guardados."); st.rerun()
+            st.success("Datos de P&G guardados.")
+            st.rerun()
+        
         st.divider()
         st.subheader("📈 Flujo de Caja Proyectado")
+        
         anios_proy = st.selectbox("A cuántos años desea proyectar?", [1, 2, 3, 4, 5], index=2, key="sel_anios")
+        
         with get_connection() as conn:
             df_fc = pd.read_sql(f"SELECT id, anio_proyeccion, saldo_inicial, ingreso, egreso, flujo_neto, saldo_final FROM flujo_caja WHERE empresa_id={empresa_id}", conn)
+        
         if len(df_fc) != anios_proy:
-            df_fc = pd.DataFrame([{'anio_proyeccion': i+1, 'saldo_inicial': 0.0, 'ingreso': 0.0, 'egreso': 0.0, 'flujo_neto': 0.0, 'saldo_final': 0.0} for i in range(anios_proy)])
+            df_fc = pd.DataFrame([{
+                'anio_proyeccion': i+1, 
+                'saldo_inicial': 0.0, 
+                'ingreso': 0.0, 
+                'egreso': 0.0, 
+                'flujo_neto': 0.0, 
+                'saldo_final': 0.0
+            } for i in range(anios_proy)])
+        
         edited_fc = st.data_editor(df_fc, num_rows="fixed", key="editor_fc_v2", use_container_width=True, disabled=['id', 'anio_proyeccion', 'flujo_neto', 'saldo_final'])
+        
         if st.button("🧮 Calcular y Guardar Flujo"):
             for idx in range(len(edited_fc)):
-                if idx > 0: edited_fc.at[idx, 'saldo_inicial'] = edited_fc.at[idx-1, 'saldo_final']
+                if idx > 0: 
+                    edited_fc.at[idx, 'saldo_inicial'] = edited_fc.at[idx-1, 'saldo_final']
                 edited_fc.at[idx, 'flujo_neto'] = edited_fc.at[idx, 'ingreso'] - edited_fc.at[idx, 'egreso']
                 edited_fc.at[idx, 'saldo_final'] = edited_fc.at[idx, 'saldo_inicial'] + edited_fc.at[idx, 'flujo_neto']
+            
             with get_connection() as conn:
                 conn.execute("DELETE FROM flujo_caja WHERE empresa_id=?", (empresa_id,))
                 edited_fc['empresa_id'] = empresa_id
-                if 'id' in edited_fc.columns: edited_fc = edited_fc.drop(columns=['id'])
+                if 'id' in edited_fc.columns: 
+                    edited_fc = edited_fc.drop(columns=['id'])
                 edited_fc.to_sql('flujo_caja', conn, if_exists='append', index=False)
-            st.success("Flujo de caja guardado."); st.rerun()
+            
+            st.success("Flujo de caja guardado.")
+            st.rerun()
+        
         st.divider()
         st.subheader("💰 Análisis de Costo / Beneficio (C/B)")
+        
         with get_connection() as conn:
             pe_data = pd.read_sql(f"SELECT * FROM punto_equilibrio WHERE empresa_id={empresa_id}", conn)
+        
         if pe_data.empty:
-            pe_data = pd.DataFrame([{'costo_fijo_total': total_inversion, 'precio_venta_unidad': 0.0, 'costo_variable_unidad': 0.0, 'unidades_producidas': 0.0}])
+            pe_data = pd.DataFrame([{
+                'costo_fijo_total': total_inversion, 
+                'precio_venta_unidad': 0.0, 
+                'costo_variable_unidad': 0.0, 
+                'unidades_producidas': 0.0
+            }])
+        
         with st.form("form_cb"):
             col1, col2 = st.columns(2)
             with col1:
@@ -992,46 +1285,66 @@ def aplicacion_principal():
             with col2:
                 cv = st.number_input("Costo Variable por Unidad ($)", value=float(pe_data.iloc[0]['costo_variable_unidad']))
                 unidades = st.number_input("Unidades Producidas/Vendidas estimadas", value=float(pe_data.iloc[0]['unidades_producidas']))
+            
             if st.form_submit_button("📊 Calcular Punto de Equilibrio y Retorno"):
                 with get_connection() as conn:
                     conn.execute("DELETE FROM punto_equilibrio WHERE empresa_id=?", (empresa_id,))
                     conn.execute("INSERT INTO punto_equilibrio (empresa_id, costo_fijo_total, precio_venta_unidad, costo_variable_unidad, unidades_producidas) VALUES (?,?,?,?,?)", 
                                  (empresa_id, cf, pv, cv, unidades))
-                st.success("Datos de C/B guardados."); st.rerun()
+                st.success("Datos de C/B guardados.")
+                st.rerun()
+        
         cf = float(pe_data.iloc[0]['costo_fijo_total'])
         pv = float(pe_data.iloc[0]['precio_venta_unidad'])
         cv = float(pe_data.iloc[0]['costo_variable_unidad'])
         margen_contribucion = pv - cv
+        
         if margen_contribucion > 0:
             pe_unidades = cf / margen_contribucion
             pe_dolares = pe_unidades * pv
             flujo_neto_total = edited_fc['flujo_neto'].sum() if not edited_fc.empty else 0
             flujo_promedio_mensual = (flujo_neto_total / (len(edited_fc) * 12)) if len(edited_fc) > 0 else 0
             tiempo_retorno = (cf / flujo_promedio_mensual) if flujo_promedio_mensual > 0 else 0
+            
             c1, c2, c3 = st.columns(3)
             c1.metric("Punto de Equilibrio (Unidades)", f"{pe_unidades:,.0f} und")
             c2.metric("Punto de Equilibrio (Dólares)", f"${pe_dolares:,.2f}")
             c3.metric("Tiempo de Retorno Est.", f"{tiempo_retorno:.1f} meses" if tiempo_retorno > 0 else "N/A")
+            
             st.write(f"**Análisis:** Para recuperar la inversión de **${cf:,.2f}**, la empresa debe vender al menos **{pe_unidades:,.0f} unidades**, lo que representa una facturación de **${pe_dolares:,.2f}**.")
         else:
             st.warning("El Precio de Venta debe ser mayor al Costo Variable para calcular el Punto de Equilibrio.")
+    
     with tab6:
         st.header("Resumen, Conclusiones y Exportación")
+        
         with st.form("pdf_form"):
             pdf_version = st.text_input("Versión del Plan Estratégico", "1.0")
             pdf_coordinador = st.text_input("Nombre del Coordinador", "Jefe de Proyecto")
+            
             if st.form_submit_button("🚀 Generar y Descargar PDF"):
                 pdf_bytes = generar_pdf_completo(empresa_id, pdf_version, pdf_coordinador)
                 st.session_state['pdf_file'] = pdf_bytes
+                st.success("¡PDF generado exitosamente!")
+        
         if 'pdf_file' in st.session_state:
-            st.download_button(label="✅ Descargar PDF Ahora", data=st.session_state['pdf_file'], file_name=f"Plan_Estrategico_V{pdf_version}.pdf", mime="application/pdf")
+            st.download_button(
+                label="✅ Descargar PDF Ahora", 
+                data=st.session_state['pdf_file'], 
+                file_name=f"Plan_Estrategico_V{pdf_version}.pdf", 
+                mime="application/pdf"
+            )
+
+# ========== PANTALLA DE ACCESO ==========
 def pantalla_acceso():
     st.sidebar.title("Estratega Pro")
     opcion = st.sidebar.radio("Acceso al Sistema", ["Entrar", "Crear Cuenta"])
+    
     if opcion == "Entrar":
         st.subheader("🔐 Iniciar Sesión")
         identificador = st.text_input("Correo o Usuario")
         password = st.text_input("Contraseña", type="password")
+        
         if st.button("Acceder"):
             try:
                 res = supabase.auth.sign_in_with_password({"email": identificador, "password": password})
@@ -1046,11 +1359,19 @@ def pantalla_acceso():
         usuario = st.text_input("Nombre de Usuario (sin @)")
         correo = st.text_input("Correo Electrónico")
         clave = st.text_input("Contraseña", type="password")
+        
         if st.button("Finalizar Registro"):
             if nombre and usuario and correo and clave:
                 try:
-                    res = supabase.auth.sign_up({ "email": correo, "password": clave, "options": { "data": {
-                                "full_name": nombre, "username": usuario.lower().strip()}}
+                    res = supabase.auth.sign_up({ 
+                        "email": correo, 
+                        "password": clave, 
+                        "options": { 
+                            "data": {
+                                "full_name": nombre, 
+                                "username": usuario.lower().strip()
+                            }
+                        }
                     })
                     if res.user:
                         st.success("¡Registro solicitado con éxito!")
@@ -1061,9 +1382,12 @@ def pantalla_acceso():
                     st.error(f"Error en el registro: {e}")
             else:
                 st.warning("Por favor, llena todos los campos.")
+
+# ========== FUNCIÓN PRINCIPAL ==========
 def main():
     if "logged_in" not in st.session_state:
         st.session_state.logged_in = False
+    
     if not st.session_state.logged_in:
         pantalla_acceso()
     else:
@@ -1073,7 +1397,8 @@ def main():
                 st.session_state.logged_in = False
                 st.rerun()
         aplicacion_principal()
+
+# ========== EJECUCIÓN ==========
 if __name__ == "__main__":
     init_db()
     main()
-
