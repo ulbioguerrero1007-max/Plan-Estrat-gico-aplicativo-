@@ -18,52 +18,53 @@ import unicodedata
 import time
 from supabase import create_client, Client
 
+# ========== CAMBIO PRINCIPAL: FUNCIÓN DE CLIENTE DEEPSEEK ==========
 def get_ia_client():
-    api_key = st.secrets.get("GROQ_API_KEY")
+    # Cambiado de GROQ_API_KEY a DEEPSEEK_API_KEY
+    api_key = st.secrets.get("DEEPSEEK_API_KEY")
 
     if not api_key:
-        st.error("❌ No se encontró la API Key de Groq en st.secrets")
+        st.error("❌ No se encontró la API Key de DeepSeek en st.secrets")
         st.stop()
 
     return OpenAI(
-        base_url="https://api.groq.com/openai/v1",
+        # Cambiado el endpoint a DeepSeek
+        base_url="https://api.deepseek.com",
         api_key=api_key,
     )
 
 def generar_analisis_ia(tipo_matriz, datos_contexto):
     client = get_ia_client()
     if not client:
-        return "Error: No se encontró la API Key de Groq en st.secrets."
+        return "Error: No se encontró la API Key de DeepSeek en st.secrets."
     
     prompt = f"Actúa como un consultor senior de estrategia. Analiza la siguiente matriz {tipo_matriz} y proporciona conclusiones estratégicas clave, riesgos y recomendaciones. Datos: {datos_contexto}"
     
     return generar_analisis(prompt, client)
 
 def generar_analisis(prompt, client):
-    # Lista de modelos verificados y estables en Groq
-    modelos_groq = [
-        "llama-3.3-70b-specdec",
-        "llama-3.2-11b-vision-preview",
-        "llama-3.1-70b-versatile",
-        "llama-3.1-8b-instant"
+    # Cambiado los modelos de Groq por modelo de DeepSeek
+    # DeepSeek tiene solo un modelo principal para chat
+    modelos_deepseek = [
+        "deepseek-chat",  # Modelo principal de DeepSeek
     ]
+    
     errores = []
-    for modelo in modelos_groq:
+    for modelo in modelos_deepseek:
         try:
             response = client.chat.completions.create(
                 model=modelo,
                 messages=[{"role": "system", "content": "Eres un analista estratégico empresarial."},
                 {"role": "user", "content": prompt}],
-                timeout=15 
+                timeout=30  # Aumentado timeout para DeepSeek
             )
             return response.choices[0].message.content
         except Exception as e:
             err_msg = str(e)
-            # Capturamos el error real para diagnóstico
             errores.append(f"{modelo}: {err_msg}")
             continue
             
-    return f"No se pudo generar el análisis. Los modelos de Groq están saturados o no disponibles en este momento. Por favor, intenta de nuevo en unos instantes. (Intentados: {', '.join(errores)})"
+    return f"No se pudo generar el análisis. DeepSeek no está disponible en este momento. Por favor, intenta de nuevo en unos instantes. (Error: {', '.join(errores)})"
 
 st.set_page_config( page_title="Estratega Pro | Business Intelligence", page_icon="♟️", layout="wide",
     initial_sidebar_state="expanded")
@@ -977,8 +978,3 @@ def main():
 if __name__ == "__main__":
     init_db()
     main()
-
-
-
-
-
