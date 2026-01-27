@@ -776,18 +776,18 @@ def aplicacion_principal():
 
                 st.subheader("Edición de Estrategias Generadas")
                 df_editor = st.session_state.df_estrategias_temp.copy()
-	                for col in ["cuadrante", "estrategia", "importancia", "actividades", "plan_asignado"]:
-	                    if col not in df_editor.columns: df_editor[col] = ""
-	                
-	                edited_df = st.data_editor(
-	                    df_editor, num_rows="dynamic", key="editor_v5", use_container_width=True,
-	                    disabled=["id", "empresa_id"],
-	                    column_config={
-	                        "cuadrante": st.column_config.SelectboxColumn("Cuadrante", options=["FO", "FA", "DO", "DA"]),
-	                        "importancia": st.column_config.SelectboxColumn("Importancia", options=["Alta", "Media Alta", "Media Baja", "Baja"]),
-	                        "plan_asignado": st.column_config.SelectboxColumn("Plan Destino", options=["Administrativo", "Mejora", "Contingencia", "Tecnológico", "Operativo", "Financiero", "Estratégico"]),
-	                    }
-	                )
+                for col in ["cuadrante", "estrategia", "importancia", "actividades", "plan_asignado"]:
+                    if col not in df_editor.columns: df_editor[col] = ""
+                
+                edited_df = st.data_editor(
+                    df_editor, num_rows="dynamic", key="editor_v5", use_container_width=True,
+                    disabled=["id", "empresa_id"],
+                    column_config={
+                        "cuadrante": st.column_config.SelectboxColumn("Cuadrante", options=["FO", "FA", "DO", "DA"]),
+                        "importancia": st.column_config.SelectboxColumn("Importancia", options=["Alta", "Media Alta", "Media Baja", "Baja"]),
+                        "plan_asignado": st.column_config.SelectboxColumn("Plan Destino", options=["Administrativo", "Mejora", "Contingencia", "Tecnológico", "Operativo", "Financiero", "Estratégico"]),
+                    }
+                )
                 
                 col1, col2 = st.columns(2)
                 with col1:
