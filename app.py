@@ -832,11 +832,11 @@ def aplicacion_principal():
                                     lista_actividades = str(row["actividades"]).split(";")
                                     for act_individual in lista_actividades:
                                         if act_individual.strip():
-	                                            plan_final = row["plan_asignado"] if "plan_asignado" in row and row["plan_asignado"] else "Estratégico"
-	                                            conn.execute("""INSERT INTO operativizacion 
-	                                                (empresa_id, plan, estrategia, actividades, plazo, responsable, recurso, costo) 
-	                                                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-	                                                (empresa_id, plan_final, row["estrategia"], act_individual.strip(), "Por definir", "Por definir", "Por definir", 0.0))
+                                            plan_final = row["plan_asignado"] if "plan_asignado" in row and row["plan_asignado"] else "Plan Estratégico"
+                                            conn.execute("""INSERT INTO operativizacion 
+                                                (empresa_id, plan, estrategia, actividades, plazo, responsable, recurso, costo) 
+                                                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                                                (empresa_id, plan_final, row["estrategia"], act_individual.strip(), "Por definir", "Por definir", "Por definir", 0.0))
                             st.success("¡Desglose completado! Revisa la pestaña de Operativización.")
                         else:
                             st.warning("No hay datos para enviar.")
