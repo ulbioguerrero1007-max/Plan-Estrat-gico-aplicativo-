@@ -42,8 +42,8 @@ def generar_analisis_ia(tipo_matriz, datos_contexto):
 def generar_analisis(prompt, client):
     # Lista de modelos recomendados para análisis estratégico en Gemini
     modelos_gemini = [
-        "gemini-1.5-flash",
-        "gemini-1.5-pro",
+        "models/gemini-1.5-flash",
+        "models/gemini-1.5-pro",
         # Puedes añadir más modelos si es necesario, pero Flash y Pro son los principales
         
     ]
