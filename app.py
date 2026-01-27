@@ -21,6 +21,7 @@ import time
 import json
 from supabase import create_client, Client
 
+genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 def llamar_ia_seguro(prompt):
     try:
         model = genai.GenerativeModel('gemini-1.5-flash')
@@ -1408,4 +1409,5 @@ def main():
 if __name__ == "__main__":
     init_db()
     main()
+
 
