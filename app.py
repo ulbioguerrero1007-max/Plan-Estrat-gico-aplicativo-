@@ -177,59 +177,59 @@ def generar_planes_por_plantilla(estrategia_foda, pest_total):
     
     # 1. Plan Administrativo
     planes['Plan Administrativo'] = {
-        'introduccion': "El plan administrativo se enfocará en fortalecer la estructura organizacional, el liderazgo y la gestión del talento humano.",
-        'objetivo': "Optimizar los procesos internos y fortalecer las capacidades directivas en un plazo de 6 meses."
+        'introduccion': "El plan administrativo se enfocará en fortalecer la base de la organización y fomentar la innovación continua.",
+        'objetivo': "Implementar un programa de formación en liderazgo y gestión de proyectos para los mandos medios en los próximos 6 meses."
     }
     
     # 2. Plan Operativo
     planes['Plan Operativo'] = {
-        'introduccion': "El plan operativo busca maximizar la eficiencia en la cadena de valor y asegurar la calidad en la entrega de productos o servicios.",
-        'objetivo': "Mejorar la productividad operativa en un 15% mediante la estandarización de procesos en el próximo año."
+        'introduccion': "El plan operativo se enfocará en optimizar la cadena de valor y escalar las operaciones de manera eficiente para soportar el crecimiento.",
+        'objetivo': "Desarrollar un plan de escalabilidad operativa para aumentar la capacidad de producción/servicio en un 20% en el próximo año, sin sacrificar la calidad."
     }
     
     # 3. Plan Tecnológico
     if "Ofensiva" in estrategia_foda or "Adaptativa" in estrategia_foda:
-        intro_tec = "La estrategia requiere un fuerte apalancamiento tecnológico para la innovación y el crecimiento."
-        obj_tec = "Implementar soluciones tecnológicas avanzadas (CRM/ERP) para mejorar la competitividad en 9 meses."
+        intro_tec = "La estrategia de crecimiento requiere un apalancamiento tecnológico. Se debe invertir en innovación para ganar ventaja competitiva."
+        obj_tec = "Evaluar e implementar una nueva herramienta de CRM o ERP en los próximos 9 meses para mejorar la relación con clientes y la eficiencia operativa."
     else:
-        intro_tec = "La tecnología se enfocará en la seguridad, estabilidad y optimización de los recursos actuales."
-        obj_tec = "Actualizar la infraestructura crítica y reforzar la ciberseguridad en el próximo semestre."
+        intro_tec = "La tecnología debe usarse para robustecer la operación y defender la posición actual. La prioridad es la seguridad y la estabilidad."
+        obj_tec = "Realizar una auditoría de ciberseguridad completa en el próximo trimestre y actualizar los sistemas críticos para mitigar vulnerabilidades."
     planes['Plan Tecnológico'] = {'introduccion': intro_tec, 'objetivo': obj_tec}
     
     # 4. Plan Financiero
     if "Ofensiva" in estrategia_foda or "Adaptativa" in estrategia_foda:
-        intro_fin = "El enfoque financiero será asegurar la inversión necesaria para la expansión y el crecimiento."
-        obj_fin = "Gestionar fuentes de financiamiento y optimizar el flujo de caja para soportar nuevos proyectos."
+        intro_fin = "El entorno es favorable y la estrategia es de crecimiento. El plan financiero debe enfocarse en asegurar los fondos para la expansión."
+        obj_fin = "Preparar un caso de negocio y una ronda de financiación (o asegurar una línea de crédito) en los próximos 6 meses para financiar las nuevas iniciativas estratégicas."
     else:
-        intro_fin = "La prioridad financiera es la austeridad, el control de costos y la preservación de la liquidez."
-        obj_fin = "Reducir costos operativos no críticos en un 10% y asegurar la rentabilidad mínima aceptable."
+        intro_fin = "La situación financiera debe ser gestionada con prudencia. La prioridad es la optimización de costos, la gestión de la liquidez y la maximización de la rentabilidad actual."
+        obj_fin = "Implementar un plan de reducción de costos no esenciales para mejorar el margen de beneficio neto en un 2% en los próximos 6 meses, sin afectar la operación crítica."
     planes['Plan Financiero'] = {'introduccion': intro_fin, 'objetivo': obj_fin}
     
     # 5. Plan de Monitoreo y control
     planes['Plan de Monitoreo y control'] = {
-        'introduccion': "Este plan establece los mecanismos de seguimiento para asegurar el cumplimiento de los objetivos estratégicos.",
-        'objetivo': "Implementar un Tablero de Control (Dashboard) con KPIs críticos y revisiones mensuales de desempeño."
+        'introduccion': "Dado que la estrategia implica nuevas iniciativas y crecimiento, se requiere un sistema de monitoreo ágil y riguroso para asegurar que los objetivos se cumplan.",
+        'objetivo': "Implementar un dashboard de KPIs (Indicadores Clave) en tiempo real para los nuevos proyectos y establecer un ciclo de revisión estratégica mensual."
     }
     
     # 6. Plan de Mejora
     if "Ofensiva" in estrategia_foda:
-        intro_mej = "Mejora continua enfocada en la excelencia y el liderazgo de mercado."
-        obj_mej = "Alcanzar estándares internacionales de calidad en los procesos clave durante los próximos 12 meses."
+        intro_mej = "La posición estratégica es Ofensiva. El plan debe centrarse en usar las fortalezas para capitalizar al máximo las oportunidades de mercado."
+        obj_mej = "Lanzar una nueva línea de producto/servicio que explote nuestras fortalezas en los próximos 12 meses, para capturar un 5% más de cuota de mercado."
     elif "Adaptativa" in estrategia_foda:
-        intro_mej = "Mejora enfocada en cerrar brechas internas y debilidades críticas."
-        obj_mej = "Eliminar los 3 principales cuellos de botella operativos identificados en el diagnóstico."
+        intro_mej = "La estrategia recomendada es Adaptativa. Se deben desarrollar áreas internas para poder aprovechar las oportunidades externas."
+        obj_mej = "Iniciar un programa de capacitación técnica en el próximo trimestre para cerrar brechas de debilidades y abordar 2 nuevas oportunidades de mercado."
     else:
-        intro_mej = "Mejora enfocada en la eficiencia y reducción de errores para mitigar riesgos."
-        obj_mej = "Reducir el índice de fallos o quejas en un 20% mediante la reingeniería de procesos básicos."
+        intro_mej = "La estrategia es Defensiva/Supervivencia. La prioridad es proteger la posición actual, usando fortalezas para mitigar amenazas."
+        obj_mej = "Implementar un plan de retención de clientes clave en los próximos 6 meses, para reducir la tasa de abandono en un 10%."
     planes['Plan de Mejora'] = {'introduccion': intro_mej, 'objetivo': obj_mej}
     
     # 7. Plan de Contingencia
     if pest_total < 2.5:
-        intro_con = f"Entorno vulnerable (PEST: {pest_total:.2f}). Se requieren medidas urgentes de mitigación de riesgos externos."
-        obj_con = "Establecer protocolos de respuesta inmediata ante crisis económicas o cambios regulatorios."
+        intro_con = f"El análisis del entorno (PEST: {pest_total:.2f}) revela vulnerabilidad a factores externos. Es crucial desarrollar planes para mitigar riesgos."
+        obj_con = "Formar un comité de gestión de riesgos que, en 2 meses, identifique los 3 principales riesgos externos y desarrolle un plan de respuesta específico."
     else:
-        intro_con = f"Entorno estable (PEST: {pest_total:.2f}). El enfoque es la prevención y vigilancia proactiva."
-        obj_con = "Mantener un fondo de reserva y un sistema de alerta temprana para eventos de bajo impacto."
+        intro_con = f"La empresa muestra buena respuesta al entorno (PEST: {pest_total:.2f}). El plan se enfocará en la monitorización proactiva de eventos inesperados."
+        obj_con = "Establecer un sistema de vigilancia del entorno trimestral y realizar un simulacro de crisis anual."
     planes['Plan de Contingencia'] = {'introduccion': intro_con, 'objetivo': obj_con}
     
     return planes
@@ -808,7 +808,7 @@ def aplicacion_principal():
                     column_config={
                         "cuadrante": st.column_config.SelectboxColumn("Cuadrante", options=["FO", "FA", "DO", "DA"]),
                         "importancia": st.column_config.SelectboxColumn("Importancia", options=["Alta", "Media Alta", "Media Baja", "Baja"]),
-                        "plan_asignado": st.column_config.SelectboxColumn("Plan Destino", options=["Plan Administrativo", "Plan Operativo", "Plan Tecnológico", "Plan Financiero", "Plan de Monitoreo y control", "Plan de Mejora", "Plan de Contingencia"]),
+                        "plan_asignado": st.column_config.SelectboxColumn("Plan Asignado", options=["Plan Administrativo", "Plan Operativo", "Plan Tecnológico", "Plan Financiero", "Plan de Monitoreo y control", "Plan de Mejora", "Plan de Contingencia"]),
                     }
                 )
                 
