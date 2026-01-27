@@ -37,23 +37,36 @@ def generar_analisis_ia(tipo_matriz, datos_contexto):
     return generar_analisis(prompt)
 
 def generar_analisis(prompt):
-    # Lista de modelos recomendados para análisis estratégico en Gemini
-    modelos_gemini = ["gemini-1.5-flash", "gemini-1.5-pro"]
     errores = []
-    
-    for nombre_modelo in modelos_gemini:
-        try:
-            model = genai.GenerativeModel(
-                model_name=nombre_modelo,
-                system_instruction="Eres un analista estratégico empresarial."
-            )
-            response = model.generate_content(prompt)
-            return response.text
-        except Exception as e:
-            errores.append(f"{nombre_modelo}: {str(e)}")
-            continue
+    try:
+        # Intentamos listar los modelos disponibles para tu API Key
+        modelos_disponibles = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        
+        # Priorizamos modelos Flash y luego Pro
+        modelos_a_probar = []
+        # Buscar cualquier variante de flash (1.5, 2.0, etc)
+        modelos_a_probar.extend([m for m in modelos_disponibles if 'flash' in m.lower()])
+        # Buscar cualquier variante de pro
+        modelos_a_probar.extend([m for m in modelos_disponibles if 'pro' in m.lower() and m not in modelos_a_probar])
+        
+        if not modelos_a_probar:
+            return "No se encontraron modelos de Gemini disponibles para esta API Key."
+
+        for nombre_modelo in modelos_a_probar:
+            try:
+                model = genai.GenerativeModel(
+                    model_name=nombre_modelo,
+                    system_instruction="Eres un analista estratégico empresarial."
+                )
+                response = model.generate_content(prompt)
+                return response.text
+            except Exception as e:
+                errores.append(f"{nombre_modelo}: {str(e)}")
+                continue
+    except Exception as e:
+        return f"Error al conectar con Google AI: {str(e)}. Verifica tu API Key."
             
-    return f"No se pudo generar el análisis. Error en Gemini: {', '.join(errores)}"
+    return f"No se pudo generar el análisis. Intentados: {', '.join(errores)}"
 
 st.set_page_config( page_title="Estratega Pro | Business Intelligence", page_icon="♟️", layout="wide",
     initial_sidebar_state="expanded")
