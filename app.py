@@ -1,6 +1,6 @@
 import streamlit as st
 import re
-from openai import OpenAI
+import google.generativeai as genai
 import pandas as pd
 import sqlite3
 import io
@@ -24,46 +24,36 @@ def get_ia_client():
     if not api_key:
         st.error("❌ No se encontró la API Key de Gemini en st.secrets")
         st.stop()
-
-    return OpenAI(
-        base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-        api_key=api_key,
-    )
+    
+    genai.configure(api_key=api_key)
+    return True # Retornamos True solo para indicar que está configurado
 
 def generar_analisis_ia(tipo_matriz, datos_contexto):
-    client = get_ia_client()
-    if not client:
+    if not get_ia_client():
         return "Error: No se encontró la API Key de Gemini en st.secrets."
     
     prompt = f"Actúa como un consultor senior de estrategia. Analiza la siguiente matriz {tipo_matriz} y proporciona conclusiones estratégicas clave, riesgos y recomendaciones. Datos: {datos_contexto}"
     
-    return generar_analisis(prompt, client)
+    return generar_analisis(prompt)
 
-def generar_analisis(prompt, client):
+def generar_analisis(prompt):
     # Lista de modelos recomendados para análisis estratégico en Gemini
-    modelos_gemini = [
-        "models/gemini-1.5-flash",
-        "models/gemini-1.5-pro",
-        # Puedes añadir más modelos si es necesario, pero Flash y Pro son los principales
-        
-    ]
+    modelos_gemini = ["gemini-1.5-flash", "gemini-1.5-pro"]
     errores = []
-    for modelo in modelos_gemini:
+    
+    for nombre_modelo in modelos_gemini:
         try:
-            response = client.chat.completions.create(
-                model=modelo,
-                messages=[{"role": "system", "content": "Eres un analista estratégico empresarial."},
-                {"role": "user", "content": prompt}],
-                timeout=15 
+            model = genai.GenerativeModel(
+                model_name=nombre_modelo,
+                system_instruction="Eres un analista estratégico empresarial."
             )
-            return response.choices[0].message.content
+            response = model.generate_content(prompt)
+            return response.text
         except Exception as e:
-            err_msg = str(e)
-            # Capturamos el error real para diagnóstico
-            errores.append(f"{modelo}: {err_msg}")
+            errores.append(f"{nombre_modelo}: {str(e)}")
             continue
             
-    return f"No se pudo generar el análisis. Los modelos de Gemini no están disponibles o fallaron. Por favor, verifica tu clave API y los límites de uso. (Intentados: {', '.join(errores)})"
+    return f"No se pudo generar el análisis. Error en Gemini: {', '.join(errores)}"
 
 st.set_page_config( page_title="Estratega Pro | Business Intelligence", page_icon="♟️", layout="wide",
     initial_sidebar_state="expanded")
