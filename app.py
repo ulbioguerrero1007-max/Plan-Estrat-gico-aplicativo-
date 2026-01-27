@@ -37,10 +37,9 @@ def get_ia_client():
 
 def init_supabase():
     try:
-        if "supabase_url" in st.secrets and "supabase_key" in st.secrets:
-            return create_client(st.secrets["supabase_url"], st.secrets["supabase_key"])
-    except: pass
-    return None
+        url, key = st.secrets.get("supabase_url"), st.secrets.get("supabase_key")
+        return create_client(url, key) if url and key else None
+    except: return None
 
 supabase = init_supabase()
 
@@ -51,48 +50,50 @@ def get_connection():
 def init_db():
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute('''CREATE TABLE IF NOT EXISTS empresas (
-                            id INTEGER PRIMARY KEY, nombre TEXT NOT NULL UNIQUE, giro TEXT, logo BLOB, 
-                            objetivo_plan TEXT, mision TEXT, vision TEXT, obj_general TEXT, obj_especificos TEXT,
-                            organigrama BLOB, politicas TEXT, valores TEXT,
-                            posicionamiento_x REAL, posicionamiento_y REAL, analisis_posicionamiento TEXT,
-                            analisis_pest TEXT, analisis_foda TEXT, analisis_made TEXT, analisis_madi TEXT,
-                            analisis_cmi TEXT, analisis_operativo TEXT
-                          )''')
-        cursor.execute('''CREATE TABLE IF NOT EXISTS matrices (id INTEGER PRIMARY KEY, empresa_id INTEGER, tipo_matriz TEXT NOT NULL, categoria TEXT, factor TEXT, tipo_foda TEXT, puntaje REAL, importancia REAL, valor_ponderado REAL, FOREIGN KEY (empresa_id) REFERENCES empresas (id) ON DELETE CASCADE)''')
-        cursor.execute('''CREATE TABLE IF NOT EXISTS foda_cruzado (id INTEGER PRIMARY KEY, empresa_id INTEGER, cuadrante TEXT, factor_fila TEXT, factor_columna TEXT, impacto INTEGER, FOREIGN KEY (empresa_id) REFERENCES empresas (id) ON DELETE CASCADE)''')
-        cursor.execute('''CREATE TABLE IF NOT EXISTS finanzas_planes (id INTEGER PRIMARY KEY, empresa_id INTEGER NOT NULL, nombre_plan TEXT NOT NULL, costo_implementacion REAL, beneficio_anual_esperado REAL, FOREIGN KEY (empresa_id) REFERENCES empresas (id) ON DELETE CASCADE, UNIQUE(empresa_id, nombre_plan))''')
-        cursor.execute('''CREATE TABLE IF NOT EXISTS operativizacion ( id INTEGER PRIMARY KEY, empresa_id INTEGER NOT NULL, plan TEXT, estrategia TEXT, actividades TEXT, plazo TEXT, responsable TEXT, recurso TEXT, costo REAL, FOREIGN KEY (empresa_id) REFERENCES empresas (id) ON DELETE CASCADE)''')
-        cursor.execute('''CREATE TABLE IF NOT EXISTS perdida_ganancia ( id INTEGER PRIMARY KEY, empresa_id INTEGER NOT NULL, anio TEXT, ingresos REAL, egresos REAL, resultado REAL, FOREIGN KEY (empresa_id) REFERENCES empresas (id) ON DELETE CASCADE)''')
-        cursor.execute('''CREATE TABLE IF NOT EXISTS flujo_caja ( id INTEGER PRIMARY KEY, empresa_id INTEGER NOT NULL, anio_proyeccion INTEGER, saldo_inicial REAL, ingreso REAL, egreso REAL, flujo_neto REAL, saldo_final REAL, FOREIGN KEY (empresa_id) REFERENCES empresas (id) ON DELETE CASCADE)''')
-        cursor.execute('''CREATE TABLE IF NOT EXISTS punto_equilibrio ( id INTEGER PRIMARY KEY, empresa_id INTEGER NOT NULL, costo_fijo_total REAL, precio_venta_unidad REAL, costo_variable_unidad REAL, unidades_producidas REAL, FOREIGN KEY (empresa_id) REFERENCES empresas (id) ON DELETE CASCADE)''')
-        cursor.execute('''CREATE TABLE IF NOT EXISTS matriz_marketing ( id INTEGER PRIMARY KEY, empresa_id INTEGER NOT NULL, tipo_matriz TEXT NOT NULL, variable TEXT, factor TEXT, producto TEXT, precio TEXT, plaza TEXT, promocion TEXT, rating REAL, weight_percent REAL, valor REAL, total INTEGER, FOREIGN KEY (empresa_id) REFERENCES empresas (id) ON DELETE CASCADE)''')
-        cursor.execute('''CREATE TABLE IF NOT EXISTS estrategias_generadas (id INTEGER PRIMARY KEY, empresa_id INTEGER NOT NULL, cuadrante TEXT NOT NULL, estrategia TEXT NOT NULL, importancia TEXT NOT NULL, actividades TEXT NOT NULL, plan_asignado TEXT, FOREIGN KEY (empresa_id) REFERENCES empresas (id) ON DELETE CASCADE)''')
+        # Tablas consolidadas para evitar redundancia en la creación
+        schemas = {
+            "empresas": "id INTEGER PRIMARY KEY, nombre TEXT NOT NULL UNIQUE, giro TEXT, logo BLOB, objetivo_plan TEXT, mision TEXT, vision TEXT, obj_general TEXT, obj_especificos TEXT, organigrama BLOB, politicas TEXT, valores TEXT, posicionamiento_x REAL, posicionamiento_y REAL, analisis_posicionamiento TEXT, analisis_pest TEXT, analisis_foda TEXT, analisis_made TEXT, analisis_madi TEXT, analisis_cmi TEXT, analisis_operativo TEXT",
+            "matrices": "id INTEGER PRIMARY KEY, empresa_id INTEGER, tipo_matriz TEXT NOT NULL, categoria TEXT, factor TEXT, tipo_foda TEXT, puntaje REAL, importancia REAL, valor_ponderado REAL, FOREIGN KEY (empresa_id) REFERENCES empresas (id) ON DELETE CASCADE",
+            "foda_cruzado": "id INTEGER PRIMARY KEY, empresa_id INTEGER, cuadrante TEXT, factor_fila TEXT, factor_columna TEXT, impacto INTEGER, FOREIGN KEY (empresa_id) REFERENCES empresas (id) ON DELETE CASCADE",
+            "finanzas_planes": "id INTEGER PRIMARY KEY, empresa_id INTEGER NOT NULL, nombre_plan TEXT NOT NULL, costo_implementacion REAL, beneficio_anual_esperado REAL, FOREIGN KEY (empresa_id) REFERENCES empresas (id) ON DELETE CASCADE, UNIQUE(empresa_id, nombre_plan)",
+            "operativizacion": "id INTEGER PRIMARY KEY, empresa_id INTEGER NOT NULL, plan TEXT, estrategia TEXT, actividades TEXT, plazo TEXT, responsable TEXT, recurso TEXT, costo REAL, FOREIGN KEY (empresa_id) REFERENCES empresas (id) ON DELETE CASCADE",
+            "perdida_ganancia": "id INTEGER PRIMARY KEY, empresa_id INTEGER NOT NULL, anio TEXT, ingresos REAL, egresos REAL, resultado REAL, FOREIGN KEY (empresa_id) REFERENCES empresas (id) ON DELETE CASCADE",
+            "flujo_caja": "id INTEGER PRIMARY KEY, empresa_id INTEGER NOT NULL, anio_proyeccion INTEGER, saldo_inicial REAL, ingreso REAL, egreso REAL, flujo_neto REAL, saldo_final REAL, FOREIGN KEY (empresa_id) REFERENCES empresas (id) ON DELETE CASCADE",
+            "punto_equilibrio": "id INTEGER PRIMARY KEY, empresa_id INTEGER NOT NULL, costo_fijo_total REAL, precio_venta_unidad REAL, costo_variable_unidad REAL, unidades_producidas REAL, FOREIGN KEY (empresa_id) REFERENCES empresas (id) ON DELETE CASCADE",
+            "matriz_marketing": "id INTEGER PRIMARY KEY, empresa_id INTEGER NOT NULL, tipo_matriz TEXT NOT NULL, variable TEXT, factor TEXT, producto TEXT, precio TEXT, plaza TEXT, promocion TEXT, rating REAL, weight_percent REAL, valor REAL, total INTEGER, FOREIGN KEY (empresa_id) REFERENCES empresas (id) ON DELETE CASCADE",
+            "estrategias_generadas": "id INTEGER PRIMARY KEY, empresa_id INTEGER NOT NULL, cuadrante TEXT NOT NULL, estrategia TEXT NOT NULL, importancia TEXT NOT NULL, actividades TEXT NOT NULL, plan_asignado TEXT, FOREIGN KEY (empresa_id) REFERENCES empresas (id) ON DELETE CASCADE"
+        }
+        for table, schema in schemas.items():
+            cursor.execute(f"CREATE TABLE IF NOT EXISTS {table} ({schema})")
         
-        # Migración de columnas
-        columnas_existentes = [c[1] for c in cursor.execute("PRAGMA table_info(empresas)").fetchall()]
-        nuevas = ['objetivo_plan', 'obj_general', 'obj_especificos', 'posicionamiento_x', 'posicionamiento_y', 'analisis_posicionamiento', 'analisis_pest', 'analisis_foda', 'analisis_made', 'analisis_madi', 'analisis_cmi', 'analisis_operativo']
-        for col in nuevas:
-            if col not in columnas_existentes: cursor.execute(f"ALTER TABLE empresas ADD COLUMN {col} TEXT")
+        # Migración de columnas faltantes
+        cols = [c[1] for c in cursor.execute("PRAGMA table_info(empresas)").fetchall()]
+        for col in ['objetivo_plan', 'obj_general', 'obj_especificos', 'posicionamiento_x', 'posicionamiento_y', 'analisis_posicionamiento', 'analisis_pest', 'analisis_foda', 'analisis_made', 'analisis_madi', 'analisis_cmi', 'analisis_operativo']:
+            if col not in cols: cursor.execute(f"ALTER TABLE empresas ADD COLUMN {col} TEXT")
         conn.commit()
 
 def get_empresas():
     with get_connection() as conn: return pd.read_sql("SELECT id, nombre FROM empresas", conn)
 
-def save_image(uploaded_file):
-    return uploaded_file.getvalue() if uploaded_file else None
-
-# --- IA Y ANÁLISIS ---
+# --- IA Y ANÁLISIS (CON LIMPIEZA DE TEXTO) ---
 def generar_analisis(prompt, client=None):
-    prompt_limpio = prompt + "\n\nIMPORTANTE: Proporciona el análisis en texto claro y profesional. Evita el uso excesivo de asteriscos o negritas. Usa párrafos bien estructurados."
+    # Instrucción estricta para evitar Markdown
+    prompt_limpio = prompt + "\n\nIMPORTANTE: Proporciona el análisis en TEXTO PLANO. NO uses asteriscos (*), almohadillas (#), negritas ni ningún formato Markdown. Usa solo párrafos y saltos de línea."
     try:
         get_ia_client()
         modelos = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
         probar = [m for m in modelos if 'flash' in m.lower()] + [m for m in modelos if 'pro' in m.lower()]
         for m_name in probar:
             try:
-                model = genai.GenerativeModel(m_name, system_instruction="Eres un consultor senior de estrategia empresarial.")
-                return model.generate_content(prompt_limpio).text.replace("****", "").replace("###", "").replace("##", "").strip()
+                model = genai.GenerativeModel(m_name, system_instruction="Eres un consultor senior de estrategia empresarial. Tu respuesta debe ser texto plano, profesional y sin decoraciones de Markdown.")
+                response = model.generate_content(prompt_limpio)
+                texto = response.text
+                # Limpieza agresiva de Markdown
+                texto = re.sub(r'\*+', '', texto) # Elimina asteriscos
+                texto = re.sub(r'#+', '', texto)  # Elimina almohadillas
+                texto = re.sub(r'_+', '', texto)  # Elimina guiones bajos de cursiva
+                texto = re.sub(r'`+', '', texto)  # Elimina backticks
+                return texto.strip()
             except: continue
     except Exception as e: return f"Error: {str(e)}"
     return "Error en análisis."
@@ -146,14 +147,6 @@ def generar_grafico_foda_radar(puntajes):
     fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
     ax.fill(angles, stats, color='blue', alpha=0.25); ax.plot(angles, stats, color='blue', linewidth=2)
     ax.set_xticks(angles[:-1]); ax.set_xticklabels(['Ofensiva\n(FO)', 'Defensiva\n(FA)', 'Adaptativa\n(DO)', 'Supervivencia\n(DA)'])
-    buf = BytesIO(); plt.savefig(buf, format='PNG', bbox_inches='tight'); plt.close(fig); buf.seek(0)
-    return buf
-
-def generar_grafico_pest_bar(df_pest):
-    if df_pest.empty: return None
-    scores = df_pest.groupby('categoria')['valor_ponderado'].sum()
-    fig, ax = plt.subplots(figsize=(7, 4))
-    scores.plot(kind='barh', ax=ax, color=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'])
     buf = BytesIO(); plt.savefig(buf, format='PNG', bbox_inches='tight'); plt.close(fig); buf.seek(0)
     return buf
 
@@ -264,7 +257,8 @@ def aplicacion_principal():
                 if not df_db.empty:
                     st.data_editor(df_db, use_container_width=True, key=f"editor_{tipo}")
                     if st.button(f"🤖 Analizar {tipo} con IA"):
-                        st.write(generar_analisis_ia(tipo, df_db.to_string()))
+                        with st.spinner("Analizando..."):
+                            st.write(generar_analisis_ia(tipo, df_db.to_string()))
 
         with d_tabs[2]:
             st.subheader("Matriz de Posicionamiento")
