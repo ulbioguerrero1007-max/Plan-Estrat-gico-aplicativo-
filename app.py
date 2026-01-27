@@ -1,4 +1,6 @@
 import streamlit as st
+import google.generativeai as genai
+from google.api_core import exceptions
 import re
 import requests
 import pandas as pd
@@ -19,6 +21,17 @@ import time
 import json
 from supabase import create_client, Client
 
+def llamar_ia_seguro(prompt):
+    try:
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        response = model.generate_content(prompt)
+        return response.text
+    except exceptions.ResourceExhausted:
+        return "⚠️ El motor de IA está saturado por la alta demanda. Por favor, espera un minuto y vuelve a intentarlo."
+    except exceptions.InvalidArgument:
+        return "⚠️ Hay un problema con el formato de los datos de la matriz."
+    except Exception as e:
+        return "⚠️ No se pudo conectar con la IA. Por favor, verifica tu conexión o intenta más tarde."
 # ========== CONFIGURACIÓN GEMINI CORREGIDA ==========
 def configurar_gemini():
     """Configura Gemini API usando requests"""
@@ -1395,3 +1408,4 @@ def main():
 if __name__ == "__main__":
     init_db()
     main()
+
