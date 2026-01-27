@@ -36,7 +36,7 @@ def generar_analisis_ia(tipo_matriz, datos_contexto):
     
     return generar_analisis(prompt)
 
-def generar_analisis(prompt):
+def generar_analisis(prompt, client=None):
     errores = []
     try:
         # Intentamos listar los modelos disponibles para tu API Key
