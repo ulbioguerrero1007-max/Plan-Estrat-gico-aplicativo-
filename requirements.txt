@@ -5,3 +5,4 @@ reportlab
 matplotlib
 numpy
 supabase
+google-generativeai
