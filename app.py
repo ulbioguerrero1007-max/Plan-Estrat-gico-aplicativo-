@@ -622,32 +622,45 @@ def aplicacion_principal():
         # Función interna para procesar datos pegados (se mantiene igual)
                 # --- INICIO DEL BLOQUE CORREGIDO ---
 
-        def procesar_made_madi(data_str, tipo):
-            # Esta función debe devolver un DataFrame con columnas en minúsculas
-            df = pd.read_csv(StringIO(data_str), sep='\t', header=0)
+                def procesar_made_madi(data_str, tipo):
+            # Si los datos ya son un DataFrame (viniendo del editor), no necesitamos leerlos de un CSV.
+            if isinstance(data_str, pd.DataFrame):
+                df = data_str.copy()
+            else:
+                df = pd.read_csv(StringIO(data_str), sep='\t', header=0)
+
+            # Normalizar nombres de columnas a minúsculas, como antes
+            df.columns = [str(c).lower().replace(' ', '_').replace('%', 'percent') for c in df.columns]
             
-            # Normalizar nombres de columnas a minúsculas y sin espacios
-            df.columns = [c.lower().replace(' ', '_').replace('%', 'percent') for c in df.columns]
-            
-            # Asegurarse de que las columnas esperadas por la BD existan
             columnas_bd = ['variable', 'factor', 'producto', 'precio', 'plaza', 'promocion', 'rating', 'weight_percent']
             for col in columnas_bd:
                 if col not in df.columns:
-                    df[col] = None # O un valor por defecto apropiado
+                    df[col] = None
 
-            # Tu lógica de cálculo original
+            # --- INICIO DE LA CORRECCIÓN CLAVE ---
             p_cols = ['producto', 'precio', 'plaza', 'promocion']
-            df['total'] = df[p_cols].apply(lambda row: row.str.contains('si', na=False, case=False)).sum(axis=1)
-            
+            for col in p_cols:
+                # Convertimos la columna a string y luego buscamos 'si'. Esto maneja tanto texto como booleanos.
+                # O, una forma más robusta, es mapear los posibles valores a 1 y 0.
+                # Mapeamos 'si' (insensible a mayúsculas) y True a 1, todo lo demás a 0.
+                df[col] = df[col].apply(lambda x: 1 if str(x).lower() == 'si' or x is True else 0)
+
+            # Ahora, simplemente sumamos los 1s.
+            df['total'] = df[p_cols].sum(axis=1)
+            # --- FIN DE LA CORRECCIÓN CLAVE ---
+
             numeric_cols = ['rating', 'weight_percent']
             for col in numeric_cols:
-                df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
             
             df['valor'] = df.get('rating', 0) * (df.get('weight_percent', 0) / 100.0)
             
-            # Devolver solo las columnas que existen en la tabla de la BD
             columnas_finales = ['variable', 'factor', 'producto', 'precio', 'plaza', 'promocion', 'rating', 'weight_percent', 'valor', 'total']
-            return df[columnas_finales]
+            
+            # Asegurarse de que las columnas de 'p_cols' vuelvan a ser texto para la BD si es necesario, o dejarlas como 0/1.
+            # Por simplicidad, las dejamos como 0/1, la base de datos las aceptará como números.
+            
+            return df[[c for c in columnas_finales if c in df.columns]]
 
         def display_and_edit_matrix(tipo_matriz, analisis_propio_data):
             df_db = get_datos_tabla('matriz_marketing', empresa_id, tipo_matriz_filter=tipo_matriz)
@@ -1066,6 +1079,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
