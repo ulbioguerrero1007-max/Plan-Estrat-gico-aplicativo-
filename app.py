@@ -622,7 +622,7 @@ def aplicacion_principal():
         # Función interna para procesar datos pegados (se mantiene igual)
                 # --- INICIO DEL BLOQUE CORREGIDO ---
 
-                def procesar_made_madi(data_str, tipo):
+        def procesar_made_madi(data_str, tipo):
             # Si los datos ya son un DataFrame (viniendo del editor), no necesitamos leerlos de un CSV.
             if isinstance(data_str, pd.DataFrame):
                 df = data_str.copy()
@@ -1079,6 +1079,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
