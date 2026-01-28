@@ -60,7 +60,7 @@ def generar_analisis(prompt, client=None):
                 )
                 response = model.generate_content(prompt_limpio)
                 texto = response.text
-                # CORRECIÓN: Limpieza de formato Markdown solicitada
+                # CORRECCIÓN: Limpieza de formato Markdown solicitada
                 texto = re.sub(r'\*+', '', texto)
                 texto = re.sub(r'#+', '', texto)
                 texto = re.sub(r'_+', '', texto)
@@ -325,6 +325,7 @@ def get_apa_styles():
     styles.add(ParagraphStyle(name='APA_H1', parent=styles['APA_Body'], fontName='Times-Bold', fontSize=14, alignment=TA_CENTER, spaceAfter=12))
     styles.add(ParagraphStyle(name='APA_H2', parent=styles['APA_Body'], fontName='Times-Bold', alignment=TA_LEFT, spaceBefore=12, spaceAfter=6))
     return styles
+
 def generar_pdf_completo(empresa_id, version, coordinador):
     empresa = get_datos_empresa(empresa_id)
     if not empresa:
@@ -403,9 +404,9 @@ def generar_pdf_completo(empresa_id, version, coordinador):
     story.append(Paragraph("Anexo C: Planes Estratégicos y Cuadro de Mando", styles['APA_H2']))
     story.append(Paragraph("<b>Cuadro de Mando Integral (CMI)</b>", styles['APA_Body']))
 
-df_estrategias_pdf = get_datos_tabla('estrategias_generadas', empresa_id)
+    df_estrategias_pdf = get_datos_tabla('estrategias_generadas', empresa_id)
     
-if not df_estrategias_pdf.empty:
+    if not df_estrategias_pdf.empty:
         df_cmi = generar_cuadro_de_mando_ia(df_estrategias_pdf)
         if not df_cmi.empty:
             cmi_data = [df_cmi.columns.tolist()] + df_cmi.values.tolist()
@@ -419,17 +420,17 @@ if not df_estrategias_pdf.empty:
                 ('LEADINGS', (0,0), (-1,-1), 10)
             ]))
             story.append(cmi_table)
-else:
+    else:
         story.append(Paragraph("No hay estrategias generadas para construir el CMI.", styles['APA_Body']))
 
-story.append(PageBreak())
-logo_bytes_data = empresa.get('logo')
-logo_bytes = None
-if logo_bytes_data:
-    try:
-        # Asumiendo que el logo se guarda como BLOB (bytes) en Supabase
-        logo_bytes = BytesIO(logo_bytes_data) 
-    except:
+    story.append(PageBreak())
+    logo_bytes_data = empresa.get('logo')
+    logo_bytes = None
+    if logo_bytes_data:
+        try:
+            # Asumiendo que el logo se guarda como BLOB (bytes) en Supabase
+            logo_bytes = BytesIO(logo_bytes_data) 
+        except:
             # Si se guarda como texto (hex), se usaría la otra lógica
             try:
                 logo_bytes = BytesIO(bytes.fromhex(logo_bytes_data.replace('\\x', '')))
@@ -529,34 +530,34 @@ def aplicacion_principal():
 
     # --- FIN DEL BLOQUE DE REEMPLAZO PARA EL SIDEBAR ---
                 
-if not empresa_id:
+    if not empresa_id:
         st.info("👈 Por favor, selecciona o crea una empresa en el menú lateral para comenzar.")
         st.stop()
 
-empresa_data = get_datos_empresa(empresa_id)
-if not empresa_data:
+    empresa_data = get_datos_empresa(empresa_id)
+    if not empresa_data:
         st.error("No se pudieron cargar los datos de la empresa. Verifica tus permisos.")
         st.stop()
 
-# Definir permisos para deshabilitar widgets
-es_propietario = empresa_data.get('propietario_id') == st.session_state.user.id
-es_editor = False
-if not es_propietario:
-    try:
-        res = supabase.table('empresas_compartidas').select('permiso').eq('empresa_id', empresa_id).eq('usuario_compartido_id', st.session_state.user.id).single().execute()
-        if res.data and res.data['permiso'] == 'editor':
-            es_editor = True
-    except: # PostgrestError si no se encuentra la fila
-        es_editor = False
+    # Definir permisos para deshabilitar widgets
+    es_propietario = empresa_data.get('propietario_id') == st.session_state.user.id
+    es_editor = False
+    if not es_propietario:
+        try:
+            res = supabase.table('empresas_compartidas').select('permiso').eq('empresa_id', empresa_id).eq('usuario_compartido_id', st.session_state.user.id).single().execute()
+            if res.data and res.data['permiso'] == 'editor':
+                es_editor = True
+        except: # PostgrestError si no se encuentra la fila
+            es_editor = False
 
-puede_editar = es_propietario or es_editor
+    puede_editar = es_propietario or es_editor
 
     # --- INICIO DEL BLOQUE DE REEMPLAZO ---
 
-tab1, tab2, tab_est, tab3, tab4, tab5, tab_dash, tab6 = st.tabs(["1. Introducción", "2. Diagnóstico Situacional", "3. Estrategia", "4. Planes Estratégicos", "5. CMI/Indicadores", "6. Operativización/Presupuesto", "7. Dashboard de Análisis", "8. Resumen y Conclusiones"])
+    tab1, tab2, tab_est, tab3, tab4, tab5, tab_dash, tab6 = st.tabs(["1. Introducción", "2. Diagnóstico Situacional", "3. Estrategia", "4. Planes Estratégicos", "5. CMI/Indicadores", "6. Operativización/Presupuesto", "7. Dashboard de Análisis", "8. Resumen y Conclusiones"])
 
     # --- PESTAÑA 1: INTRODUCCIÓN ---
-with tab1:
+    with tab1:
         st.header("Introducción y Cultura Organizacional")
         with st.form("form_intro"):
             st.subheader("Datos Generales")
@@ -607,7 +608,7 @@ with tab1:
                     st.error(f"Error al guardar: {e}")
 
     # --- PESTAÑA 2: DIAGNÓSTICO SITUACIONAL (CORREGIDA) ---
-with tab2:
+    with tab2:
         st.header("Diagnóstico Situacional (Análisis de Matrices)")
 
         # La variable 'empresa_data' ya está cargada al principio de aplicacion_principal()
@@ -828,7 +829,7 @@ with tab2:
             
             mostrar_ultimo_analisis_guardado(empresa_id, 'foda')            
     # --- PESTAÑA 3: ESTRATEGIA ---
-with tab_est:
+    with tab_est:
         st.header("🎯 Formulación de Estrategias")
         # ... (Tu lógica de generación de estrategias con IA)
         
@@ -861,7 +862,7 @@ with tab_est:
                 pass
     
     # --- PESTAÑA 4: PLANES ESTRATÉGICOS ---
-with tab3:
+    with tab3:
         st.header("Planes Estratégicos")
         with st.form("form_planes"):
             if st.form_submit_button("🤖 Generar Planes con IA"):
@@ -877,7 +878,7 @@ with tab3:
         mostrar_ultimo_analisis_guardado(empresa_data, 'operativo')
     
     # --- PESTAÑA 5: CMI/INDICADORES ---
-with tab4:
+    with tab4:
         st.header("CMI / Indicadores")
         with st.form("form_cmi"):
             if st.form_submit_button("🤖 Generar CMI con IA"):
@@ -893,7 +894,7 @@ with tab4:
         mostrar_ultimo_analisis_guardado(empresa_data, 'cmi')
     
     # --- PESTAÑA 6: OPERATIVIZACIÓN/PRESUPUESTO ---
-with tab5:
+    with tab5:
         st.header("Operativización / Presupuesto")
         
         # Cuadro de Operativización
@@ -941,7 +942,7 @@ with tab5:
         # ... (Tu lógica de C/B y punto de equilibrio, usando 'pe_data')
         
     # --- PESTAÑA 7: DASHBOARD DE ANÁLISIS ---
-with tab_dash:
+    with tab_dash:
         st.header("📊 Dashboard de Análisis Estratégico")
         df_est_dash = get_datos_tabla('estrategias_generadas', empresa_id)
         df_pg_dash = get_datos_tabla('perdida_ganancia', empresa_id)
@@ -949,7 +950,7 @@ with tab_dash:
         # ... (Toda tu lógica de visualización con Plotly se mantiene intacta)
         
     # --- PESTAÑA 8: RESUMEN Y CONCLUSIONES ---
-with tab6:
+    with tab6:
         st.header("Resumen, Conclusiones y Exportación")
         with st.form("pdf_form"):
             pdf_version = st.text_input("Versión del Plan", value="1.0")
@@ -1014,10 +1015,8 @@ def main():
         aplicacion_principal()
 
 if __name__ == "__main__":
+    supabase = init_supabase()
     if supabase:
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
-
-
-
