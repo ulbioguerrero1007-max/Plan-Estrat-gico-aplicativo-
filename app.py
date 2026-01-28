@@ -495,13 +495,16 @@ def aplicacion_principal():
                     else:
                         st.warning("El nombre no puede estar vacío.")
 
-    if empresa_id and st.button("❌ Eliminar Empresa Seleccionada", type="primary"):
-            try:
-                supabase.table('empresas').delete().eq('id', empresa_id).execute()
-                st.success(f"Empresa '{empresa_seleccionada}' eliminada.")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Error al eliminar la empresa: {e}")
+         if empresa_id and st.button("❌ Eliminar Empresa Seleccionada", type="primary"):
+            # La línea "if supabase:" y todo lo que sigue ahora está DENTRO del primer if.
+            if supabase:
+                try:
+                    # RLS se encarga de verificar que solo el propietario pueda borrar
+                    supabase.table('empresas').delete().eq('id', empresa_id).execute()
+                    st.success(f"Empresa '{empresa_seleccionada}' eliminada.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error al eliminar la empresa: {e}")
                 
 if not empresa_id:
         st.info("👈 Por favor, selecciona o crea una empresa en el menú lateral para comenzar.")
@@ -884,4 +887,5 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
