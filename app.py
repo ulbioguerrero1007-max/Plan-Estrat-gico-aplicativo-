@@ -58,7 +58,7 @@ def generar_analisis(prompt, client=None):
                 )
                 response = model.generate_content(prompt_limpio)
                 texto = response.text
-                # CORRECCIÓN: Limpieza de formato Markdown solicitada
+                # CORRECIÓN: Limpieza de formato Markdown solicitada
                 texto = re.sub(r'\*+', '', texto)
                 texto = re.sub(r'#+', '', texto)
                 texto = re.sub(r'_+', '', texto)
@@ -394,6 +394,39 @@ def generar_pdf_completo(empresa_id, version, coordinador):
                      onLaterPages=lambda c, d: encabezado_pie_pagina(c, d, logo_bytes, empresa['nombre'], version, coordinador))
     pdf_buffer.seek(0)
     return pdf_buffer
+
+# NUEVA FUNCIÓN: Mostrar último análisis guardado desde la base de datos
+def mostrar_ultimo_analisis_guardado(empresa_id, tipo_analisis):
+    """
+    Muestra el último análisis guardado desde la base de datos.
+    tipo_analisis: 'made', 'madi', 'posicionamiento', 'pest', 'foda', 'cmi', 'operativo'
+    """
+    try:
+        with get_connection() as conn:
+            # Consultar el análisis específico
+            query = f"SELECT analisis_{tipo_analisis} FROM empresas WHERE id=?"
+            resultado = pd.read_sql(query, conn, params=(empresa_id,))
+            
+            if not resultado.empty:
+                contenido = resultado.iloc[0][f'analisis_{tipo_analisis}']
+                if contenido and str(contenido).strip():
+                    st.markdown("---")
+                    st.markdown(f"**📄 Último análisis de {tipo_analisis.upper()} guardado:**")
+                    st.text_area(
+                        f"contenido_guardado_{tipo_analisis}", 
+                        value=contenido, 
+                        height=200, 
+                        disabled=True,
+                        label_visibility="collapsed"
+                    )
+                else:
+                    st.markdown("---")
+                    st.info(f"ℹ️ No hay análisis de {tipo_analisis.upper()} guardado aún en la base de datos.")
+            else:
+                st.error("No se encontró la empresa en la base de datos.")
+    except Exception as e:
+        st.error(f"Error al cargar el último análisis guardado: {e}")
+
 def aplicacion_principal():
     init_db()
     with st.sidebar:
@@ -568,6 +601,8 @@ def aplicacion_principal():
                     except Exception as e:
                         st.error(f"Error al procesar datos de MADE: {e}")
             display_and_edit_matrix('MADE', analisis_data.get('analisis_made', ''))
+            # NUEVO: Mostrar último análisis guardado de MADE
+            mostrar_ultimo_analisis_guardado(empresa_id, 'made')
         with diag_tab2:
             st.subheader("Análisis de Marketing Externo (MADI)")
             with st.expander("📋 Pegar datos de MADI desde Excel"):
@@ -582,6 +617,8 @@ def aplicacion_principal():
                     except Exception as e:
                         st.error(f"Error al procesar datos de MADI: {e}")
             display_and_edit_matrix('MADI', analisis_data.get('analisis_madi', ''))
+            # NUEVO: Mostrar último análisis guardado de MADI
+            mostrar_ultimo_analisis_guardado(empresa_id, 'madi')
         with diag_tab3:
             st.subheader("Matriz de Posicionamiento")
             with get_connection() as conn:
@@ -632,6 +669,8 @@ def aplicacion_principal():
                     with get_connection() as conn:
                         conn.execute("UPDATE empresas SET analisis_posicionamiento=? WHERE id=?", (analisis_propio_pos, empresa_id))
                     st.success("Análisis de Posicionamiento guardado."); st.rerun()
+            # NUEVO: Mostrar último análisis guardado de Posicionamiento
+            mostrar_ultimo_analisis_guardado(empresa_id, 'posicionamiento')
         with diag_tab4:
             st.subheader("Análisis PEST")
             with st.expander("📋 Pegar datos desde Excel"):
@@ -678,6 +717,8 @@ def aplicacion_principal():
                     with get_connection() as conn:
                         conn.execute("UPDATE empresas SET analisis_pest=? WHERE id=?", (analisis_propio_pest, empresa_id))
                     st.success("Análisis de PEST guardado."); st.rerun()
+            # NUEVO: Mostrar último análisis guardado de PEST
+            mostrar_ultimo_analisis_guardado(empresa_id, 'pest')
         with diag_tab5:
             st.subheader("Análisis FODA Cruzado (Numérico)")
             with st.expander("📋 Pegar datos de FODA Cruzado desde Excel"):
@@ -724,6 +765,8 @@ def aplicacion_principal():
                     with get_connection() as conn:
                         conn.execute("UPDATE empresas SET analisis_foda=? WHERE id=?", (analisis_propio_foda, empresa_id))
                     st.success("Análisis de FODA guardado."); st.rerun()
+            # NUEVO: Mostrar último análisis guardado de FODA
+            mostrar_ultimo_analisis_guardado(empresa_id, 'foda')
 
         with tab_est:
             st.header("🎯 Formulación de Estrategias")
@@ -902,6 +945,8 @@ def aplicacion_principal():
                     with get_connection() as conn:
                         conn.execute("UPDATE empresas SET analisis_operativo=? WHERE id=?", (analisis_propio_operativo, empresa_id))
                     st.success("Plan Estratégico guardado."); st.rerun()
+            # NUEVO: Mostrar último análisis guardado de Planes Operativos
+            mostrar_ultimo_analisis_guardado(empresa_id, 'operativo')
         with tab4:
             st.header("CMI / Indicadores")
             with st.form("form_cmi"):
@@ -920,6 +965,8 @@ def aplicacion_principal():
                     with get_connection() as conn:
                         conn.execute("UPDATE empresas SET analisis_cmi=? WHERE id=?", (analisis_propio_cmi, empresa_id))
                     st.success("CMI guardado."); st.rerun()
+            # NUEVO: Mostrar último análisis guardado de CMI
+            mostrar_ultimo_analisis_guardado(empresa_id, 'cmi')
         with tab5:
             st.header("Operativización / Presupuesto")
             st.subheader("📝 Cuadro de Operativización y Presupuesto (Cascada)")
