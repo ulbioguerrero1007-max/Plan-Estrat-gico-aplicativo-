@@ -318,7 +318,7 @@ def get_apa_styles():
             
             if st.form_submit_button("🚀 Generar PDF Profesional"):
                 with st.spinner("Generando documento con formato APA. Esto puede tomar un momento..."):
-                    pdf_bytes = generar_pdf_completo_mejorado(
+                    pdf_bytes = generar_pdf_completo_mejorado(empresa_id, pdf_version, pdf_elaborado, pdf_revisado, pdf_aprobado)
                         empresa_id, 
                         pdf_version, 
                         pdf_elaborado, 
@@ -1503,7 +1503,7 @@ Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses enc
             pdf_coordinador = st.text_input("Coordinador del Plan", value="Consultor Estratégico")
             if st.form_submit_button("🚀 Generar PDF Completo"):
                 with st.spinner("Generando documento PDF..."):
-                    pdf_bytes = generar_pdf_completo(empresa_id, pdf_version, pdf_coordinador)
+                    pdf_bytes = generar_pdf_completo_mejorado(empresa_id, pdf_version, pdf_elaborado, pdf_revisado, pdf_aprobado)
                     if pdf_bytes:
                         st.session_state['pdf_file'] = pdf_bytes
                         st.success("PDF generado correctamente.")
@@ -1574,6 +1574,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
