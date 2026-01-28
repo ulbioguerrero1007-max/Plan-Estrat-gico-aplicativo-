@@ -821,7 +821,7 @@ with tab2:
             
             mostrar_ultimo_analisis_guardado(empresa_id, 'foda')            
     # --- PESTAÑA 3: ESTRATEGIA ---
-    with tab_est:
+with tab_est:
         st.header("🎯 Formulación de Estrategias")
         # ... (Tu lógica de generación de estrategias con IA)
         
@@ -852,7 +852,7 @@ with tab2:
             if st.button("🚀 Enviar a Operativización", disabled=not puede_editar):
                 # ... (Tu lógica para enviar a operativización, usando 'edited_df')
                 pass
-
+    
     # --- PESTAÑA 4: PLANES ESTRATÉGICOS ---
     with tab3:
         st.header("Planes Estratégicos")
@@ -1011,6 +1011,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
