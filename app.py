@@ -1350,60 +1350,6 @@ def create_table_pdf(data, col_widths=None, style=None):
     
 # AQUÍ VA LA FUNCIÓN mostrar_ultimo_analisis_guardado (ya existe en tu código)
 
-    # --- PESTAÑA 8: RESUMEN Y CONCLUSIONES ---
-    with tab6:
-        st.header("Resumen, Conclusiones y Exportación")
-        
-        st.subheader("📄 Generar Documento Final (Formato APA)")
-        
-        with st.form("pdf_form"):
-            col1, col2 = st.columns(2)
-            with col1:
-                pdf_version = st.text_input("Versión del Plan", value="1.0")
-                pdf_elaborado = st.text_input("Elaborado por", value="Consultor Estratégico")
-            with col2:
-                pdf_revisado = st.text_input("Revisado por", value="Director de Planeación")
-                pdf_aprobado = st.text_input("Aprobado por", value="Director General")
-            
-            st.info(
-                "**Estructura del documento generado:**\n\n"
-                "- **Resumen Ejecutivo** (máx. 5 hojas): Diagnóstico clave, estrategias prioritarias y recomendación\n"
-                "- **Plan Estratégico** (máx. 30 hojas): Introducción, estrategias, planes, CMI, operativización\n"
-                "- **Anexos** (ilimitado): Análisis detallados, matrices, dashboards y proyecciones\n\n"
-                "**Formato:** Tamaño carta (A4), Times New Roman 12pt, interlineado doble, márgenes de 1 pulgada"
-            )
-            
-            submitted_pdf = st.form_submit_button("🚀 Generar PDF Profesional")
-        
-        # El procesamiento va FUERA del with st.form()
-        if submitted_pdf:
-            with st.spinner("Generando documento con formato APA. Esto puede tomar un momento..."):
-                pdf_bytes = generar_pdf_completo_mejorado(
-                    empresa_id, 
-                    pdf_version, 
-                    pdf_elaborado, 
-                    pdf_revisado, 
-                    pdf_aprobado
-                )
-                if pdf_bytes:
-                    st.session_state['pdf_file'] = pdf_bytes
-                    st.session_state['pdf_nombre'] = f"Plan_Estrategico_{empresa_data.get('nombre', 'Empresa')}_V{pdf_version}.pdf"
-                    st.success("✅ PDF generado correctamente con formato APA.")
-                    st.rerun()
-        
-        if 'pdf_file' in st.session_state:
-            col1, col2 = st.columns([1, 3])
-            with col1:
-                st.download_button(
-                    label="⬇️ Descargar PDF", 
-                    data=st.session_state['pdf_file'], 
-                    file_name=st.session_state.get('pdf_nombre', 'plan_estrategico.pdf'), 
-                    mime="application/pdf",
-                    type="primary"
-                )
-            with col2:
-                st.success(f"Documento listo: {st.session_state.get('pdf_nombre', 'plan_estrategico.pdf')}")
-                st.caption("El documento incluye encabezado con logo, pie de página con firmas, y todas las secciones requeridas.")
 
 def mostrar_ultimo_analisis_guardado(empresa_data, tipo_analisis):
     """
@@ -2552,6 +2498,61 @@ def aplicacion_principal():
             fig = px.bar(df_foda_dash, x='cuadrante', y='impacto', color='cuadrante', title="Impacto por Cuadrante FODA")
             st.plotly_chart(fig, use_container_width=True)
         
+    # --- PESTAÑA 8: RESUMEN Y CONCLUSIONES ---
+    with tab6:
+        st.header("Resumen, Conclusiones y Exportación")
+        
+        st.subheader("📄 Generar Documento Final (Formato APA)")
+        
+        with st.form("pdf_form"):
+            col1, col2 = st.columns(2)
+            with col1:
+                pdf_version = st.text_input("Versión del Plan", value="1.0")
+                pdf_elaborado = st.text_input("Elaborado por", value="Consultor Estratégico")
+            with col2:
+                pdf_revisado = st.text_input("Revisado por", value="Director de Planeación")
+                pdf_aprobado = st.text_input("Aprobado por", value="Director General")
+            
+            st.info(
+                "**Estructura del documento generado:**\n\n"
+                "- **Resumen Ejecutivo** (máx. 5 hojas): Diagnóstico clave, estrategias prioritarias y recomendación\n"
+                "- **Plan Estratégico** (máx. 30 hojas): Introducción, estrategias, planes, CMI, operativización\n"
+                "- **Anexos** (ilimitado): Análisis detallados, matrices, dashboards y proyecciones\n\n"
+                "**Formato:** Tamaño carta (A4), Times New Roman 12pt, interlineado doble, márgenes de 1 pulgada"
+            )
+            
+            submitted_pdf = st.form_submit_button("🚀 Generar PDF Profesional")
+        
+        # El procesamiento va FUERA del with st.form()
+        if submitted_pdf:
+            with st.spinner("Generando documento con formato APA. Esto puede tomar un momento..."):
+                pdf_bytes = generar_pdf_completo_mejorado(
+                    empresa_id, 
+                    pdf_version, 
+                    pdf_elaborado, 
+                    pdf_revisado, 
+                    pdf_aprobado
+                )
+                if pdf_bytes:
+                    st.session_state['pdf_file'] = pdf_bytes
+                    st.session_state['pdf_nombre'] = f"Plan_Estrategico_{empresa_data.get('nombre', 'Empresa')}_V{pdf_version}.pdf"
+                    st.success("✅ PDF generado correctamente con formato APA.")
+                    st.rerun()
+        
+        if 'pdf_file' in st.session_state:
+            col1, col2 = st.columns([1, 3])
+            with col1:
+                st.download_button(
+                    label="⬇️ Descargar PDF", 
+                    data=st.session_state['pdf_file'], 
+                    file_name=st.session_state.get('pdf_nombre', 'plan_estrategico.pdf'), 
+                    mime="application/pdf",
+                    type="primary"
+                )
+            with col2:
+                st.success(f"Documento listo: {st.session_state.get('pdf_nombre', 'plan_estrategico.pdf')}")
+                st.caption("El documento incluye encabezado con logo, pie de página con firmas, y todas las secciones requeridas.")
+
 def pantalla_acceso():
     st.sidebar.title("Estratega Pro")
     opcion = st.sidebar.radio("Acceso al Sistema", ["Entrar", "Crear Cuenta"])
@@ -2606,5 +2607,3 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
-
-
