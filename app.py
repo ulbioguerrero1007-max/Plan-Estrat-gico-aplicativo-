@@ -496,22 +496,21 @@ def aplicacion_principal():
                         st.warning("El nombre no puede estar vacío.")
 
     if empresa_id and st.button("❌ Eliminar Empresa Seleccionada", type="primary"):
-    if supabase:
-        try:
-            # RLS se encarga de verificar que solo el propietario pueda borrar
-            supabase.table('empresas').delete().eq('id', empresa_id).execute()
-            st.success(f"Empresa '{empresa_seleccionada}' eliminada.")
-            st.rerun()
-        except Exception as e:
-            st.error(f"Error al eliminar la empresa: {e}")
-
-    if not empresa_id:
+            try:
+                supabase.table('empresas').delete().eq('id', empresa_id).execute()
+                st.success(f"Empresa '{empresa_seleccionada}' eliminada.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error al eliminar la empresa: {e}")
+                
+if not empresa_id:
         st.info("👈 Por favor, selecciona o crea una empresa en el menú lateral para comenzar.")
         st.stop()
-        empresa_data = get_datos_empresa(empresa_id)
+
+empresa_data = get_datos_empresa(empresa_id)
 if not empresa_data:
-    st.error("No se pudieron cargar los datos de la empresa seleccionada. Verifica tus permisos.")
-    st.stop()
+        st.error("No se pudieron cargar los datos de la empresa. Verifica tus permisos.")
+        st.stop()
 
 # Definir permisos para deshabilitar widgets
 es_propietario = empresa_data.get('propietario_id') == st.session_state.user.id
@@ -885,11 +884,3 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
-
-
-
-
-
-
-
-
