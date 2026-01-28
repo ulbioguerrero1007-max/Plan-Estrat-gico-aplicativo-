@@ -423,14 +423,13 @@ else:
         story.append(Paragraph("No hay estrategias generadas para construir el CMI.", styles['APA_Body']))
 
 story.append(PageBreak())
-
-    logo_bytes_data = empresa.get('logo')
-    logo_bytes = None
-    if logo_bytes_data:
-        try:
-            # Asumiendo que el logo se guarda como BLOB (bytes) en Supabase
-            logo_bytes = BytesIO(logo_bytes_data) 
-        except:
+logo_bytes_data = empresa.get('logo')
+logo_bytes = None
+if logo_bytes_data:
+    try:
+        # Asumiendo que el logo se guarda como BLOB (bytes) en Supabase
+        logo_bytes = BytesIO(logo_bytes_data) 
+    except:
             # Si se guarda como texto (hex), se usaría la otra lógica
             try:
                 logo_bytes = BytesIO(bytes.fromhex(logo_bytes_data.replace('\\x', '')))
@@ -1019,5 +1018,6 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
