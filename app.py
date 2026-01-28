@@ -423,11 +423,11 @@ story.append(PageBreak())
 
 logo_bytes_data = empresa.get('logo')
 logo_bytes = None
-    if logo_bytes_data:
-        try:
-            logo_bytes = BytesIO(bytes.fromhex(logo_bytes_data.replace('\\x', '')))
-        except:
-            pass
+if logo_bytes_data:
+    try:
+        logo_bytes = BytesIO(bytes.fromhex(logo_bytes_data.replace('\\x', '')))
+    except:
+        pass
     
     doc.build(story, onFirstPage=lambda c, d: encabezado_pie_pagina(c, d, logo_bytes, empresa.get('nombre', ''), version, coordinador), 
                      onLaterPages=lambda c, d: encabezado_pie_pagina(c, d, logo_bytes, empresa.get('nombre', ''), version, coordinador))
@@ -885,6 +885,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
