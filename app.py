@@ -292,116 +292,57 @@ def get_apa_styles():
     styles.add(ParagraphStyle(name='APA_H2', parent=styles['APA_Body'], fontName='Times-Bold', alignment=TA_LEFT, spaceBefore=12, spaceAfter=6))
     return styles
 
-def generar_pdf_completo(empresa_id, version, coordinador):
-    empresa = get_datos_empresa(empresa_id)
-    if not empresa:
-        st.error("No se pueden generar el PDF, no se encontraron datos de la empresa.")
-        return None
-    df_pest = get_datos_tabla('matrices', empresa_id, tipo_matriz_filter='PEST')
-    df_foda = get_datos_tabla('foda_cruzado', empresa_id)
-    
-    pdf_buffer = BytesIO()
-    doc = SimpleDocTemplate(pdf_buffer, pagesize=A4, leftMargin=1*inch, rightMargin=1*inch, topMargin=1*inch, bottomMargin=1*inch)
-    styles = get_apa_styles()
-    story = []
-    
-    story.append(Spacer(1, 2*inch))
-    story.append(Paragraph("Plan Estratégico", styles['APA_H1']))
-    story.append(Spacer(1, 0.2*inch))
-    story.append(Paragraph(empresa['nombre'], styles['APA_H1']))
-    story.append(Spacer(1, 2*inch))
-    story.append(Paragraph(f"Versión: {version}", styles['APA_Body']))
-    story.append(Paragraph(f"Fecha: {pd.Timestamp.now().strftime('%Y-%m-%d')}", styles['APA_Body']))
-    story.append(PageBreak())
-    story.append(Paragraph("Resumen Ejecutivo", styles['APA_H1']))
-    story.append(Paragraph("Este resumen presenta los hallazgos y recomendaciones clave del diagnóstico estratégico. Está diseñado para proporcionar una visión general rápida y comprensible para la alta dirección, facilitando la toma de decisiones informadas.", styles['APA_Body']))
-    story.append(Spacer(1, 24))
-    analisis_foda_df, resumen_foda, estrategia_principal, puntajes_foda = analizar_foda(df_foda)
-    pest_total = df_pest['valor_ponderado'].sum() if not df_pest.empty else 0
-    story.append(Paragraph("Diagnóstico Estratégico General", styles['APA_H2']))
-    story.append(Paragraph(f"La estrategia principal recomendada, basada en el análisis FODA cruzado, es la <b>{estrategia_principal}</b>. Esto indica la postura que la empresa debería adoptar prioritariamente. El siguiente gráfico de radar ilustra la ponderación de las cuatro posibles estrategias.", styles['APA_Body']))
-    grafico_foda = generar_grafico_foda_radar(puntajes_foda)
-    if grafico_foda: 
-        story.append(Image(grafico_foda, width=5*inch, height=5*inch))
-    story.append(PageBreak())
-    story.append(Paragraph("Factores Críticos de Éxito", styles['APA_H2']))
-    story.append(Paragraph("A continuación, se destacan los factores más influyentes del análisis PEST, que representan las mayores oportunidades y amenazas del entorno.", styles['APA_Body']))
-    if not df_pest.empty:
-        pest_criticos = df_pest.sort_values(by='valor_ponderado', ascending=False).head(5)
-        pest_data = [pest_criticos.columns.tolist()] + pest_criticos.values.tolist()
-        pest_table = Table(pest_data, colWidths=[1.2*inch, 2*inch, 1*inch, 0.8*inch, 1*inch, 1*inch])
-        pest_table.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), '#CCCCCC'), ('GRID', (0,0), (-1,-1), 1, '#000000')]))
-        story.append(pest_table)
-    story.append(Spacer(1, 24))
-    story.append(PageBreak())
-    story.append(Paragraph("Objetivos Estratégicos Propuestos", styles['APA_H2']))
-    story.append(Paragraph("Derivado del diagnóstico, se proponen los siguientes objetivos macro para cada área de planificación. Estos objetivos forman la base del Cuadro de Mando Integral.", styles['APA_Body']))
-    planes = generar_planes_por_plantilla(estrategia_principal, pest_total)
-    for nombre_plan, datos_plan in planes.items():
-        story.append(Paragraph(f"<b>{nombre_plan}:</b> {datos_plan['objetivo']}", styles['APA_Body']))
-        story.append(Spacer(1, 6))
-    story.append(PageBreak())
-    story.append(Paragraph("Conclusiones y Próximos Pasos", styles['APA_H2']))
-    story.append(Paragraph("El éxito de este plan estratégico depende de la ejecución disciplinada y el monitoreo constante. Se recomienda iniciar con la operativización de las estrategias de mayor impacto y establecer los indicadores del CMI para medir el progreso desde el primer mes.", styles['APA_Body']))
-    story.append(PageBreak())
-    story.append(Paragraph("Anexos: Detalles del Plan Estratégico", styles['APA_H1']))
-    story.append(Paragraph("Anexo A: Introducción y Cultura Organizacional", styles['APA_H2']))
-    story.append(Paragraph(f"<b>Nombre de la Empresa:</b> {empresa.get('nombre', 'N/A')}", styles['APA_Body']))
-    story.append(Paragraph(f"<b>Giro del Negocio:</b> {empresa.get('giro', 'N/A')}", styles['APA_Body']))
-    story.append(Paragraph(f"<b>Misión:</b> {empresa.get('mision', 'N/A')}", styles['APA_Body']))
-    story.append(Paragraph(f"<b>Visión:</b> {empresa.get('vision', 'N/A')}", styles['APA_Body']))
-    story.append(Paragraph(f"<b>Valores y Principios:</b> {empresa.get('valores', 'N/A')}", styles['APA_Body']))
-    story.append(PageBreak())
-    story.append(Paragraph("Anexo B: Diagnóstico Situacional Detallado", styles['APA_H2']))
-    story.append(Paragraph("<b>Matriz PEST Completa</b>", styles['APA_Body']))
-    if not df_pest.empty:
-        pest_data_full = [df_pest.columns.tolist()] + df_pest.values.tolist()
-        pest_table_full = Table(pest_data_full, colWidths=[1.2*inch, 2*inch, 1*inch, 0.8*inch, 1*inch, 1*inch])
-        pest_table_full.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), '#CCCCCC'), ('GRID', (0,0), (-1,-1), 1, '#000000')]))
-        story.append(pest_table_full)
-    story.append(PageBreak())
-    story.append(Paragraph("<b>Matriz FODA Cruzado Completa</b>", styles['APA_Body']))
-    if not df_foda.empty:
-        foda_data_full = [df_foda.columns.tolist()] + df_foda.values.tolist()
-        foda_table_full = Table(foda_data_full, colWidths=[1.2*inch, 2*inch, 2*inch, 1*inch])
-        foda_table_full.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), '#CCCCCC'), ('GRID', (0,0), (-1,-1), 1, '#000000')]))
-        story.append(foda_table_full)
-    story.append(PageBreak())
-    story.append(Paragraph("Anexo C: Planes Estratégicos y Cuadro de Mando", styles['APA_H2']))
-    story.append(Paragraph("<b>Cuadro de Mando Integral (CMI)</b>", styles['APA_Body']))
-    df_estrategias_pdf = get_datos_tabla('estrategias_generadas', empresa_id)
-    if not df_estrategias_pdf.empty:
-        df_cmi = generar_cuadro_de_mando_ia(df_estrategias_pdf)
-        if not df_cmi.empty:
-            cmi_data = [df_cmi.columns.tolist()] + df_cmi.values.tolist()
-            col_widths = [1.2*inch, 1*inch, 1*inch, 1*inch, 0.8*inch, 0.5*inch, 0.5*inch, 0.5*inch]
-            cmi_table = Table(cmi_data, colWidths=col_widths)
-            cmi_table.setStyle(TableStyle([
-                ('BACKGROUND', (0,0), (-1,0), '#CCCCCC'),
-                ('GRID', (0,0), (-1,-1), 0.5, '#000000'),
-                ('VALIGN', (0,0), (-1,-1), 'TOP'),
-                ('FONTSIZE', (0,0), (-1,-1), 8),
-                ('LEADINGS', (0,0), (-1,-1), 10)
-            ]))
-            story.append(cmi_table)
-    else:
-        story.append(Paragraph("No hay estrategias generadas para construir el CMI.", styles['APA_Body']))
-    story.append(PageBreak())
-    logo_bytes_data = empresa.get('logo')
-    logo_bytes = None
-    if logo_bytes_data:
-        try:
-            logo_bytes = BytesIO(logo_bytes_data) 
-        except:
-            try:
-                logo_bytes = BytesIO(bytes.fromhex(logo_bytes_data.replace('\\x', '')))
-            except:
-                pass
-    doc.build(story, onFirstPage=lambda c, d: encabezado_pie_pagina(c, d, logo_bytes, empresa.get('nombre', ''), version, coordinador), 
-                     onLaterPages=lambda c, d: encabezado_pie_pagina(c, d, logo_bytes, empresa.get('nombre', ''), version, coordinador))
-    pdf_buffer.seek(0)
-    return pdf_buffer
-
+    # --- PESTAÑA 8: RESUMEN Y CONCLUSIONES (MODIFICADA) ---
+    with tab6:
+        st.header("Resumen, Conclusiones y Exportación")
+        
+        st.subheader("📄 Generar Documento Final (Formato APA)")
+        
+        with st.form("pdf_form"):
+            col1, col2 = st.columns(2)
+            with col1:
+                pdf_version = st.text_input("Versión del Plan", value="1.0")
+                pdf_elaborado = st.text_input("Elaborado por", value="Consultor Estratégico")
+            with col2:
+                pdf_revisado = st.text_input("Revisado por", value="Director de Planeación")
+                pdf_aprobado = st.text_input("Aprobado por", value="Director General")
+            
+            st.info("""
+            **Estructura del documento generado:**
+            - **Resumen Ejecutivo** (máx. 5 hojas): Diagnóstico clave, estrategias prioritarias y recomendación
+            - **Plan Estratégico** (máx. 30 hojas): Introducción, estrategias, planes, CMI, operativización
+            - **Anexos** (ilimitado): Análisis detallados, matrices, dashboards y proyecciones
+            
+            **Formato:** Tamaño carta (A4), Times New Roman 12pt, interlineado doble, márgenes de 1 pulgada
+            """)
+            
+            if st.form_submit_button("🚀 Generar PDF Profesional"):
+                with st.spinner("Generando documento con formato APA. Esto puede tomar un momento..."):
+                    pdf_bytes = generar_pdf_completo_mejorado(
+                        empresa_id, 
+                        pdf_version, 
+                        pdf_elaborado, 
+                        pdf_revisado, 
+                        pdf_aprobado
+                    )
+                    if pdf_bytes:
+                        st.session_state['pdf_file'] = pdf_bytes
+                        st.session_state['pdf_nombre'] = f"Plan_Estrategico_{empresa.get('nombre', 'Empresa')}_V{pdf_version}.pdf"
+                        st.success("✅ PDF generado correctamente con formato APA.")
+        
+        if 'pdf_file' in st.session_state:
+            col1, col2 = st.columns([1, 3])
+            with col1:
+                st.download_button(
+                    label="⬇️ Descargar PDF", 
+                    data=st.session_state['pdf_file'], 
+                    file_name=st.session_state.get('pdf_nombre', 'plan_estrategico.pdf'), 
+                    mime="application/pdf",
+                    type="primary"
+                )
+            with col2:
+                st.success(f"Documento listo: {st.session_state.get('pdf_nombre', 'plan_estrategico.pdf')}")
+                st.caption("El documento incluye encabezado con logo, pie de página con firmas, y todas las secciones requeridas.")
 def mostrar_ultimo_analisis_guardado(empresa_data, tipo_analisis):
     """
     Muestra el último análisis guardado desde el diccionario de datos de la empresa.
@@ -1633,6 +1574,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
