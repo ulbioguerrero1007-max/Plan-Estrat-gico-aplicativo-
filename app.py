@@ -477,7 +477,7 @@ def aplicacion_principal():
         empresa_seleccionada = st.selectbox("Selecciona una Empresa", empresas_df['nombre'], index=None, placeholder="Elige una opción")
         empresa_id = int(empresas_df[empresas_df['nombre'] == empresa_seleccionada]['id'].iloc[0]) if empresa_seleccionada else None
         st.divider()
-       with st.expander("➕ Crear Nueva Empresa"):
+    with st.expander("➕ Crear Nueva Empresa"):
             with st.form("new_empresa_form"):
                 new_empresa_name = st.text_input("Nombre de la nueva empresa")
                 if st.form_submit_button("Crear"):
@@ -885,6 +885,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
