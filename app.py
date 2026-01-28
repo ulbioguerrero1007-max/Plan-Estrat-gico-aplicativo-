@@ -351,7 +351,7 @@ def generar_pdf_completo(empresa_id, version, coordinador):
     story.append(Paragraph(f"<b>Misión:</b> {empresa.get('mision', 'N/A')}", styles['APA_Body']))
     story.append(Paragraph(f"<b>Visión:</b> {empresa.get('vision', 'N/A')}", styles['APA_Body']))
     story.append(Paragraph(f"<b>Valores y Principios:</b> {empresa.get('valores', 'N/A')}", styles['APA_Body']))
-   故事.append(PageBreak())
+    故事.append(PageBreak())
     story.append(Paragraph("Anexo B: Diagnóstico Situacional Detallado", styles['APA_H2']))
     story.append(Paragraph("<b>Matriz PEST Completa</b>", styles['APA_Body']))
     if not df_pest.empty:
@@ -1094,3 +1094,4 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
