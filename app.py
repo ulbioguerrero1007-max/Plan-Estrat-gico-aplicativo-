@@ -637,32 +637,32 @@ def aplicacion_principal():
                 if col not in df.columns:
                     df[col] = None
 
-            # --- INICIO DE LA CORRECCIÓN CLAVE ---
             p_cols = ['producto', 'precio', 'plaza', 'promocion']
-            
-            # Función auxiliar para determinar si un valor es "afirmativo"
             def es_afirmativo(valor):
-                if isinstance(valor, bool):
-                    return valor
-                if isinstance(valor, str):
-                    return 'si' in valor.lower()
+                if isinstance(valor, bool): return valor
+                if isinstance(valor, str): return 'si' in valor.lower()
                 return False
-
-            # Aplicamos esta lógica para contar, pero NO modificamos las columnas originales
             df['total'] = df[p_cols].applymap(es_afirmativo).sum(axis=1)
-            # --- FIN DE LA CORRECCIÓN CLAVE ---
 
             numeric_cols = ['rating', 'weight_percent']
             for col in numeric_cols:
-                # Asegurarse de que la columna exista antes de intentar convertirla
                 if col in df.columns:
-                    df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+                    df[col] = pd.to_numeric(df[col], errors='coerce') # 'coerce' crea NaNs
             
-            df['valor'] = df.get('rating', 0) * (df.get('weight_percent', 0) / 100.0)
+            # --- INICIO DE LA CORRECCIÓN CLAVE ---
+            # Reemplazar NaNs con None ANTES de calcular el valor final
+            df.fillna(value=np.nan, inplace=True) # Asegurar que todos los nulos sean np.nan
+            df = df.replace({np.nan: None}) # Reemplazar np.nan con None (JSON compliant)
+            
+            # Ahora, al calcular, si hay un None, la operación debe manejarlo
+            # Llenamos con 0 para el cálculo, pero los None se mantendrán en otras partes
+            rating_calc = pd.to_numeric(df.get('rating'), errors='coerce').fillna(0)
+            weight_calc = pd.to_numeric(df.get('weight_percent'), errors='coerce').fillna(0)
+            df['valor'] = rating_calc * (weight_calc / 100.0)
+            # --- FIN DE LA CORRECCIÓN CLAVE ---
             
             columnas_finales = ['variable', 'factor', 'producto', 'precio', 'plaza', 'promocion', 'rating', 'weight_percent', 'valor', 'total']
             
-            # Devolvemos el DataFrame con las columnas originales intactas y las calculadas
             return df[[c for c in columnas_finales if c in df.columns]]
 
         def display_and_edit_matrix(tipo_matriz, analisis_propio_data):
@@ -1082,6 +1082,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
