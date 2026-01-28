@@ -236,7 +236,7 @@ def generar_planes_por_plantilla(estrategia_foda, pest_total):
         obj_con = "Establecer un sistema de vigilancia del entorno trimestral y realizar un simulacro de crisis anual."
     planes['Plan de Contingencia'] = {'introduccion': intro_con, 'objetivo': obj_con}
     
-    return planesdef generar_cuadro_de_mando_ia(estrategias_df):
+       return planesdef generar_cuadro_de_mando_ia(estrategias_df):
     """
     Genera el CMI utilizando IA basado en las estrategias generadas.
     """
@@ -1166,3 +1166,4 @@ def main():
 if __name__ == "__main__":
     init_db()
     main()
+
