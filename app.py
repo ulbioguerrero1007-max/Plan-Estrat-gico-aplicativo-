@@ -20,6 +20,9 @@ import unicodedata
 import time
 from supabase import create_client, Client
 
+# Inicializar Supabase globalmente
+supabase = None
+
 def get_ia_client():
     api_key = st.secrets.get("GEMINI_API_KEY")
 
@@ -60,7 +63,7 @@ def generar_analisis(prompt, client=None):
                 )
                 response = model.generate_content(prompt_limpio)
                 texto = response.text
-                # CORRECCIÓN: Limpieza de formato Markdown solicitada
+                # CORRECIÓN: Limpieza de formato Markdown solicitada
                 texto = re.sub(r'\*+', '', texto)
                 texto = re.sub(r'#+', '', texto)
                 texto = re.sub(r'_+', '', texto)
@@ -88,6 +91,7 @@ st.markdown("""
     h1, h2, h3 { color:
     </style>
     """, unsafe_allow_html=True)
+
 def init_supabase():
     try:
         if "supabase_url" in st.secrets and "supabase_key" in st.secrets:
@@ -97,7 +101,6 @@ def init_supabase():
         return None
     except Exception:
         return None
-        # --- 4. FUNCIONES DE INTERACCIÓN CON LA BASE DE DATOS (SUPABASE) ---
 
 def get_datos_empresa(empresa_id):
     """Obtiene todos los datos de una única empresa."""
@@ -132,6 +135,7 @@ def guardar_analisis_db(empresa_id, tipo_analisis, contenido):
             st.rerun()
         except Exception as e:
             st.error(f"Error al guardar análisis: {e}")
+
 def get_empresas():
     """Obtiene las empresas a las que el usuario tiene acceso (propias y compartidas)."""
     if supabase and st.session_state.get("user"):
@@ -147,6 +151,7 @@ def save_image(uploaded_file):
     if uploaded_file:
         return uploaded_file.getvalue()
     return None
+
 def analizar_foda(df_foda):
     if df_foda.empty: return None, None, None, pd.Series(dtype='float64')
     estrategias = {'FO': 'Ofensiva (F+O)', 'FA': 'Defensiva (F+A)', 'DO': 'Adaptativa (D+O)', 'DA': 'Supervivencia (D+A)'}
@@ -160,6 +165,7 @@ def analizar_foda(df_foda):
     estrategia_principal = analisis_df.iloc[0]['Estrategia']
     resumen = f"La estrategia principal recomendada es **{analisis_df.iloc[0]['Estrategia']}** ({analisis_df.iloc[0]['Puntaje Total']} puntos), seguida por **{analisis_df.iloc[1]['Estrategia']}** ({analisis_df.iloc[1]['Puntaje Total']} puntos)."
     return analisis_df, resumen, estrategia_principal, puntajes_ordenados
+
 def generar_planes_por_plantilla(estrategia_foda, pest_total):
     planes = {}
     
@@ -270,6 +276,7 @@ No incluyas encabezados ni texto adicional, solo las líneas de datos separadas 
     perspectiva_orden = ['Financiera', 'Cliente', 'Procesos', 'Aprendizaje y Control']
     df_cmi['Perspectiva'] = pd.Categorical(df_cmi['Perspectiva'], categories=perspectiva_orden, ordered=True)
     return df_cmi.sort_values(by='Perspectiva').reset_index(drop=True)
+
 def generar_grafico_foda_radar(puntajes):
     if puntajes is None or puntajes.empty: return None
     labels = np.array(['Ofensiva\n(FO)', 'Defensiva\n(FA)', 'Adaptativa\n(DO)', 'Supervivencia\n(DA)'])
@@ -289,6 +296,7 @@ def generar_grafico_foda_radar(puntajes):
     plt.close(fig)
     buf.seek(0)
     return buf
+
 def generar_grafico_pest_bar(df_pest):
     if df_pest.empty: return None
     pest_scores = df_pest.groupby('categoria')['valor_ponderado'].sum()
@@ -301,6 +309,7 @@ def generar_grafico_pest_bar(df_pest):
     plt.close(fig)
     buf.seek(0)
     return buf
+
 def encabezado_pie_pagina(canvas, doc, logo_bytes, nombre_empresa, version, coordinador):
     canvas.saveState()
     canvas.setFont('Helvetica-Bold', 14)
@@ -319,6 +328,7 @@ def encabezado_pie_pagina(canvas, doc, logo_bytes, nombre_empresa, version, coor
     canvas.drawCentredString(doc.width/2 + doc.leftMargin, 0.5*inch, f"Revisado por: {coordinador}")
     canvas.drawRightString(doc.width + doc.leftMargin, 0.5*inch, "Aprobado por: Ing. Monica Legarda")
     canvas.restoreState()
+
 def get_apa_styles():
     styles = getSampleStyleSheet()
     styles.add(ParagraphStyle(name='APA_Body', fontName='Times-Roman', fontSize=12, leading=24, alignment=TA_JUSTIFY))
@@ -333,7 +343,6 @@ def generar_pdf_completo(empresa_id, version, coordinador):
         return None
     df_pest = get_datos_tabla('matrices', empresa_id, tipo_matriz_filter='PEST')
     df_foda = get_datos_tabla('foda_cruzado', empresa_id)
-    df_estrategias_pdf = get_datos_tabla('estrategias_generadas', empresa_id)
     
     pdf_buffer = BytesIO()
     doc = SimpleDocTemplate(pdf_buffer, pagesize=A4, leftMargin=1*inch, rightMargin=1*inch, topMargin=1*inch, bottomMargin=1*inch)
@@ -384,7 +393,7 @@ def generar_pdf_completo(empresa_id, version, coordinador):
     story.append(Paragraph(f"<b>Giro del Negocio:</b> {empresa.get('giro', 'N/A')}", styles['APA_Body']))
     story.append(Paragraph(f"<b>Misión:</b> {empresa.get('mision', 'N/A')}", styles['APA_Body']))
     story.append(Paragraph(f"<b>Visión:</b> {empresa.get('vision', 'N/A')}", styles['APA_Body']))
-    story.append(Paragraph(f"<b>Valores y Principios:</b> {empresa.get('valores', 'N/A')}", styles['APA_Body']))
+   故事.append(Paragraph(f"<b>Valores y Principios:</b> {empresa.get('valores', 'N/A')}", styles['APA_Body']))
     story.append(PageBreak())
     story.append(Paragraph("Anexo B: Diagnóstico Situacional Detallado", styles['APA_H2']))
     story.append(Paragraph("<b>Matriz PEST Completa</b>", styles['APA_Body']))
@@ -444,20 +453,16 @@ def generar_pdf_completo(empresa_id, version, coordinador):
     
     return pdf_buffer
 
-# NUEVA FUNCIÓN: Mostrar último análisis guardado desde la base de datos
 def mostrar_ultimo_analisis_guardado(empresa_id, tipo_analisis):
     """
     Muestra el último análisis guardado desde la base de datos.
-    tipo_analisis: 'made', 'madi', 'posicionamiento', 'pest', 'foda', 'cmi', 'operativo'
     """
     try:
-        with get_connection() as conn:
-            # Consultar el análisis específico
-            query = f"SELECT analisis_{tipo_analisis} FROM empresas WHERE id=?"
-            resultado = pd.read_sql(query, conn, params=(empresa_id,))
-            
-            if not resultado.empty:
-                contenido = resultado.iloc[0][f'analisis_{tipo_analisis}']
+        # Usar Supabase en lugar de SQLite
+        if supabase and empresa_id:
+            response = supabase.table('empresas').select(f'analisis_{tipo_analisis}').eq('id', empresa_id).single().execute()
+            if response.data:
+                contenido = response.data.get(f'analisis_{tipo_analisis}')
                 if contenido and str(contenido).strip():
                     st.markdown("---")
                     st.markdown(f"**📄 Último análisis de {tipo_analisis.upper()} guardado:**")
@@ -472,19 +477,16 @@ def mostrar_ultimo_analisis_guardado(empresa_id, tipo_analisis):
                 else:
                     st.markdown("---")
                     st.info(f"ℹ️ No hay análisis de {tipo_analisis.upper()} guardado aún en la base de datos.")
-            else:
-                st.error("No se encontró la empresa en la base de datos.")
     except Exception as e:
         st.error(f"Error al cargar el último análisis guardado: {e}")
 
 def aplicacion_principal():
-    init_db()
-        # --- INICIO DEL BLOQUE DE REEMPLAZO PARA EL SIDEBAR ---
+    # ELIMINADA LA LLAMADA A init_db() - NO EXISTE ESTA FUNCIÓN
+    
     with st.sidebar:
         st.header("Gestión de Empresas")
         empresas_df = get_empresas()
         
-        # Manejo seguro por si empresas_df está vacío
         nombres_empresas = []
         if not empresas_df.empty:
             nombres_empresas = empresas_df['nombre'].tolist()
@@ -516,20 +518,15 @@ def aplicacion_principal():
                         st.warning("El nombre no puede estar vacío.")
 
         if empresa_id:
-            # Este bloque solo se muestra si se ha seleccionado una empresa
             if st.button("❌ Eliminar Empresa Seleccionada", type="primary"):
                 if supabase:
                     try:
-                        # RLS se encarga de verificar que solo el propietario pueda borrar
                         supabase.table('empresas').delete().eq('id', empresa_id).execute()
                         st.success(f"Empresa '{empresa_seleccionada}' eliminada.")
-                        # Forzar un rerun para que la empresa desaparezca de la lista
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error al eliminar la empresa: {e}")
 
-    # --- FIN DEL BLOQUE DE REEMPLAZO PARA EL SIDEBAR ---
-                
     if not empresa_id:
         st.info("👈 Por favor, selecciona o crea una empresa en el menú lateral para comenzar.")
         st.stop()
@@ -547,12 +544,10 @@ def aplicacion_principal():
             res = supabase.table('empresas_compartidas').select('permiso').eq('empresa_id', empresa_id).eq('usuario_compartido_id', st.session_state.user.id).single().execute()
             if res.data and res.data['permiso'] == 'editor':
                 es_editor = True
-        except: # PostgrestError si no se encuentra la fila
+        except:
             es_editor = False
 
     puede_editar = es_propietario or es_editor
-
-    # --- INICIO DEL BLOQUE DE REEMPLAZO ---
 
     tab1, tab2, tab_est, tab3, tab4, tab5, tab_dash, tab6 = st.tabs(["1. Introducción", "2. Diagnóstico Situacional", "3. Estrategia", "4. Planes Estratégicos", "5. CMI/Indicadores", "6. Operativización/Presupuesto", "7. Dashboard de Análisis", "8. Resumen y Conclusiones"])
 
@@ -575,7 +570,7 @@ def aplicacion_principal():
             st.subheader("Cultura Organizacional")
             objetivo_plan = st.text_area("Objetivo del Plan Estratégico", empresa_data.get('objetivo_plan', ''), disabled=not puede_editar)
             mision = st.text_area("Misión", empresa_data.get('mision', ''), disabled=not puede_editar)
-            vision = st.text_area("Visión", empresa_data.get('vision', ''), disabled=not puede_editar)
+            vision = st.text_area("Visión", empresa data.get('vision', ''), disabled=not puede_editar)
             obj_gen = st.text_area("Objetivo General", empresa_data.get('obj_general', ''), disabled=not puede_editar)
             obj_esp = st.text_area("Objetivos Específicos", empresa_data.get('obj_especificos', ''), disabled=not puede_editar)
             politicas = st.text_area("Políticas de la Empresa", empresa_data.get('politicas', ''), disabled=not puede_editar)
@@ -607,21 +602,13 @@ def aplicacion_principal():
                 except Exception as e:
                     st.error(f"Error al guardar: {e}")
 
-    # --- PESTAÑA 2: DIAGNÓSTICO SITUACIONAL (CORREGIDA) ---
+    # --- PESTAÑA 2: DIAGNÓSTICO SITUACIONAL ---
     with tab2:
         st.header("Diagnóstico Situacional (Análisis de Matrices)")
 
-        # La variable 'empresa_data' ya está cargada al principio de aplicacion_principal()
-        # La variable 'puede_editar' también está definida y disponible.
-
-        # Función interna para procesar datos pegados (se mantiene igual)
         def procesar_made_madi(data_str, tipo):
-            # ... (Tu lógica original para procesar datos de Excel va aquí)
-            # Asegúrate de que esta función devuelva un DataFrame de Pandas.
-            # Por ejemplo:
             df = pd.read_csv(StringIO(data_str), sep='\t', header=0)
-            # ... más procesamiento ...
-            return df # df_to_db en tu código original
+            return df
 
         def display_and_edit_matrix(tipo_matriz, analisis_propio_data):
             df_db = get_datos_tabla('matriz_marketing', empresa_id, tipo_matriz_filter=tipo_matriz)
@@ -635,7 +622,7 @@ def aplicacion_principal():
                     try:
                         supabase.table('matriz_marketing').delete().eq('empresa_id', empresa_id).eq('tipo_matriz', tipo_matriz).execute()
                         if not edited_df.empty:
-                            df_to_save = procesar_made_madi(edited_df.to_csv(sep='\t', index=False), tipo_matriz) # Re-procesar para asegurar consistencia
+                            df_to_save = procesar_made_madi(edited_df.to_csv(sep='\t', index=False), tipo_matriz)
                             df_to_save['empresa_id'] = empresa_id
                             df_to_save['tipo_matriz'] = tipo_matriz
                             supabase.table('matriz_marketing').insert(df_to_save.to_dict(orient='records')).execute()
@@ -645,7 +632,6 @@ def aplicacion_principal():
                 
                 total_score = df_db['total'].sum() if 'total' in df_db.columns else 0
                 st.metric(f"Puntaje Total {tipo_matriz}", f"{total_score}")
-                # ... (resto de tu lógica de análisis automático)
             else:
                 st.info(f"Aún no hay datos para la Matriz {tipo_matriz}. Pega los datos desde Excel para comenzar.")
         
@@ -689,7 +675,6 @@ def aplicacion_principal():
 
         with diag_tab3:
             st.subheader("Matriz de Posicionamiento")
-            # Los datos ya no se leen aquí, se usan los de 'empresa_data'
             coord_x_val = float(empresa_data.get('posicionamiento_x') or 0)
             coord_y_val = float(empresa_data.get('posicionamiento_y') or 0)
 
@@ -710,14 +695,12 @@ def aplicacion_principal():
             ax.grid(True, which='both', linestyle='--', linewidth=0.5)
             st.pyplot(fig)
             
-            st.subheader("📌 Diagnóstico Estratégico de Posicionamiento")
-            # ... (Tu lógica de interpretaciones se mantiene igual)
+            st.subheader("📌 Diágnostico Estratégico de Posicionamiento")
             
             with st.form("form_analisis_pos"):
                 st.subheader("Análisis Estratégico")
                 if st.form_submit_button("🤖 Generar Análisis con IA"):
                     with st.spinner("La IA está analizando la posición..."):
-                        # ... (Tu lógica de generación de análisis con IA)
                         pass
                 
                 current_analisis_pos = st.session_state.get("ia_analisis_posicionamiento", empresa_data.get('analisis_posicionamiento', ''))
@@ -761,13 +744,11 @@ def aplicacion_principal():
                 
                 total_ponderado = pd.to_numeric(df_pest['valor_ponderado'], errors='coerce').sum()
                 st.metric("Puntaje Ponderado Total PEST", f"{total_ponderado:.2f}")
-                # ... (Tu lógica de análisis de perfil)
             
             with st.form("form_analisis_pest"):
                 st.subheader("Análisis Estratégico")
                 if st.form_submit_button("🤖 Generar Análisis con IA"):
                     with st.spinner("La IA está analizando el entorno PEST..."):
-                        # ... (Tu lógica de generación de análisis)
                         pass
                 
                 current_analisis_pest = st.session_state.get("ia_analisis_pest", empresa_data.get('analisis_pest', ''))
@@ -819,7 +800,6 @@ def aplicacion_principal():
                 st.subheader("Análisis Estratégico")
                 if st.form_submit_button("🤖 Generar Análisis con IA"):
                     with st.spinner("La IA está analizando el FODA Cruzado..."):
-                        # ... (Tu lógica de generación de análisis)
                         pass
                 
                 current_analisis_foda = st.session_state.get("ia_analisis_foda", empresa_data.get('analisis_foda', ''))
@@ -828,10 +808,10 @@ def aplicacion_principal():
                     guardar_analisis_db(empresa_id, 'foda', analisis_propio_foda)
             
             mostrar_ultimo_analisis_guardado(empresa_id, 'foda')            
+    
     # --- PESTAÑA 3: ESTRATEGIA ---
     with tab_est:
         st.header("🎯 Formulación de Estrategias")
-        # ... (Tu lógica de generación de estrategias con IA)
         
         df_estrategias = get_datos_tabla('estrategias_generadas', empresa_id)
         edited_df = st.data_editor(
@@ -858,7 +838,6 @@ def aplicacion_principal():
 
         with col2:
             if st.button("🚀 Enviar a Operativización", disabled=not puede_editar):
-                # ... (Tu lógica para enviar a operativización, usando 'edited_df')
                 pass
     
     # --- PESTAÑA 4: PLANES ESTRATÉGICOS ---
@@ -866,7 +845,6 @@ def aplicacion_principal():
         st.header("Planes Estratégicos")
         with st.form("form_planes"):
             if st.form_submit_button("🤖 Generar Planes con IA"):
-                # ... (Tu lógica de generación de planes)
                 pass
             
             current_analisis_operativo = st.session_state.get("ia_analisis_operativo", empresa_data.get('analisis_operativo', ''))
@@ -875,14 +853,13 @@ def aplicacion_principal():
             if st.form_submit_button("💾 Guardar Plan Maestro", disabled=not puede_editar):
                 guardar_analisis_db(empresa_id, 'operativo', analisis_propio_operativo)
         
-        mostrar_ultimo_analisis_guardado(empresa_data, 'operativo')
+        mostrar_ultimo_analisis_guardado(empresa_id, 'operativo')
     
     # --- PESTAÑA 5: CMI/INDICADORES ---
     with tab4:
         st.header("CMI / Indicadores")
         with st.form("form_cmi"):
             if st.form_submit_button("🤖 Generar CMI con IA"):
-                # ... (Tu lógica de generación de CMI)
                 pass
             
             current_analisis_cmi = st.session_state.get("ia_analisis_cmi", empresa_data.get('analisis_cmi', ''))
@@ -891,7 +868,7 @@ def aplicacion_principal():
             if st.form_submit_button("💾 Guardar CMI", disabled=not puede_editar):
                 guardar_analisis_db(empresa_id, 'cmi', analisis_propio_cmi)
         
-        mostrar_ultimo_analisis_guardado(empresa_data, 'cmi')
+        mostrar_ultimo_analisis_guardado(empresa_id, 'cmi')
     
     # --- PESTAÑA 6: OPERATIVIZACIÓN/PRESUPUESTO ---
     with tab5:
@@ -927,7 +904,6 @@ def aplicacion_principal():
         df_fc = get_datos_tabla('flujo_caja', empresa_id)
         edited_fc = st.data_editor(df_fc.drop(columns=['id', 'empresa_id'], errors='ignore'), num_rows="fixed", key="editor_fc_v2", use_container_width=True, disabled=not puede_editar)
         if st.button("🧮 Calcular y Guardar Flujo", disabled=not puede_editar):
-            # ... (Tu lógica de cálculo de flujo)
             try:
                 supabase.table('flujo_caja').delete().eq('empresa_id', empresa_id).execute()
                 if not edited_fc.empty:
@@ -939,7 +915,6 @@ def aplicacion_principal():
 
         # Análisis de Costo / Beneficio
         pe_data = get_datos_tabla('punto_equilibrio', empresa_id)
-        # ... (Tu lógica de C/B y punto de equilibrio, usando 'pe_data')
         
     # --- PESTAÑA 7: DASHBOARD DE ANÁLISIS ---
     with tab_dash:
@@ -947,7 +922,6 @@ def aplicacion_principal():
         df_est_dash = get_datos_tabla('estrategias_generadas', empresa_id)
         df_pg_dash = get_datos_tabla('perdida_ganancia', empresa_id)
         df_fc_dash = get_datos_tabla('flujo_caja', empresa_id)
-        # ... (Toda tu lógica de visualización con Plotly se mantiene intacta)
         
     # --- PESTAÑA 8: RESUMEN Y CONCLUSIONES ---
     with tab6:
@@ -962,8 +936,7 @@ def aplicacion_principal():
         
         if 'pdf_file' in st.session_state:
             st.download_button(label="✅ Descargar PDF Ahora", data=st.session_state['pdf_file'], file_name=f"Plan_Estrategico_V{pdf_version}.pdf", mime="application/pdf")
-    
-    # --- FIN DEL BLOQUE DE REEMPLAZO ---
+
 def pantalla_acceso():
     st.sidebar.title("Estratega Pro")
     opcion = st.sidebar.radio("Acceso al Sistema", ["Entrar", "Crear Cuenta"])
@@ -1004,6 +977,7 @@ def pantalla_acceso():
                         st.warning("Por favor, llena todos los campos.")
     with col2:
         st.image("https://i.imgur.com/gYv2k3C.png", width=200 )
+
 def main():
     """Función principal que controla el flujo de la aplicación."""
     if "logged_in" not in st.session_state:
@@ -1019,4 +993,4 @@ if __name__ == "__main__":
     if supabase:
         main()
     else:
-        st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+        st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase). Verifica que tienes configurados 'supabase_url' y 'supabase_key' en los secrets.")
