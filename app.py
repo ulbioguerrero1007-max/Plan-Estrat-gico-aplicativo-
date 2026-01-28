@@ -1366,12 +1366,65 @@ Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses enc
                                 'Utilidad Neta Proyectada': utilidad_neta_proy
                             })
                         
+        # PROYECCIÓN con Análisis Costo-Beneficio
+        st.subheader("📈 Proyección y Análisis Costo-Beneficio")
+        
+        if not df_pg.empty and not df_oper.empty:
+            datos_base = df_pg.iloc[0]
+            
+            with st.form("form_proyeccion"):
+                st.write("**Parámetros de Proyección:**")
+                
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    crecimiento_ventas = st.slider("Crecimiento en Ventas (%)", -50, 100, 10, key="proj_crec") / 100
+                    reduccion_costos = st.slider("Reducción de Costos (%)", 0, 50, 5, key="proj_red") / 100
+                with col2:
+                    periodos_proyeccion = st.selectbox("Período de Proyección", ["1 año", "2 años", "3 años", "5 años"], key="proj_per")
+                    unidades_proyectadas = st.number_input("Unidades Totales Proyectadas", min_value=1, value=1000, key="proj_unid")
+                with col3:
+                    inversion_total = st.number_input("Inversión Total Requerida ($)", min_value=0.0, value=float(total_costo), key="proj_inv")
+                    tasa_descuento = st.slider("Tasa de Descuento Anual (%)", 0, 30, 10, key="proj_tasa") / 100
+                
+                if st.form_submit_button("🚀 Calcular Proyección y Costo-Beneficio", disabled=not puede_editar):
+                    try:
+                        anios = int(periodos_proyeccion.split()[0])
+                        
+                        proyecciones = []
+                        ingreso_actual = datos_base['ingresos_ventas']
+                        costo_actual = datos_base['costos_ventas']
+                        
+                        flujos_futuros = []
+                        
+                        for anio_num in range(1, anios + 1):
+                            ingreso_proy = ingreso_actual * ((1 + crecimiento_ventas) ** anio_num)
+                            costo_proy = costo_actual * ((1 - reduccion_costos) ** anio_num) * ((1 + crecimiento_ventas) ** anio_num)
+                            utilidad_bruta_proy = ingreso_proy - costo_proy
+                            gastos_proy = (datos_base['gastos_operativos'] + datos_base['gastos_administrativos'] + datos_base['gastos_ventas']) * ((1 + crecimiento_ventas * 0.5) ** anio_num)
+                            utilidad_neta_proy = utilidad_bruta_proy - gastos_proy - (utilidad_bruta_proy * 0.25)
+                            
+                            flujos_futuros.append(utilidad_neta_proy)
+                            
+                            # USAR NOMBRES EN MINÚSCULA DESDE EL INICIO
+                            proyecciones.append({
+                                'anio': anio_num,  # minúscula, sin tilde
+                                'ingresos_proyectados': ingreso_proy,
+                                'costos_proyectados': costo_proy,
+                                'utilidad_neta_proyectada': utilidad_neta_proy
+                            })
+                        
                         df_proyeccion = pd.DataFrame(proyecciones)
                         
+                        # Guardar proyección - USAR NOMBRES EN MINÚSCULA
                         supabase.table('proyeccion_financiera').delete().eq('empresa_id', empresa_id).execute()
                         for _, row in df_proyeccion.iterrows():
-                            row_dict = row.to_dict()
-                            row_dict['empresa_id'] = empresa_id
+                            row_dict = {
+                                'empresa_id': empresa_id,
+                                'anio': int(row['anio']),
+                                'ingresos_proyectados': float(row['ingresos_proyectados']),
+                                'costos_proyectados': float(row['costos_proyectados']),
+                                'utilidad_neta_proyectada': float(row['utilidad_neta_proyectada'])
+                            }
                             supabase.table('proyeccion_financiera').insert(row_dict).execute()
                         
                         # Calcular Costo-Beneficio
@@ -1383,18 +1436,14 @@ Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses enc
                             relacion_cb_dolares = float('inf') if vpn > 0 else 0
                         
                         flujo_acumulado = 0
-                        payback_años = 0
+                        payback_anios = None
                         for i, flujo in enumerate(flujos_futuros):
                             flujo_acumulado += flujo
                             if flujo_acumulado >= inversion_total:
                                 exceso = flujo_acumulado - inversion_total
-                                fraccion_año = 1 - (exceso / flujo) if flujo > 0 else 0
-                                payback_años = i + fraccion_año
+                                fraccion_anio = 1 - (exceso / flujo) if flujo > 0 else 0
+                                payback_anios = i + fraccion_anio
                                 break
-                            payback_años = i + 1
-                        
-                        if flujo_acumulado < inversion_total:
-                            payback_años = None
                         
                         if unidades_proyectadas > 0 and inversion_total > 0:
                             beneficio_por_unidad = vpn / unidades_proyectadas
@@ -1405,17 +1454,18 @@ Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses enc
                             costo_por_unidad = 0
                             relacion_cb_unidades = 0
                         
+                        # Guardar análisis CB - NOMBRES EN MINÚSCULA
                         analisis_cb = {
                             'empresa_id': empresa_id,
-                            'inversion_total': inversion_total,
-                            'vpn_total': vpn,
-                            'relacion_costo_beneficio_dolares': relacion_cb_dolares,
-                            'payback_periodo_años': payback_años,
-                            'unidades_proyectadas': unidades_proyectadas,
-                            'beneficio_por_unidad': beneficio_por_unidad,
-                            'costo_por_unidad': costo_por_unidad,
-                            'relacion_cb_unidades': relacion_cb_unidades,
-                            'tasa_descuento': tasa_descuento
+                            'inversion_total': float(inversion_total),
+                            'vpn_total': float(vpn),
+                            'relacion_costo_beneficio_dolares': float(relacion_cb_dolares),
+                            'payback_periodo_anios': float(payback_anios) if payback_anios else None,
+                            'unidades_proyectadas': int(unidades_proyectadas),
+                            'beneficio_por_unidad': float(beneficio_por_unidad),
+                            'costo_por_unidad': float(costo_por_unidad),
+                            'relacion_cb_unidades': float(relacion_cb_unidades),
+                            'tasa_descuento': float(tasa_descuento)
                         }
                         
                         supabase.table('analisis_costo_beneficio').delete().eq('empresa_id', empresa_id).execute()
@@ -1426,7 +1476,7 @@ Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses enc
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error en el cálculo: {e}")
-            
+                        
             if st.session_state.get('mostrar_resultados_cb', False):
                 df_cb = get_datos_tabla('analisis_costo_beneficio', empresa_id)
                 df_proy = get_datos_tabla('proyeccion_financiera', empresa_id)
@@ -1619,4 +1669,5 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
