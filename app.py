@@ -422,7 +422,7 @@ else:
 story.append(PageBreak())
 
 logo_bytes_data = empresa.get('logo')
-    logo_bytes = None
+logo_bytes = None
     if logo_bytes_data:
         try:
             logo_bytes = BytesIO(bytes.fromhex(logo_bytes_data.replace('\\x', '')))
@@ -885,6 +885,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
