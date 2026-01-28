@@ -1365,14 +1365,13 @@ def create_table_pdf(data, col_widths=None, style=None):
                 pdf_revisado = st.text_input("Revisado por", value="Director de Planeación")
                 pdf_aprobado = st.text_input("Aprobado por", value="Director General")
             
-            st.info("""
-            **Estructura del documento generado:**
-            - **Resumen Ejecutivo** (máx. 5 hojas): Diagnóstico clave, estrategias prioritarias y recomendación
-            - **Plan Estratégico** (máx. 30 hojas): Introducción, estrategias, planes, CMI, operativización
-            - **Anexos** (ilimitado): Análisis detallados, matrices, dashboards y proyecciones
-            
-            **Formato:** Tamaño carta (A4), Times New Roman 12pt, interlineado doble, márgenes de 1 pulgada
-            """)
+            st.info(
+                "**Estructura del documento generado:**\n\n"
+                "- **Resumen Ejecutivo** (máx. 5 hojas): Diagnóstico clave, estrategias prioritarias y recomendación\n"
+                "- **Plan Estratégico** (máx. 30 hojas): Introducción, estrategias, planes, CMI, operativización\n"
+                "- **Anexos** (ilimitado): Análisis detallados, matrices, dashboards y proyecciones\n\n"
+                "**Formato:** Tamaño carta (A4), Times New Roman 12pt, interlineado doble, márgenes de 1 pulgada"
+            )
             
             submitted_pdf = st.form_submit_button("🚀 Generar PDF Profesional")
         
@@ -1404,8 +1403,7 @@ def create_table_pdf(data, col_widths=None, style=None):
                 )
             with col2:
                 st.success(f"Documento listo: {st.session_state.get('pdf_nombre', 'plan_estrategico.pdf')}")
-                st.caption("El documento incluye encabezado con logo, pie de página con firmas, y todas las secciones requeridas.")    """
-
+                st.caption("El documento incluye encabezado con logo, pie de página con firmas, y todas las secciones requeridas.")
     Muestra el último análisis guardado desde el diccionario de datos de la empresa.
     """
     contenido = empresa_data.get(f'analisis_{tipo_analisis}')
@@ -2635,6 +2633,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
