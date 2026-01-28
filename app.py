@@ -419,7 +419,7 @@ if not df_estrategias_pdf.empty:
                 ('LEADINGS', (0,0), (-1,-1), 10)
             ]))
             story.append(cmi_table)
-    else:
+else:
         story.append(Paragraph("No hay estrategias generadas para construir el CMI.", styles['APA_Body']))
 
     story.append(PageBreak())
@@ -1019,16 +1019,4 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
-
-
-
-
-
-
-
-
-
-
-
-
 
