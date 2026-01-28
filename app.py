@@ -1026,7 +1026,7 @@ Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses enc
         else:
             st.warning("No hay estrategias disponibles para generar el CMI. Genera estrategias primero en la pestaña anterior.")
     
-    # --- PESTAÑA 6: OPERATIVIZACIÓN/PRESUPUESTO (CORREGIDA) ---
+    # --- PESTAÑA 6: OPERATIVIZACIÓN/PRESUPUESTO ---
     with tab5:
         st.header("Operativización / Presupuesto")
         
@@ -1063,20 +1063,16 @@ Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses enc
                         nuevas_actividades = []
                         
                         for _, estrategia in df_estrategias_oper.iterrows():
-                            # Dividir las actividades de la estrategia (separadas por comas o saltos de línea)
+                            # Dividir las actividades de la estrategia
                             actividades_texto = estrategia.get('actividades', '')
-                            # Separar por coma, punto y coma, o salto de línea
                             import re
                             lista_actividades = re.split(r'[,;\n]+', actividades_texto)
-                            # Limpiar y filtrar actividades vacías
                             lista_actividades = [act.strip() for act in lista_actividades if act.strip()]
                             
-                            # Si no hay actividades definidas, crear una actividad genérica
                             if not lista_actividades:
                                 lista_actividades = ["Implementación general de la estrategia"]
                             
                             for num_act, actividad in enumerate(lista_actividades, 1):
-                                # Buscar si hay datos existentes para esta actividad
                                 key = f"{estrategia['id']}_{num_act}"
                                 datos_previos = datos_existentes.get(key, {})
                                 
@@ -1133,7 +1129,6 @@ Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses enc
             st.divider()
             
             # Preparar datos para el editor
-            # Agregar columna de referencia para agrupar visualmente
             df_oper['ref_estrategia'] = df_oper['cuadrante'] + " - " + df_oper['estrategia_nombre'].str[:50] + "..."
             
             # Ordenar por cuadrante y número de actividad
@@ -1153,12 +1148,12 @@ Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses enc
                 'Plazo', 'Responsable', 'Costo ($)', 'Plan Asignado', 'Importancia'
             ]
             
-            # Editor de datos - SOLO ciertas columnas son editables
+            # Editor de datos
             st.write("**Edita directamente el Plazo, Responsable y Costo de cada actividad:**")
             
             edited_df = st.data_editor(
                 df_display,
-                num_rows="fixed",  # No permitir agregar/eliminar filas manualmente
+                num_rows="fixed",
                 key="editor_oper_actividades",
                 use_container_width=True,
                 disabled=not puede_editar,
@@ -1166,8 +1161,8 @@ Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses enc
                     'Estrategia (Referencia)': st.column_config.TextColumn("Estrategia", disabled=True, width="medium"),
                     'N°': st.column_config.NumberColumn("N°", disabled=True, width="small"),
                     'Actividad': st.column_config.TextColumn("Descripción de la Actividad", disabled=True, width="large"),
-                    'Plazo': st.column_config.TextColumn("⏱️ Plazo", width="medium", help="Ej: 2 semanas, 1 mes, Q1 2024"),
-                    'Responsable': st.column_config.TextColumn("👤 Responsable", width="medium", help="Nombre del área o persona responsable"),
+                    'Plazo': st.column_config.TextColumn("⏱️ Plazo", width="medium"),
+                    'Responsable': st.column_config.TextColumn("👤 Responsable", width="medium"),
                     'Costo ($)': st.column_config.NumberColumn("💰 Costo ($)", min_value=0, step=100, format="$%.2f", width="medium"),
                     'Plan Asignado': st.column_config.TextColumn("Plan", disabled=True, width="small"),
                     'Importancia': st.column_config.TextColumn("Importancia", disabled=True, width="small")
@@ -1240,7 +1235,6 @@ Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses enc
                 )
                 st.plotly_chart(fig, use_container_width=True)
                 
-                # Tabla resumen por plan
                 tabla_planes = df_oper.groupby('plan_asignado').agg({
                     'costo': 'sum',
                     'descripcion_actividad': 'count'
@@ -1253,7 +1247,7 @@ Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses enc
         
         st.divider()
         
-        # Estado de Pérdidas y Ganancias del ÚLTIMO AÑO (se mantiene igual)
+        # Estado de Pérdidas y Ganancias del ÚLTIMO AÑO
         st.subheader("💰 Estado de Pérdidas y Ganancias (Último Año Real)")
         
         with st.expander("📊 Ingresar Datos del Último Año"):
@@ -1267,41 +1261,43 @@ Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses enc
                     gastos_operativos = st.number_input("Gastos Operativos", min_value=0.0, step=1000.0, key="pg_gop")
                 with col2:
                     gastos_admin = st.number_input("Gastos Administrativos", min_value=0.0, step=1000.0, key="pg_gadm")
-                    gastos_ventas = st.number_input("Gastos de Ventas y Marketing", min_value=0.0, step=1000.0, key="pg_gvta")
+                    gastos_ventas_marketing = st.number_input("Gastos de Ventas y Marketing", min_value=0.0, step=1000.0, key="pg_gvta")
                     otros_ingresos = st.number_input("Otros Ingresos", min_value=0.0, step=1000.0, key="pg_oting")
                 
                 impuestos = st.number_input("Impuestos sobre la Renta", min_value=0.0, step=1000.0, key="pg_imp")
                 utilidad_retenida = st.number_input("Utilidad Retenida del Año Anterior", min_value=0.0, step=1000.0, key="pg_uti_ret")
                 
-                if st.form_submit_button("💾 Guardar Estado P&G", disabled=not puede_editar):
-                    try:
-                        utilidad_bruta = ingresos_ventas - costos_ventas
-                        utilidad_operativa = utilidad_bruta - gastos_operativos - gastos_admin - gastos_ventas
-                        utilidad_antes_impuestos = utilidad_operativa + otros_ingresos
-                        utilidad_neta = utilidad_antes_impuestos - impuestos
-                        
-                        datos_pg = {
-                            'empresa_id': empresa_id,
-                            'ingresos_ventas': ingresos_ventas,
-                            'costos_ventas': costos_ventas,
-                            'gastos_operativos': gastos_operativos,
-                            'gastos_administrativos': gastos_admin,
-                            'gastos_ventas': gastos_ventas,
-                            'otros_ingresos': otros_ingresos,
-                            'impuestos': impuestos,
-                            'utilidad_retenida_anterior': utilidad_retenida,
-                            'utilidad_bruta': utilidad_bruta,
-                            'utilidad_operativa': utilidad_operativa,
-                            'utilidad_antes_impuestos': utilidad_antes_impuestos,
-                            'utilidad_neta': utilidad_neta
-                        }
-                        
-                        supabase.table('perdida_ganancia').delete().eq('empresa_id', empresa_id).execute()
-                        supabase.table('perdida_ganancia').insert(datos_pg).execute()
-                        st.success("✅ Estado de Pérdidas y Ganancias guardado.")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error al guardar P&G: {e}")
+                submitted_pg = st.form_submit_button("💾 Guardar Estado P&G", disabled=not puede_editar)
+            
+            if submitted_pg:
+                try:
+                    utilidad_bruta = ingresos_ventas - costos_ventas
+                    utilidad_operativa = utilidad_bruta - gastos_operativos - gastos_admin - gastos_ventas_marketing
+                    utilidad_antes_impuestos = utilidad_operativa + otros_ingresos
+                    utilidad_neta = utilidad_antes_impuestos - impuestos
+                    
+                    datos_pg = {
+                        'empresa_id': empresa_id,
+                        'ingresos_ventas': ingresos_ventas,
+                        'costos_ventas': costos_ventas,
+                        'gastos_operativos': gastos_operativos,
+                        'gastos_administrativos': gastos_admin,
+                        'gastos_ventas': gastos_ventas_marketing,
+                        'otros_ingresos': otros_ingresos,
+                        'impuestos': impuestos,
+                        'utilidad_retenida_anterior': utilidad_retenida,
+                        'utilidad_bruta': utilidad_bruta,
+                        'utilidad_operativa': utilidad_operativa,
+                        'utilidad_antes_impuestos': utilidad_antes_impuestos,
+                        'utilidad_neta': utilidad_neta
+                    }
+                    
+                    supabase.table('perdida_ganancia').delete().eq('empresa_id', empresa_id).execute()
+                    supabase.table('perdida_ganancia').insert(datos_pg).execute()
+                    st.success("✅ Estado de Pérdidas y Ganancias guardado.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error al guardar P&G: {e}")
         
         df_pg = get_datos_tabla('perdida_ganancia', empresa_id)
         if not df_pg.empty:
@@ -1320,52 +1316,6 @@ Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses enc
         
         st.divider()
         
-        # PROYECCIÓN con Análisis Costo-Beneficio (se mantiene igual)
-        st.subheader("📈 Proyección y Análisis Costo-Beneficio")
-        
-        if not df_pg.empty and not df_oper.empty:
-            datos_base = df_pg.iloc[0]
-            
-            with st.form("form_proyeccion"):
-                st.write("**Parámetros de Proyección:**")
-                
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    crecimiento_ventas = st.slider("Crecimiento en Ventas (%)", -50, 100, 10, key="proj_crec") / 100
-                    reduccion_costos = st.slider("Reducción de Costos (%)", 0, 50, 5, key="proj_red") / 100
-                with col2:
-                    periodos_proyeccion = st.selectbox("Período de Proyección", ["1 año", "2 años", "3 años", "5 años"], key="proj_per")
-                    unidades_proyectadas = st.number_input("Unidades Totales Proyectadas", min_value=1, value=1000, key="proj_unid")
-                with col3:
-                    inversion_total = st.number_input("Inversión Total Requerida ($)", min_value=0.0, value=float(total_costo), key="proj_inv")
-                    tasa_descuento = st.slider("Tasa de Descuento Anual (%)", 0, 30, 10, key="proj_tasa") / 100
-                
-                if st.form_submit_button("🚀 Calcular Proyección y Costo-Beneficio", disabled=not puede_editar):
-                    try:
-                        años = int(periodos_proyeccion.split()[0])
-                        
-                        proyecciones = []
-                        ingreso_actual = datos_base['ingresos_ventas']
-                        costo_actual = datos_base['costos_ventas']
-                        
-                        flujos_futuros = []
-                        
-                        for año in range(1, años + 1):
-                            ingreso_proy = ingreso_actual * ((1 + crecimiento_ventas) ** año)
-                            costo_proy = costo_actual * ((1 - reduccion_costos) ** año) * ((1 + crecimiento_ventas) ** año)
-                            utilidad_bruta_proy = ingreso_proy - costo_proy
-                            gastos_proy = (datos_base['gastos_operativos'] + datos_base['gastos_administrativos'] + datos_base['gastos_ventas']) * ((1 + crecimiento_ventas * 0.5) ** año)
-                            utilidad_neta_proy = utilidad_bruta_proy - gastos_proy - (utilidad_bruta_proy * 0.25)
-                            
-                            flujos_futuros.append(utilidad_neta_proy)
-                            
-                            proyecciones.append({
-                                'Año': año,
-                                'Ingresos Proyectados': ingreso_proy,
-                                'Costos Proyectados': costo_proy,
-                                'Utilidad Neta Proyectada': utilidad_neta_proy
-                            })
-                        
         # PROYECCIÓN con Análisis Costo-Beneficio
         st.subheader("📈 Proyección y Análisis Costo-Beneficio")
         
@@ -1386,10 +1336,10 @@ Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses enc
                     inversion_total = st.number_input("Inversión Total Requerida ($)", min_value=0.0, value=float(total_costo), key="proj_inv")
                     tasa_descuento = st.slider("Tasa de Descuento Anual (%)", 0, 30, 10, key="proj_tasa") / 100
                 
-                submitted = st.form_submit_button("🚀 Calcular Proyección y Costo-Beneficio", disabled=not puede_editar)
+                submitted_proj = st.form_submit_button("🚀 Calcular Proyección y Costo-Beneficio", disabled=not puede_editar)
             
             # El procesamiento va FUERA del with st.form()
-            if submitted:
+            if submitted_proj:
                 try:
                     anios = int(periodos_proyeccion.split()[0])
                     
@@ -1479,109 +1429,111 @@ Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses enc
                     
                 except Exception as e:
                     st.error(f"Error en el cálculo: {e}")
+            
+            # Mostrar resultados si existen
+            if st.session_state.get('mostrar_resultados_cb', False):
+                df_cb = get_datos_tabla('analisis_costo_beneficio', empresa_id)
+                df_proy = get_datos_tabla('proyeccion_financiera', empresa_id)
+                
+                if not df_cb.empty and not df_proy.empty:
+                    datos_cb = df_cb.iloc[0]
+                    
+                    st.divider()
+                    st.subheader("📊 Resultados del Análisis Costo-Beneficio")
+                    
+                    # Renombrar columnas para mostrar
+                    df_proy_display = df_proy.rename(columns={
+                        'anio': 'Año',
+                        'ingresos_proyectados': 'Ingresos Proyectados',
+                        'costos_proyectados': 'Costos Proyectados',
+                        'utilidad_neta_proyectada': 'Utilidad Neta Proyectada'
+                    })
+                    
+                    st.write("**Proyección Financiera:**")
+                    st.dataframe(df_proy_display, use_container_width=True, hide_index=True)
+                    
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(x=df_proy['anio'], y=df_proy['ingresos_proyectados'], 
+                                           mode='lines+markers', name='Ingresos', line=dict(color='green')))
+                    fig.add_trace(go.Scatter(x=df_proy['anio'], y=df_proy['costos_proyectados'], 
+                                           mode='lines+markers', name='Costos', line=dict(color='red')))
+                    fig.add_trace(go.Scatter(x=df_proy['anio'], y=df_proy['utilidad_neta_proyectada'], 
+                                           mode='lines+markers', name='Utilidad Neta', line=dict(color='blue')))
+                    fig.update_layout(title="Proyección Financiera", xaxis_title="Año", yaxis_title="Monto ($)")
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    st.write("**Indicadores Costo-Beneficio:**")
+                    
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        st.markdown("### 💵 En DÓLARES")
+                        st.metric("Relación C-B", f"{float(datos_cb['relacion_costo_beneficio_dolares']):.2f}")
+                        st.write(f"**Inversión:** ${float(datos_cb['inversion_total']):,.2f}")
+                        st.write(f"**VPN Total:** ${float(datos_cb['vpn_total']):,.2f}")
+                        if datos_cb['relacion_costo_beneficio_dolares'] >= 1:
+                            st.success(f"✅ Por cada $1 invertido, se recuperan ${float(datos_cb['relacion_costo_beneficio_dolares']):.2f}")
+                        else:
+                            st.error(f"❌ Por cada $1 invertido, solo se recuperan ${float(datos_cb['relacion_costo_beneficio_dolares']):.2f}")
+                    
+                    with col2:
+                        st.markdown("### ⏱️ En TIEMPO")
+                        if datos_cb['payback_periodo_anios']:
+                            st.metric("Periodo de Recuperación", f"{float(datos_cb['payback_periodo_anios']):.1f} años")
+                            if datos_cb['payback_periodo_anios'] <= 2:
+                                st.success("✅ Recuperación rápida")
+                            elif datos_cb['payback_periodo_anios'] <= 5:
+                                st.info("ℹ️ Recuperación moderada")
+                            else:
+                                st.warning("⚠️ Recuperación lenta")
+                        else:
+                            st.metric("Periodo de Recuperación", "No recuperable")
+                            st.error("❌ Inversión no recuperable")
+                    
+                    with col3:
+                        st.markdown("### 📦 En UNIDADES")
+                        st.metric("Beneficio/Unidad", f"${float(datos_cb['beneficio_por_unidad']):,.2f}")
+                        st.metric("Costo/Unidad", f"${float(datos_cb['costo_por_unidad']):,.2f}")
+                        st.metric("Relación C-B", f"{float(datos_cb['relacion_cb_unidades']):.2f}")
+                        if datos_cb['relacion_cb_unidades'] >= 1:
+                            st.success("✅ Rentable por unidad")
+                        else:
+                            st.error("❌ No rentable por unidad")
+                    
+                    st.divider()
+                    st.subheader("📝 Interpretación Ejecutiva")
+                    
+                    interpretaciones = []
+                    if datos_cb['relacion_costo_beneficio_dolares'] >= 1.5:
+                        interpretaciones.append("**Rentabilidad Excelente:** Retorno significativo de la inversión.")
+                    elif datos_cb['relacion_costo_beneficio_dolares'] >= 1:
+                        interpretaciones.append("**Rentabilidad Aceptable:** El proyecto es viable.")
+                    else:
+                        interpretaciones.append("**Alerta:** El proyecto no es viable financieramente.")
+                    
+                    if datos_cb['payback_periodo_anios'] and datos_cb['payback_periodo_anios'] <= 3:
+                        interpretaciones.append("**Liquidez:** Recuperación rápida del capital.")
+                    
+                    for interp in interpretaciones:
+                        st.write(f"• {interp}")
+                    
+                    puntos_positivos = sum([
+                        datos_cb['relacion_costo_beneficio_dolares'] >= 1,
+                        datos_cb['payback_periodo_anios'] is not None and datos_cb['payback_periodo_anios'] <= 5,
+                        datos_cb['relacion_cb_unidades'] >= 1
+                    ])
+                    
+                    if puntos_positivos >= 2:
+                        st.success("### ✅ RECOMENDACIÓN: APROBAR PROYECTO")
+                    elif puntos_positivos == 1:
+                        st.warning("### ⚠️ RECOMENDACIÓN: EVALUAR CON PRECAUCIÓN")
+                    else:
+                        st.error("### ❌ RECOMENDACIÓN: RECHAZAR PROYECTO")
         
         else:
             st.warning("Completa el Estado de Pérdidas y Ganancias y genera el Cuadro de Operativización para realizar la proyección.")
-        
-        # Mostrar resultados si existen
-        if st.session_state.get('mostrar_resultados_cb', False):
-            df_cb = get_datos_tabla('analisis_costo_beneficio', empresa_id)
-            df_proy = get_datos_tabla('proyeccion_financiera', empresa_id)
-            
-            if not df_cb.empty and not df_proy.empty:
-                datos_cb = df_cb.iloc[0]
-                
-                st.divider()
-                st.subheader("📊 Resultados del Análisis Costo-Beneficio")
-                
-                # Renombrar columnas para mostrar
-                df_proy_display = df_proy.rename(columns={
-                    'anio': 'Año',
-                    'ingresos_proyectados': 'Ingresos Proyectados',
-                    'costos_proyectados': 'Costos Proyectados',
-                    'utilidad_neta_proyectada': 'Utilidad Neta Proyectada'
-                })
-                
-                st.write("**Proyección Financiera:**")
-                st.dataframe(df_proy_display, use_container_width=True, hide_index=True)
-                
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(x=df_proy['anio'], y=df_proy['ingresos_proyectados'], 
-                                       mode='lines+markers', name='Ingresos', line=dict(color='green')))
-                fig.add_trace(go.Scatter(x=df_proy['anio'], y=df_proy['costos_proyectados'], 
-                                       mode='lines+markers', name='Costos', line=dict(color='red')))
-                fig.add_trace(go.Scatter(x=df_proy['anio'], y=df_proy['utilidad_neta_proyectada'], 
-                                       mode='lines+markers', name='Utilidad Neta', line=dict(color='blue')))
-                fig.update_layout(title="Proyección Financiera", xaxis_title="Año", yaxis_title="Monto ($)")
-                st.plotly_chart(fig, use_container_width=True)
-                
-                st.write("**Indicadores Costo-Beneficio:**")
-                
-                col1, col2, col3 = st.columns(3)
-                
-                with col1:
-                    st.markdown("### 💵 En DÓLARES")
-                    st.metric("Relación C-B", f"{float(datos_cb['relacion_costo_beneficio_dolares']):.2f}")
-                    st.write(f"**Inversión:** ${float(datos_cb['inversion_total']):,.2f}")
-                    st.write(f"**VPN Total:** ${float(datos_cb['vpn_total']):,.2f}")
-                    if datos_cb['relacion_costo_beneficio_dolares'] >= 1:
-                        st.success(f"✅ Por cada $1 invertido, se recuperan ${float(datos_cb['relacion_costo_beneficio_dolares']):.2f}")
-                    else:
-                        st.error(f"❌ Por cada $1 invertido, solo se recuperan ${float(datos_cb['relacion_costo_beneficio_dolares']):.2f}")
-                
-                with col2:
-                    st.markdown("### ⏱️ En TIEMPO")
-                    if datos_cb['payback_periodo_anios']:
-                        st.metric("Periodo de Recuperación", f"{float(datos_cb['payback_periodo_anios']):.1f} años")
-                        if datos_cb['payback_periodo_anios'] <= 2:
-                            st.success("✅ Recuperación rápida")
-                        elif datos_cb['payback_periodo_anios'] <= 5:
-                            st.info("ℹ️ Recuperación moderada")
-                        else:
-                            st.warning("⚠️ Recuperación lenta")
-                    else:
-                        st.metric("Periodo de Recuperación", "No recuperable")
-                        st.error("❌ Inversión no recuperable")
-                
-                with col3:
-                    st.markdown("### 📦 En UNIDADES")
-                    st.metric("Beneficio/Unidad", f"${float(datos_cb['beneficio_por_unidad']):,.2f}")
-                    st.metric("Costo/Unidad", f"${float(datos_cb['costo_por_unidad']):,.2f}")
-                    st.metric("Relación C-B", f"{float(datos_cb['relacion_cb_unidades']):.2f}")
-                    if datos_cb['relacion_cb_unidades'] >= 1:
-                        st.success("✅ Rentable por unidad")
-                    else:
-                        st.error("❌ No rentable por unidad")
-                
-                st.divider()
-                st.subheader("📝 Interpretación Ejecutiva")
-                
-                interpretaciones = []
-                if datos_cb['relacion_costo_beneficio_dolares'] >= 1.5:
-                    interpretaciones.append("**Rentabilidad Excelente:** Retorno significativo de la inversión.")
-                elif datos_cb['relacion_costo_beneficio_dolares'] >= 1:
-                    interpretaciones.append("**Rentabilidad Aceptable:** El proyecto es viable.")
-                else:
-                    interpretaciones.append("**Alerta:** El proyecto no es viable financieramente.")
-                
-                if datos_cb['payback_periodo_anios'] and datos_cb['payback_periodo_anios'] <= 3:
-                    interpretaciones.append("**Liquidez:** Recuperación rápida del capital.")
-                
-                for interp in interpretaciones:
-                    st.write(f"• {interp}")
-                
-                puntos_positivos = sum([
-                    datos_cb['relacion_costo_beneficio_dolares'] >= 1,
-                    datos_cb['payback_periodo_anios'] is not None and datos_cb['payback_periodo_anios'] <= 5,
-                    datos_cb['relacion_cb_unidades'] >= 1
-                ])
-                
-                if puntos_positivos >= 2:
-                    st.success("### ✅ RECOMENDACIÓN: APROBAR PROYECTO")
-                elif puntos_positivos == 1:
-                    st.warning("### ⚠️ RECOMENDACIÓN: EVALUAR CON PRECAUCIÓN")
-                else:
-                    st.error("### ❌ RECOMENDACIÓN: RECHAZAR PROYECTO")            
+
+    
     # --- PESTAÑA 7: DASHBOARD ---
     with tab_dash:
         st.header("📊 Dashboard de Análisis Estratégico")
@@ -1681,6 +1633,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
