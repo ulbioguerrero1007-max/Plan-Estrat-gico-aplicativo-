@@ -634,12 +634,26 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     logo_bytes = None
     if logo_bytes_data:
         try:
-            logo_bytes = BytesIO(bytes.fromhex(logo_bytes_data.replace('\\x', '')))
-        except:
-            try:
+            # Intentar convertir desde hexadecimal
+            if isinstance(logo_bytes_data, str):
+                # Limpiar el string hex de prefijos y caracteres problemáticos
+                hex_clean = logo_bytes_data.replace('\\x', '').replace('0x', '').replace("'", "")
+                logo_bytes = BytesIO(bytes.fromhex(hex_clean))
+            elif isinstance(logo_bytes_data, bytes):
+                # Si ya es bytes, usar directamente
                 logo_bytes = BytesIO(logo_bytes_data)
-            except:
-                pass
+            else:
+                logo_bytes = BytesIO(logo_bytes_data)
+
+            # Verificar que sea una imagen válida
+            from PIL import Image as PILImage
+            logo_bytes.seek(0)
+            PILImage.open(logo_bytes)
+            logo_bytes.seek(0)
+        except Exception as e:
+            # Si hay cualquier error, no usar logo
+            logo_bytes = None
+            print(f"Advertencia: No se pudo cargar el logo: {e}")
     
     # Función para encabezado/pie en cada página
     def header_footer(canvas, doc):
