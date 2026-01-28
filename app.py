@@ -403,31 +403,36 @@ def generar_pdf_completo(empresa_id, version, coordinador):
 df_estrategias_pdf = get_datos_tabla('estrategias_generadas', empresa_id)
     
 if not df_estrategias_pdf.empty:
-    df_cmi = generar_cuadro_de_mando_ia(df_estrategias_pdf)
-    cmi_data = [df_cmi.columns.tolist()] + df_cmi.values.tolist()
-    # Ajustar anchos de columna para las 8 columnas
-    col_widths = [1.2*inch, 1*inch, 1*inch, 1*inch, 0.8*inch, 0.5*inch, 0.5*inch, 0.5*inch]
-    cmi_table = Table(cmi_data, colWidths=col_widths)
-    cmi_table.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), '#CCCCCC'),
-        ('GRID', (0,0), (-1,-1), 0.5, '#000000'),
-        ('VALIGN', (0,0), (-1,-1), 'TOP'),
-        ('FONTSIZE', (0,0), (-1,-1), 8),
-        ('LEADINGS', (0,0), (-1,-1), 10)
-    ]))
-    story.append(cmi_table)
-else:
-    story.append(Paragraph("No hay estrategias generadas para construir el CMI.", styles['APA_Body']))
+        df_cmi = generar_cuadro_de_mando_ia(df_estrategias_pdf)
+        if not df_cmi.empty:
+            cmi_data = [df_cmi.columns.tolist()] + df_cmi.values.tolist()
+            col_widths = [1.2*inch, 1*inch, 1*inch, 1*inch, 0.8*inch, 0.5*inch, 0.5*inch, 0.5*inch]
+            cmi_table = Table(cmi_data, colWidths=col_widths)
+            cmi_table.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (-1,0), '#CCCCCC'),
+                ('GRID', (0,0), (-1,-1), 0.5, '#000000'),
+                ('VALIGN', (0,0), (-1,-1), 'TOP'),
+                ('FONTSIZE', (0,0), (-1,-1), 8),
+                ('LEADINGS', (0,0), (-1,-1), 10)
+            ]))
+            story.append(cmi_table)
+    else:
+        story.append(Paragraph("No hay estrategias generadas para construir el CMI.", styles['APA_Body']))
 
-story.append(PageBreak())
+    story.append(PageBreak())
 
-logo_bytes_data = empresa.get('logo')
-logo_bytes = None
-if logo_bytes_data:
-    try:
-        logo_bytes = BytesIO(bytes.fromhex(logo_bytes_data.replace('\\x', '')))
-    except:
-        pass
+    logo_bytes_data = empresa.get('logo')
+    logo_bytes = None
+    if logo_bytes_data:
+        try:
+            # Asumiendo que el logo se guarda como BLOB (bytes) en Supabase
+            logo_bytes = BytesIO(logo_bytes_data) 
+        except:
+            # Si se guarda como texto (hex), se usaría la otra lógica
+            try:
+                logo_bytes = BytesIO(bytes.fromhex(logo_bytes_data.replace('\\x', '')))
+            except:
+                pass
     
     doc.build(story, onFirstPage=lambda c, d: encabezado_pie_pagina(c, d, logo_bytes, empresa.get('nombre', ''), version, coordinador), 
                      onLaterPages=lambda c, d: encabezado_pie_pagina(c, d, logo_bytes, empresa.get('nombre', ''), version, coordinador))
@@ -1011,6 +1016,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
