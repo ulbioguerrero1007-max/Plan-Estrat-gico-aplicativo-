@@ -1386,190 +1386,202 @@ Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses enc
                     inversion_total = st.number_input("Inversión Total Requerida ($)", min_value=0.0, value=float(total_costo), key="proj_inv")
                     tasa_descuento = st.slider("Tasa de Descuento Anual (%)", 0, 30, 10, key="proj_tasa") / 100
                 
-                if st.form_submit_button("🚀 Calcular Proyección y Costo-Beneficio", disabled=not puede_editar):
-                    try:
-                        anios = int(periodos_proyeccion.split()[0])
+                submitted = st.form_submit_button("🚀 Calcular Proyección y Costo-Beneficio", disabled=not puede_editar)
+            
+            # El procesamiento va FUERA del with st.form()
+            if submitted:
+                try:
+                    anios = int(periodos_proyeccion.split()[0])
+                    
+                    proyecciones = []
+                    ingreso_actual = datos_base['ingresos_ventas']
+                    costo_actual = datos_base['costos_ventas']
+                    
+                    flujos_futuros = []
+                    
+                    for anio_num in range(1, anios + 1):
+                        ingreso_proy = ingreso_actual * ((1 + crecimiento_ventas) ** anio_num)
+                        costo_proy = costo_actual * ((1 - reduccion_costos) ** anio_num) * ((1 + crecimiento_ventas) ** anio_num)
+                        utilidad_bruta_proy = ingreso_proy - costo_proy
+                        gastos_proy = (datos_base['gastos_operativos'] + datos_base['gastos_administrativos'] + datos_base['gastos_ventas']) * ((1 + crecimiento_ventas * 0.5) ** anio_num)
+                        utilidad_neta_proy = utilidad_bruta_proy - gastos_proy - (utilidad_bruta_proy * 0.25)
                         
-                        proyecciones = []
-                        ingreso_actual = datos_base['ingresos_ventas']
-                        costo_actual = datos_base['costos_ventas']
+                        flujos_futuros.append(utilidad_neta_proy)
                         
-                        flujos_futuros = []
-                        
-                        for anio_num in range(1, anios + 1):
-                            ingreso_proy = ingreso_actual * ((1 + crecimiento_ventas) ** anio_num)
-                            costo_proy = costo_actual * ((1 - reduccion_costos) ** anio_num) * ((1 + crecimiento_ventas) ** anio_num)
-                            utilidad_bruta_proy = ingreso_proy - costo_proy
-                            gastos_proy = (datos_base['gastos_operativos'] + datos_base['gastos_administrativos'] + datos_base['gastos_ventas']) * ((1 + crecimiento_ventas * 0.5) ** anio_num)
-                            utilidad_neta_proy = utilidad_bruta_proy - gastos_proy - (utilidad_bruta_proy * 0.25)
-                            
-                            flujos_futuros.append(utilidad_neta_proy)
-                            
-                            # USAR NOMBRES EN MINÚSCULA DESDE EL INICIO
-                            proyecciones.append({
-                                'anio': anio_num,  # minúscula, sin tilde
-                                'ingresos_proyectados': ingreso_proy,
-                                'costos_proyectados': costo_proy,
-                                'utilidad_neta_proyectada': utilidad_neta_proy
-                            })
-                        
-                        df_proyeccion = pd.DataFrame(proyecciones)
-                        
-                        # Guardar proyección - USAR NOMBRES EN MINÚSCULA
-                        supabase.table('proyeccion_financiera').delete().eq('empresa_id', empresa_id).execute()
-                        for _, row in df_proyeccion.iterrows():
-                            row_dict = {
-                                'empresa_id': empresa_id,
-                                'anio': int(row['anio']),
-                                'ingresos_proyectados': float(row['ingresos_proyectados']),
-                                'costos_proyectados': float(row['costos_proyectados']),
-                                'utilidad_neta_proyectada': float(row['utilidad_neta_proyectada'])
-                            }
-                            supabase.table('proyeccion_financiera').insert(row_dict).execute()
-                        
-                        # Calcular Costo-Beneficio
-                        vpn = sum([f / ((1 + tasa_descuento) ** (i+1)) for i, f in enumerate(flujos_futuros)])
-                        
-                        if inversion_total > 0:
-                            relacion_cb_dolares = vpn / inversion_total
-                        else:
-                            relacion_cb_dolares = float('inf') if vpn > 0 else 0
-                        
-                        flujo_acumulado = 0
-                        payback_anios = None
-                        for i, flujo in enumerate(flujos_futuros):
-                            flujo_acumulado += flujo
-                            if flujo_acumulado >= inversion_total:
-                                exceso = flujo_acumulado - inversion_total
-                                fraccion_anio = 1 - (exceso / flujo) if flujo > 0 else 0
-                                payback_anios = i + fraccion_anio
-                                break
-                        
-                        if unidades_proyectadas > 0 and inversion_total > 0:
-                            beneficio_por_unidad = vpn / unidades_proyectadas
-                            costo_por_unidad = inversion_total / unidades_proyectadas
-                            relacion_cb_unidades = beneficio_por_unidad / costo_por_unidad if costo_por_unidad > 0 else 0
-                        else:
-                            beneficio_por_unidad = 0
-                            costo_por_unidad = 0
-                            relacion_cb_unidades = 0
-                        
-                        # Guardar análisis CB - NOMBRES EN MINÚSCULA
-                        analisis_cb = {
+                        proyecciones.append({
+                            'anio': anio_num,
+                            'ingresos_proyectados': ingreso_proy,
+                            'costos_proyectados': costo_proy,
+                            'utilidad_neta_proyectada': utilidad_neta_proy
+                        })
+                    
+                    df_proyeccion = pd.DataFrame(proyecciones)
+                    
+                    # Guardar proyección
+                    supabase.table('proyeccion_financiera').delete().eq('empresa_id', empresa_id).execute()
+                    for _, row in df_proyeccion.iterrows():
+                        row_dict = {
                             'empresa_id': empresa_id,
-                            'inversion_total': float(inversion_total),
-                            'vpn_total': float(vpn),
-                            'relacion_costo_beneficio_dolares': float(relacion_cb_dolares),
-                            'payback_periodo_anios': float(payback_anios) if payback_anios else None,
-                            'unidades_proyectadas': int(unidades_proyectadas),
-                            'beneficio_por_unidad': float(beneficio_por_unidad),
-                            'costo_por_unidad': float(costo_por_unidad),
-                            'relacion_cb_unidades': float(relacion_cb_unidades),
-                            'tasa_descuento': float(tasa_descuento)
+                            'anio': int(row['anio']),
+                            'ingresos_proyectados': float(row['ingresos_proyectados']),
+                            'costos_proyectados': float(row['costos_proyectados']),
+                            'utilidad_neta_proyectada': float(row['utilidad_neta_proyectada'])
                         }
-                        
-                        supabase.table('analisis_costo_beneficio').delete().eq('empresa_id', empresa_id).execute()
-                        supabase.table('analisis_costo_beneficio').insert(analisis_cb).execute()
-                        
-                        st.success("✅ Proyección y análisis Costo-Beneficio calculados y guardados.")
-                        st.session_state['mostrar_resultados_cb'] = True
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error en el cálculo: {e}")
-                        
-            if st.session_state.get('mostrar_resultados_cb', False):
-                df_cb = get_datos_tabla('analisis_costo_beneficio', empresa_id)
-                df_proy = get_datos_tabla('proyeccion_financiera', empresa_id)
-                
-                if not df_cb.empty and not df_proy.empty:
-                    datos_cb = df_cb.iloc[0]
+                        supabase.table('proyeccion_financiera').insert(row_dict).execute()
                     
-                    st.divider()
-                    st.subheader("📊 Resultados del Análisis Costo-Beneficio")
+                    # Calcular Costo-Beneficio
+                    vpn = sum([f / ((1 + tasa_descuento) ** (i+1)) for i, f in enumerate(flujos_futuros)])
                     
-                    st.write("**Proyección Financiera:**")
-                    st.dataframe(df_proy, use_container_width=True, hide_index=True)
-                    
-                    fig = go.Figure()
-                    fig.add_trace(go.Scatter(x=df_proy['Año'], y=df_proy['Ingresos Proyectados'], 
-                                           mode='lines+markers', name='Ingresos', line=dict(color='green')))
-                    fig.add_trace(go.Scatter(x=df_proy['Año'], y=df_proy['Costos Proyectados'], 
-                                           mode='lines+markers', name='Costos', line=dict(color='red')))
-                    fig.add_trace(go.Scatter(x=df_proy['Año'], y=df_proy['Utilidad Neta Proyectada'], 
-                                           mode='lines+markers', name='Utilidad Neta', line=dict(color='blue')))
-                    fig.update_layout(title="Proyección Financiera", xaxis_title="Año", yaxis_title="Monto ($)")
-                    st.plotly_chart(fig, use_container_width=True)
-                    
-                    st.write("**Indicadores Costo-Beneficio:**")
-                    
-                    col1, col2, col3 = st.columns(3)
-                    
-                    with col1:
-                        st.markdown("### 💵 En DÓLARES")
-                        st.metric("Relación C-B", f"{datos_cb['relacion_costo_beneficio_dolares']:.2f}")
-                        st.write(f"**Inversión:** ${datos_cb['inversion_total']:,.2f}")
-                        st.write(f"**VPN Total:** ${datos_cb['vpn_total']:,.2f}")
-                        if datos_cb['relacion_costo_beneficio_dolares'] >= 1:
-                            st.success(f"✅ Por cada $1 invertido, se recuperan ${datos_cb['relacion_costo_beneficio_dolares']:.2f}")
-                        else:
-                            st.error(f"❌ Por cada $1 invertido, solo se recuperan ${datos_cb['relacion_costo_beneficio_dolares']:.2f}")
-                    
-                    with col2:
-                        st.markdown("### ⏱️ En TIEMPO")
-                        if datos_cb['payback_periodo_años']:
-                            st.metric("Periodo de Recuperación", f"{datos_cb['payback_periodo_años']:.1f} años")
-                            if datos_cb['payback_periodo_años'] <= 2:
-                                st.success("✅ Recuperación rápida")
-                            elif datos_cb['payback_periodo_años'] <= 5:
-                                st.info("ℹ️ Recuperación moderada")
-                            else:
-                                st.warning("⚠️ Recuperación lenta")
-                        else:
-                            st.metric("Periodo de Recuperación", "No recuperable")
-                            st.error("❌ Inversión no recuperable")
-                    
-                    with col3:
-                        st.markdown("### 📦 En UNIDADES")
-                        st.metric("Beneficio/Unidad", f"${datos_cb['beneficio_por_unidad']:,.2f}")
-                        st.metric("Costo/Unidad", f"${datos_cb['costo_por_unidad']:,.2f}")
-                        st.metric("Relación C-B", f"{datos_cb['relacion_cb_unidades']:.2f}")
-                        if datos_cb['relacion_cb_unidades'] >= 1:
-                            st.success("✅ Rentable por unidad")
-                        else:
-                            st.error("❌ No rentable por unidad")
-                    
-                    st.divider()
-                    st.subheader("📝 Interpretación Ejecutiva")
-                    
-                    interpretaciones = []
-                    if datos_cb['relacion_costo_beneficio_dolares'] >= 1.5:
-                        interpretaciones.append("**Rentabilidad Excelente:** Retorno significativo de la inversión.")
-                    elif datos_cb['relacion_costo_beneficio_dolares'] >= 1:
-                        interpretaciones.append("**Rentabilidad Aceptable:** El proyecto es viable.")
+                    if inversion_total > 0:
+                        relacion_cb_dolares = vpn / inversion_total
                     else:
-                        interpretaciones.append("**Alerta:** El proyecto no es viable financieramente.")
+                        relacion_cb_dolares = float('inf') if vpn > 0 else 0
                     
-                    if datos_cb['payback_periodo_años'] and datos_cb['payback_periodo_años'] <= 3:
-                        interpretaciones.append("**Liquidez:** Recuperación rápida del capital.")
+                    flujo_acumulado = 0
+                    payback_anios = None
+                    for i, flujo in enumerate(flujos_futuros):
+                        flujo_acumulado += flujo
+                        if flujo_acumulado >= inversion_total:
+                            exceso = flujo_acumulado - inversion_total
+                            fraccion_anio = 1 - (exceso / flujo) if flujo > 0 else 0
+                            payback_anios = i + fraccion_anio
+                            break
                     
-                    for interp in interpretaciones:
-                        st.write(f"• {interp}")
-                    
-                    puntos_positivos = sum([
-                        datos_cb['relacion_costo_beneficio_dolares'] >= 1,
-                        datos_cb['payback_periodo_años'] is not None and datos_cb['payback_periodo_años'] <= 5,
-                        datos_cb['relacion_cb_unidades'] >= 1
-                    ])
-                    
-                    if puntos_positivos >= 2:
-                        st.success("### ✅ RECOMENDACIÓN: APROBAR PROYECTO")
-                    elif puntos_positivos == 1:
-                        st.warning("### ⚠️ RECOMENDACIÓN: EVALUAR CON PRECAUCIÓN")
+                    if unidades_proyectadas > 0 and inversion_total > 0:
+                        beneficio_por_unidad = vpn / unidades_proyectadas
+                        costo_por_unidad = inversion_total / unidades_proyectadas
+                        relacion_cb_unidades = beneficio_por_unidad / costo_por_unidad if costo_por_unidad > 0 else 0
                     else:
-                        st.error("### ❌ RECOMENDACIÓN: RECHAZAR PROYECTO")
+                        beneficio_por_unidad = 0
+                        costo_por_unidad = 0
+                        relacion_cb_unidades = 0
+                    
+                    # Guardar análisis CB
+                    analisis_cb = {
+                        'empresa_id': empresa_id,
+                        'inversion_total': float(inversion_total),
+                        'vpn_total': float(vpn),
+                        'relacion_costo_beneficio_dolares': float(relacion_cb_dolares),
+                        'payback_periodo_anios': float(payback_anios) if payback_anios else None,
+                        'unidades_proyectadas': int(unidades_proyectadas),
+                        'beneficio_por_unidad': float(beneficio_por_unidad),
+                        'costo_por_unidad': float(costo_por_unidad),
+                        'relacion_cb_unidades': float(relacion_cb_unidades),
+                        'tasa_descuento': float(tasa_descuento)
+                    }
+                    
+                    supabase.table('analisis_costo_beneficio').delete().eq('empresa_id', empresa_id).execute()
+                    supabase.table('analisis_costo_beneficio').insert(analisis_cb).execute()
+                    
+                    st.success("✅ Proyección y análisis Costo-Beneficio calculados y guardados.")
+                    st.session_state['mostrar_resultados_cb'] = True
+                    st.rerun()
+                    
+                except Exception as e:
+                    st.error(f"Error en el cálculo: {e}")
+        
         else:
             st.warning("Completa el Estado de Pérdidas y Ganancias y genera el Cuadro de Operativización para realizar la proyección.")
+        
+        # Mostrar resultados si existen
+        if st.session_state.get('mostrar_resultados_cb', False):
+            df_cb = get_datos_tabla('analisis_costo_beneficio', empresa_id)
+            df_proy = get_datos_tabla('proyeccion_financiera', empresa_id)
             
+            if not df_cb.empty and not df_proy.empty:
+                datos_cb = df_cb.iloc[0]
+                
+                st.divider()
+                st.subheader("📊 Resultados del Análisis Costo-Beneficio")
+                
+                # Renombrar columnas para mostrar
+                df_proy_display = df_proy.rename(columns={
+                    'anio': 'Año',
+                    'ingresos_proyectados': 'Ingresos Proyectados',
+                    'costos_proyectados': 'Costos Proyectados',
+                    'utilidad_neta_proyectada': 'Utilidad Neta Proyectada'
+                })
+                
+                st.write("**Proyección Financiera:**")
+                st.dataframe(df_proy_display, use_container_width=True, hide_index=True)
+                
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(x=df_proy['anio'], y=df_proy['ingresos_proyectados'], 
+                                       mode='lines+markers', name='Ingresos', line=dict(color='green')))
+                fig.add_trace(go.Scatter(x=df_proy['anio'], y=df_proy['costos_proyectados'], 
+                                       mode='lines+markers', name='Costos', line=dict(color='red')))
+                fig.add_trace(go.Scatter(x=df_proy['anio'], y=df_proy['utilidad_neta_proyectada'], 
+                                       mode='lines+markers', name='Utilidad Neta', line=dict(color='blue')))
+                fig.update_layout(title="Proyección Financiera", xaxis_title="Año", yaxis_title="Monto ($)")
+                st.plotly_chart(fig, use_container_width=True)
+                
+                st.write("**Indicadores Costo-Beneficio:**")
+                
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.markdown("### 💵 En DÓLARES")
+                    st.metric("Relación C-B", f"{float(datos_cb['relacion_costo_beneficio_dolares']):.2f}")
+                    st.write(f"**Inversión:** ${float(datos_cb['inversion_total']):,.2f}")
+                    st.write(f"**VPN Total:** ${float(datos_cb['vpn_total']):,.2f}")
+                    if datos_cb['relacion_costo_beneficio_dolares'] >= 1:
+                        st.success(f"✅ Por cada $1 invertido, se recuperan ${float(datos_cb['relacion_costo_beneficio_dolares']):.2f}")
+                    else:
+                        st.error(f"❌ Por cada $1 invertido, solo se recuperan ${float(datos_cb['relacion_costo_beneficio_dolares']):.2f}")
+                
+                with col2:
+                    st.markdown("### ⏱️ En TIEMPO")
+                    if datos_cb['payback_periodo_anios']:
+                        st.metric("Periodo de Recuperación", f"{float(datos_cb['payback_periodo_anios']):.1f} años")
+                        if datos_cb['payback_periodo_anios'] <= 2:
+                            st.success("✅ Recuperación rápida")
+                        elif datos_cb['payback_periodo_anios'] <= 5:
+                            st.info("ℹ️ Recuperación moderada")
+                        else:
+                            st.warning("⚠️ Recuperación lenta")
+                    else:
+                        st.metric("Periodo de Recuperación", "No recuperable")
+                        st.error("❌ Inversión no recuperable")
+                
+                with col3:
+                    st.markdown("### 📦 En UNIDADES")
+                    st.metric("Beneficio/Unidad", f"${float(datos_cb['beneficio_por_unidad']):,.2f}")
+                    st.metric("Costo/Unidad", f"${float(datos_cb['costo_por_unidad']):,.2f}")
+                    st.metric("Relación C-B", f"{float(datos_cb['relacion_cb_unidades']):.2f}")
+                    if datos_cb['relacion_cb_unidades'] >= 1:
+                        st.success("✅ Rentable por unidad")
+                    else:
+                        st.error("❌ No rentable por unidad")
+                
+                st.divider()
+                st.subheader("📝 Interpretación Ejecutiva")
+                
+                interpretaciones = []
+                if datos_cb['relacion_costo_beneficio_dolares'] >= 1.5:
+                    interpretaciones.append("**Rentabilidad Excelente:** Retorno significativo de la inversión.")
+                elif datos_cb['relacion_costo_beneficio_dolares'] >= 1:
+                    interpretaciones.append("**Rentabilidad Aceptable:** El proyecto es viable.")
+                else:
+                    interpretaciones.append("**Alerta:** El proyecto no es viable financieramente.")
+                
+                if datos_cb['payback_periodo_anios'] and datos_cb['payback_periodo_anios'] <= 3:
+                    interpretaciones.append("**Liquidez:** Recuperación rápida del capital.")
+                
+                for interp in interpretaciones:
+                    st.write(f"• {interp}")
+                
+                puntos_positivos = sum([
+                    datos_cb['relacion_costo_beneficio_dolares'] >= 1,
+                    datos_cb['payback_periodo_anios'] is not None and datos_cb['payback_periodo_anios'] <= 5,
+                    datos_cb['relacion_cb_unidades'] >= 1
+                ])
+                
+                if puntos_positivos >= 2:
+                    st.success("### ✅ RECOMENDACIÓN: APROBAR PROYECTO")
+                elif puntos_positivos == 1:
+                    st.warning("### ⚠️ RECOMENDACIÓN: EVALUAR CON PRECAUCIÓN")
+                else:
+                    st.error("### ❌ RECOMENDACIÓN: RECHAZAR PROYECTO")            
     # --- PESTAÑA 7: DASHBOARD ---
     with tab_dash:
         st.header("📊 Dashboard de Análisis Estratégico")
@@ -1669,5 +1681,6 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
