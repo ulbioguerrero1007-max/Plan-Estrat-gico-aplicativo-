@@ -601,8 +601,7 @@ with tab1:
 
     # --- PESTAÑA 2: DIAGNÓSTICO SITUACIONAL ---
     with tab2:
-        st.header("Diagnóstico Situacional (Análisis de Matrices)")
-        
+        st.header("Diagnóstico Situacional (Análisis de Matrices)")        
         # Función interna para procesar datos pegados (se mantiene igual)
         def procesar_made_madi(data_str, tipo):
             # ... (tu lógica original)
@@ -903,6 +902,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
