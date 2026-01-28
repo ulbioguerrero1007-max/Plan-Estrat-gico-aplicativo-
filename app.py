@@ -325,7 +325,7 @@ def generar_pdf_completo(empresa_id, version, coordinador):
         story.append(Image(grafico_foda, width=5*inch, height=5*inch))
     story.append(PageBreak())
     story.append(Paragraph("Factores Críticos de Éxito", styles['APA_H2']))
-    stort.append(Paragraph("A continuación, se destacan los factores más influyentes del análisis PEST, que representan las mayores oportunidades y amenazas del entorno.", styles['APA_Body']))
+    story.append(Paragraph("A continuación, se destacan los factores más influyentes del análisis PEST, que representan las mayores oportunidades y amenazas del entorno.", styles['APA_Body']))
     if not df_pest.empty:
         pest_criticos = df_pest.sort_values(by='valor_ponderado', ascending=False).head(5)
         pest_data = [pest_criticos.columns.tolist()] + pest_criticos.values.tolist()
@@ -351,7 +351,7 @@ def generar_pdf_completo(empresa_id, version, coordinador):
     story.append(Paragraph(f"<b>Misión:</b> {empresa.get('mision', 'N/A')}", styles['APA_Body']))
     story.append(Paragraph(f"<b>Visión:</b> {empresa.get('vision', 'N/A')}", styles['APA_Body']))
     story.append(Paragraph(f"<b>Valores y Principios:</b> {empresa.get('valores', 'N/A')}", styles['APA_Body']))
-    故事.append(PageBreak())
+    story.append(PageBreak())
     story.append(Paragraph("Anexo B: Diagnóstico Situacional Detallado", styles['APA_H2']))
     story.append(Paragraph("<b>Matriz PEST Completa</b>", styles['APA_Body']))
     if not df_pest.empty:
@@ -857,13 +857,79 @@ def aplicacion_principal():
             
             mostrar_ultimo_analisis_guardado(empresa_data, 'foda')
 
-    # --- PESTAÑA 3: ESTRATEGIA ---
+    # --- PESTAÑA 3: ESTRATEGIA (CORREGIDA CON GENERACIÓN IA) ---
     with tab_est:
         st.header("🎯 Formulación de Estrategias")
-        df_estrategias = get_datos_tabla('estrategias_generadas', empresa_id)
         
-        if not df_estrategias.empty:
-            st.write("**Estrategias Generadas:**")
+        df_estrategias = get_datos_tabla('estrategias_generadas', empresa_id)
+        df_foda_estrategia = get_datos_tabla('foda_cruzado', empresa_id)
+        
+        if df_estrategias.empty:
+            st.info("No hay estrategias generadas. Utiliza el botón de abajo para generarlas automáticamente con IA basándose en el análisis FODA.")
+            
+            if st.button("🤖 Generar Estrategias con IA (3 por cuadrante)", disabled=not puede_editar, type="primary"):
+                if df_foda_estrategia.empty:
+                    st.error("Primero debes cargar los datos del FODA Cruzado en la pestaña anterior.")
+                else:
+                    with st.spinner("Generando 12 estrategias estratégicas (3 por cuadrante)..."):
+                        # Obtener factores por cuadrante para contexto
+                        contexto_foda = df_foda_estrategia.to_string()
+                        
+                        prompt_estrategias = f"""Basado en el siguiente análisis FODA Cruzado:
+{contexto_foda}
+
+Genera exactamente 3 estrategias para cada uno de los 4 cuadrantes (FO, FA, DO, DA), total 12 estrategias.
+Para cada estrategia proporciona:
+1. Cuadrante (FO, FA, DO, o DA)
+2. Estrategia: Descripción clara y específica de la estrategia
+3. Importancia: Selecciona una de (Alta, Media Alta, Media Baja, Baja)
+4. Actividades: Lista de actividades clave para implementarla (máximo 3 líneas)
+5. Plan Asignado: Selecciona uno de (Plan Administrativo, Plan Operativo, Plan Tecnológico, Plan Financiero, Plan de Monitoreo y control, Plan de Mejora, Plan de Contingencia)
+
+Formato de salida EXACTO (una estrategia por línea):
+CUADRANTE|ESTRATEGIA|IMPORTANCIA|ACTIVIDADES|PLAN_ASIGNADO
+
+Ejemplo:
+FO|Expandir mercado en nuevas regiones utilizando fortalezas tecnológicas|Alta|Investigar mercados potenciales, Adaptar producto, Lanzar campaña marketing|Plan Operativo
+FO|Alianza estratégica con proveedores clave|Media Alta|Identificar proveedores, Negociar contratos, Implementar integración|Plan Administrativo
+FA|Programa de retención de clientes ante nueva competencia|Alta|Analizar churn, Crear programa fidelización, Capacitar equipo ventas|Plan de Mejora
+
+Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses encabezados."""
+                        
+                        resultado = generar_analisis(prompt_estrategias)
+                        
+                        # Parsear resultado
+                        estrategias_list = []
+                        lineas = [l.strip() for l in resultado.split('\n') if l.strip() and '|' in l]
+                        
+                        for linea in lineas[:12]:  # Máximo 12 estrategias
+                            partes = linea.split('|')
+                            if len(partes) >= 5:
+                                estrategias_list.append({
+                                    'empresa_id': empresa_id,
+                                    'cuadrante': partes[0].strip().upper(),
+                                    'estrategia': partes[1].strip(),
+                                    'importancia': partes[2].strip(),
+                                    'actividades': partes[3].strip(),
+                                    'plan_asignado': partes[4].strip()
+                                })
+                        
+                        if estrategias_list:
+                            try:
+                                # Guardar en Supabase
+                                supabase.table('estrategias_generadas').delete().eq('empresa_id', empresa_id).execute()
+                                supabase.table('estrategias_generadas').insert(estrategias_list).execute()
+                                st.success(f"✅ {len(estrategias_list)} estrategias generadas y guardadas exitosamente.")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Error al guardar estrategias: {e}")
+                        else:
+                            st.error("No se pudieron parsear las estrategias generadas. Intenta nuevamente.")
+        else:
+            # Mostrar estrategias existentes en editor
+            st.success(f"Se encontraron {len(df_estrategias)} estrategias generadas.")
+            st.write("**Editar Estrategias:**")
+            
             edited_df = st.data_editor(
                 df_estrategias.drop(columns=['id', 'empresa_id'], errors='ignore'), 
                 num_rows="dynamic", 
@@ -873,26 +939,43 @@ def aplicacion_principal():
                 column_config={
                     "cuadrante": st.column_config.SelectboxColumn("Cuadrante", options=["FO", "FA", "DO", "DA"]),
                     "importancia": st.column_config.SelectboxColumn("Importancia", options=["Alta", "Media Alta", "Media Baja", "Baja"]),
-                    "plan_asignado": st.column_config.SelectboxColumn("Plan Asignado", options=["Plan Administrativo", "Plan Operativo", "Plan Tecnológico", "Plan Financiero", "Plan de Monitoreo y control", "Plan de Mejora", "Plan de Contingencia"]),
+                    "plan_asignado": st.column_config.SelectboxColumn("Plan Asignado", 
+                        options=["Plan Administrativo", "Plan Operativo", "Plan Tecnológico", "Plan Financiero", 
+                                "Plan de Monitoreo y control", "Plan de Mejora", "Plan de Contingencia"]),
+                    "estrategia": st.column_config.TextColumn("Estrategia", width="large"),
+                    "actividades": st.column_config.TextColumn("Actividades", width="large")
                 }
             )
-            col1, col2 = st.columns(2)
+            
+            col1, col2, col3 = st.columns(3)
             with col1:
                 if st.button("💾 Guardar Cambios", disabled=not puede_editar):
                     try:
                         supabase.table('estrategias_generadas').delete().eq('empresa_id', empresa_id).execute()
                         if not edited_df.empty:
-                            edited_df['empresa_id'] = empresa_id
-                            supabase.table('estrategias_generadas').insert(edited_df.to_dict(orient='records')).execute()
-                        st.success("Estrategias guardadas."); 
+                            df_to_save = edited_df.copy()
+                            df_to_save['empresa_id'] = empresa_id
+                            supabase.table('estrategias_generadas').insert(df_to_save.to_dict(orient='records')).execute()
+                        st.success("Estrategias actualizadas."); 
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error al guardar estrategias: {e}")
             with col2:
-                if st.button("🚀 Generar Planes Operativos", disabled=not puede_editar):
-                    st.info("Función de generación de planes operativos disponible en la siguiente pestaña.")
-        else:
-            st.info("No hay estrategias generadas. Utiliza el análisis FODA para generar estrategias primero.")
+                if st.button("🗑️ Eliminar Todas", type="secondary", disabled=not puede_editar):
+                    try:
+                        supabase.table('estrategias_generadas').delete().eq('empresa_id', empresa_id).execute()
+                        st.success("Estrategias eliminadas."); 
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al eliminar: {e}")
+            with col3:
+                if st.button("🔄 Regenerar con IA", disabled=not puede_editar):
+                    # Eliminar actuales y regenerar
+                    try:
+                        supabase.table('estrategias_generadas').delete().eq('empresa_id', empresa_id).execute()
+                        st.rerun()
+                    except:
+                        pass
 
     # --- PESTAÑA 4: PLANES ESTRATÉGICOS ---
     with tab3:
@@ -941,7 +1024,7 @@ def aplicacion_principal():
             
             mostrar_ultimo_analisis_guardado(empresa_data, 'cmi')
         else:
-            st.warning("No hay estrategias disponibles para generar el CMI. Genera estrategias primero.")
+            st.warning("No hay estrategias disponibles para generar el CMI. Genera estrategias primero en la pestaña anterior.")
     
     # --- PESTAÑA 6: OPERATIVIZACIÓN/PRESUPUESTO ---
     with tab5:
@@ -1100,5 +1183,3 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
-
-
