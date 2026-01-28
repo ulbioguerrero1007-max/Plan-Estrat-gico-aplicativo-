@@ -444,38 +444,39 @@ def generar_pdf_completo(empresa_id, version, coordinador):
     
     return pdf_buffer
 
-# NUEVA FUNCIÓN: Mostrar último análisis guardado desde la base de datos
-def mostrar_ultimo_analisis_guardado(empresa_id, tipo_analisis):
+# ==============================================================================
+# FUNCIÓN CORREGIDA - REEMPLAZAR LA ANTIGUA
+# ==============================================================================
+
+def mostrar_ultimo_analisis_guardado(empresa_data, tipo_analisis):
     """
-    Muestra el último análisis guardado desde la base de datos.
-    tipo_analisis: 'made', 'madi', 'posicionamiento', 'pest', 'foda', 'cmi', 'operativo'
+    Muestra el último análisis guardado desde el diccionario de datos de la empresa,
+    que ya ha sido cargado desde Supabase.
     """
-    try:
-        with get_connection() as conn:
-            # Consultar el análisis específico
-            query = f"SELECT analisis_{tipo_analisis} FROM empresas WHERE id=?"
-            resultado = pd.read_sql(query, conn, params=(empresa_id,))
-            
-            if not resultado.empty:
-                contenido = resultado.iloc[0][f'analisis_{tipo_analisis}']
-                if contenido and str(contenido).strip():
-                    st.markdown("---")
-                    st.markdown(f"**📄 Último análisis de {tipo_analisis.upper()} guardado:**")
-                    if tipo_analisis == 'cmi' and '|' in str(contenido):
-                        try:
-                            df_view = pd.read_csv(io.StringIO(contenido), sep="|")
-                            st.table(df_view)
-                        except:
-                            st.text_area(f"contenido_guardado_{tipo_analisis}", value=contenido, height=200, disabled=True, label_visibility="collapsed")
-                    else:
-                        st.text_area(f"contenido_guardado_{tipo_analisis}", value=contenido, height=200, disabled=True, label_visibility="collapsed")
-                else:
-                    st.markdown("---")
-                    st.info(f"ℹ️ No hay análisis de {tipo_analisis.upper()} guardado aún en la base de datos.")
-            else:
-                st.error("No se encontró la empresa en la base de datos.")
-    except Exception as e:
-        st.error(f"Error al cargar el último análisis guardado: {e}")
+    # Ya no necesita conectarse a la base de datos, usa los datos ya cargados.
+    contenido = empresa_data.get(f'analisis_{tipo_analisis}')
+    
+    if contenido and str(contenido).strip():
+        st.markdown("---")
+        st.markdown(f"**📄 Último análisis de {tipo_analisis.upper()} guardado:**")
+        
+        # Lógica para mostrar tablas o texto
+        if tipo_analisis == 'cmi' and '|' in str(contenido):
+            try:
+                df_view = pd.read_csv(io.StringIO(contenido), sep="|")
+                st.table(df_view)
+            except Exception as e:
+                st.text_area(f"contenido_guardado_{tipo_analisis}", value=contenido, height=200, disabled=True, label_visibility="collapsed")
+                st.warning(f"No se pudo mostrar como tabla: {e}")
+        else:
+            st.text_area(f"contenido_guardado_{tipo_analisis}", value=contenido, height=200, disabled=True, label_visibility="collapsed")
+    else:
+        # Opcional: para no llenar la pantalla de mensajes si no hay nada.
+        # st.markdown("---")
+        # st.info(f"ℹ️ No hay análisis de {tipo_analisis.upper()} guardado aún.")
+        pass # No muestra nada si no hay contenido, para una UI más limpia.
+
+# ==============================================================================
 
 def aplicacion_principal():
     # La línea init_db() ha sido eliminada.
@@ -1124,6 +1125,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
