@@ -886,7 +886,7 @@ with tab4:
         mostrar_ultimo_analisis_guardado(empresa_data, 'cmi')
     
     # --- PESTAÑA 6: OPERATIVIZACIÓN/PRESUPUESTO ---
-    with tab5:
+with tab5:
         st.header("Operativización / Presupuesto")
         
         # Cuadro de Operativización
@@ -1011,6 +1011,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
