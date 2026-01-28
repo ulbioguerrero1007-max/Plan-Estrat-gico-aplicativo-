@@ -236,24 +236,52 @@ def generar_planes_por_plantilla(estrategia_foda, pest_total):
         obj_con = "Establecer un sistema de vigilancia del entorno trimestral y realizar un simulacro de crisis anual."
     planes['Plan de Contingencia'] = {'introduccion': intro_con, 'objetivo': obj_con}
     
-    return planes
-def generar_cuadro_de_mando(planes):
-    cmi_data = []
-    for nombre_plan, datos_plan in planes.items():
-        objetivo = datos_plan['objetivo'].lower()
-        perspectiva = 'Procesos Internos'
-        if any(keyword in objetivo for keyword in ['margen', 'costo', 'ingreso', 'financiar', 'cuota de mercado', 'rentabilidad']):
-            perspectiva = 'Financiera'
-        elif any(keyword in objetivo for keyword in ['cliente', 'retención', 'abandono', 'propuesta de valor', 'satisfacción']):
-            perspectiva = 'Clientes'
-        elif any(keyword in objetivo for keyword in ['capacitación', 'habilidades', 'liderazgo', 'cultura', 'innovación', 'sistemas', 'ciberseguridad']):
-            perspectiva = 'Aprendizaje y Crecimiento'
-        kpi = "Por definir"
-        meta = "Por definir"
-        iniciativa = f"Proyecto derivado del Plan {nombre_plan}"
-        cmi_data.append([perspectiva, datos_plan['objetivo'], kpi, meta, iniciativa])
-    df_cmi = pd.DataFrame(cmi_data, columns=['Perspectiva', 'Objetivo Estratégico', 'KPI (Indicador)', 'Meta', 'Iniciativa'])
-    perspectiva_orden = ['Financiera', 'Clientes', 'Procesos Internos', 'Aprendizaje y Crecimiento']
+    return planesdef generar_cuadro_de_mando_ia(estrategias_df):
+    """
+    Genera el CMI utilizando IA basado en las estrategias generadas.
+    """
+    if estrategias_df.empty:
+        return pd.DataFrame(columns=['Estrategia', 'Perspectiva', 'KPIs', 'Formulas', 'Frecuencia', 'LI', 'LC', 'LS'])
+    
+    contexto_estrategias = ""
+    for _, row in estrategias_df.iterrows():
+        contexto_estrategias += f"- Estrategia: {row['estrategia']} (Plan: {row['plan_asignado']})\n"
+    
+    prompt = f"""Actúa como un experto en Balanced Scorecard. Basado en las siguientes estrategias:
+{contexto_estrategias}
+
+Genera una tabla de Cuadro de Mando Integral (CMI) con las siguientes columnas exactas:
+1. (estrategia): La estrategia proporcionada.
+2. (perspectiva): A qué perspectiva corresponde (Financiera, Cliente, Procesos, Aprendizaje y Control).
+3. (KPIs): El indicador clave de desempeño que medirá la estrategia.
+4. (Formulas): La fórmula de cálculo del KPI.
+5. (Frecuencia): Cada cuánto se mide (Mensual, Trimestral, etc.).
+6. (LI): Límite Inferior (Rojo/Crítico).
+7. (LC): Límite de Control (Amarillo/Preventivo).
+8. (LS): Límite Superior (Verde/Satisfactorio).
+
+Formato de salida: ESTRATEGIA|PERSPECTIVA|KPI|FORMULA|FRECUENCIA|LI|LC|LS
+No incluyas encabezados ni texto adicional, solo las líneas de datos separadas por pipe (|)."""
+
+    resultado_ia = generar_analisis(prompt)
+    
+    cmi_rows = []
+    for line in resultado_ia.strip().split("\n"):
+        partes = line.split("|")
+        if len(partes) >= 8:
+            cmi_rows.append({
+                "Estrategia": partes[0].strip(),
+                "Perspectiva": partes[1].strip(),
+                "KPIs": partes[2].strip(),
+                "Formulas": partes[3].strip(),
+                "Frecuencia": partes[4].strip(),
+                "LI": partes[5].strip(),
+                "LC": partes[6].strip(),
+                "LS": partes[7].strip()
+            })
+    
+    df_cmi = pd.DataFrame(cmi_rows)
+    perspectiva_orden = ['Financiera', 'Cliente', 'Procesos', 'Aprendizaje y Control']
     df_cmi['Perspectiva'] = pd.Categorical(df_cmi['Perspectiva'], categories=perspectiva_orden, ordered=True)
     return df_cmi.sort_values(by='Perspectiva').reset_index(drop=True)
 def generar_grafico_foda_radar(puntajes):
@@ -383,11 +411,26 @@ def generar_pdf_completo(empresa_id, version, coordinador):
     story.append(PageBreak())
     story.append(Paragraph("Anexo C: Planes Estratégicos y Cuadro de Mando", styles['APA_H2']))
     story.append(Paragraph("<b>Cuadro de Mando Integral (CMI)</b>", styles['APA_Body']))
-    df_cmi = generar_cuadro_de_mando(planes)
-    cmi_data = [df_cmi.columns.tolist()] + df_cmi.values.tolist()
-    cmi_table = Table(cmi_data, colWidths=[1.5*inch, 2.5*inch, 1*inch, 1*inch, 1.5*inch])
-    cmi_table.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), '#CCCCCC'), ('GRID', (0,0), (-1,-1), 1, '#000000'), ('VALIGN', (0,0), (-1,-1), 'TOP')]))
-    story.append(cmi_table)
+    
+    with get_connection() as conn:
+        df_estrategias_pdf = pd.read_sql(f"SELECT estrategia, plan_asignado FROM estrategias_generadas WHERE empresa_id={empresa_id}", conn)
+    
+    if not df_estrategias_pdf.empty:
+        df_cmi = generar_cuadro_de_mando_ia(df_estrategias_pdf)
+        cmi_data = [df_cmi.columns.tolist()] + df_cmi.values.tolist()
+        # Ajustar anchos de columna para las 8 columnas
+        col_widths = [1.2*inch, 1*inch, 1*inch, 1*inch, 0.8*inch, 0.5*inch, 0.5*inch, 0.5*inch]
+        cmi_table = Table(cmi_data, colWidths=col_widths)
+        cmi_table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), '#CCCCCC'),
+            ('GRID', (0,0), (-1,-1), 0.5, '#000000'),
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+            ('FONTSIZE', (0,0), (-1,-1), 8),
+            ('LEADINGS', (0,0), (-1,-1), 10)
+        ]))
+        story.append(cmi_table)
+    else:
+        story.append(Paragraph("No hay estrategias generadas para construir el CMI.", styles['APA_Body']))
     story.append(PageBreak())
     logo_bytes = BytesIO(empresa['logo']) if empresa['logo'] else None
     doc.build(story, onFirstPage=lambda c, d: encabezado_pie_pagina(c, d, logo_bytes, empresa['nombre'], version, coordinador), 
@@ -953,10 +996,13 @@ def aplicacion_principal():
                 if st.form_submit_button("🤖 Generar CMI con IA"):
                     with st.spinner("La IA está diseñando el Cuadro de Mando Integral..."):
                         with get_connection() as conn:
-                            datos_empresa = pd.read_sql(f"SELECT mision, vision, analisis_operativo FROM empresas WHERE id={empresa_id}", conn).iloc[0]
+                            df_estrategias = pd.read_sql(f"SELECT estrategia, plan_asignado FROM estrategias_generadas WHERE empresa_id={empresa_id}", conn)
                         
-                        prompt_cmi = f"Basado en la Misión: {datos_empresa['mision']}, Visión: {datos_empresa['vision']} y el Plan Estratégico: {datos_empresa['analisis_operativo']}, genera un Cuadro de Mando Integral (CMI) con indicadores clave (KPIs) para las 4 perspectivas: Financiera, Cliente, Procesos Internos y Aprendizaje/Crecimiento."
-                        st.session_state["ia_analisis_cmi"] = generar_analisis(prompt_cmi)
+                        if df_estrategias.empty:
+                            st.warning("No se encontraron estrategias generadas. Por favor, genérelas en la pestaña 'Estrategia' primero.")
+                        else:
+                            df_cmi_ia = generar_cuadro_de_mando_ia(df_estrategias)
+                            st.session_state["ia_analisis_cmi"] = df_cmi_ia.to_markdown(index=False)
                 
                 current_analisis_cmi = st.session_state.get("ia_analisis_cmi", analisis_data.get('analisis_cmi', ''))
                 analisis_propio_cmi = st.text_area("Edite el Cuadro de Mando Integral", value=current_analisis_cmi, height=400)
