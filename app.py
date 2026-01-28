@@ -457,13 +457,14 @@ def mostrar_ultimo_analisis_guardado(empresa_id, tipo_analisis):
                 if contenido and str(contenido).strip():
                     st.markdown("---")
                     st.markdown(f"**📄 Último análisis de {tipo_analisis.upper()} guardado:**")
-                    st.text_area(
-                        f"contenido_guardado_{tipo_analisis}", 
-                        value=contenido, 
-                        height=200, 
-                        disabled=True,
-                        label_visibility="collapsed"
-                    )
+                    if tipo_analisis == 'cmi' and '|' in str(contenido):
+                        try:
+                            df_view = pd.read_csv(io.StringIO(contenido), sep="|")
+                            st.table(df_view)
+                        except:
+                            st.text_area(f"contenido_guardado_{tipo_analisis}", value=contenido, height=200, disabled=True, label_visibility="collapsed")
+                    else:
+                        st.text_area(f"contenido_guardado_{tipo_analisis}", value=contenido, height=200, disabled=True, label_visibility="collapsed")
                 else:
                     st.markdown("---")
                     st.info(f"ℹ️ No hay análisis de {tipo_analisis.upper()} guardado aún en la base de datos.")
@@ -1004,10 +1005,23 @@ def aplicacion_principal():
                             st.warning("No se encontraron estrategias generadas. Por favor, genérelas en la pestaña 'Estrategia' primero.")
                         else:
                             df_cmi_ia = generar_cuadro_de_mando_ia(df_estrategias)
-                            st.session_state["ia_analisis_cmi"] = df_cmi_ia.to_markdown(index=False)
+                            # Convertimos a CSV para que sea fácil de editar y guardar sin dependencias externas
+                            st.session_state["ia_analisis_cmi"] = df_cmi_ia.to_csv(index=False, sep="|")
                 
                 current_analisis_cmi = st.session_state.get("ia_analisis_cmi", analisis_data.get('analisis_cmi', ''))
-                analisis_propio_cmi = st.text_area("Edite el Cuadro de Mando Integral", value=current_analisis_cmi, height=400)
+                
+                # Mostramos un editor de datos si hay contenido, de lo contrario un área de texto
+                if current_analisis_cmi:
+                    try:
+                        df_editor = pd.read_csv(io.StringIO(current_analisis_cmi), sep="|")
+                        st.write("### Vista Previa y Edición del CMI")
+                        df_edited = st.data_editor(df_editor, use_container_width=True, num_rows="dynamic")
+                        # Actualizamos el valor para guardar
+                        analisis_propio_cmi = df_edited.to_csv(index=False, sep="|")
+                    except:
+                        analisis_propio_cmi = st.text_area("Edite el Cuadro de Mando Integral (Formato CSV con |)", value=current_analisis_cmi, height=400)
+                else:
+                    analisis_propio_cmi = st.text_area("Edite el Cuadro de Mando Integral", value=current_analisis_cmi, height=400)
                 
                 if st.form_submit_button("💾 Guardar CMI"):
                     with get_connection() as conn:
