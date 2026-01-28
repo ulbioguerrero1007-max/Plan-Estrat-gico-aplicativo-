@@ -648,7 +648,7 @@ def aplicacion_principal():
             # 5. Mostrar último análisis
             mostrar_ultimo_analisis_guardado(empresa_data, 'made')
 
-        # --- MADI ---
+            # --- MADI ---
         with diag_tab2:
             st.subheader("Análisis de Marketing Externo (MADI)")
             with st.expander("📋 Pegar datos de MADI desde Excel"):
@@ -663,13 +663,19 @@ def aplicacion_principal():
                             supabase.table('matriz_marketing').insert(df_madi.to_dict(orient='records')).execute()
                             st.success(f"¡{len(df_madi)} filas importadas a MADI exitosamente!"); 
                             st.rerun()
+                        except Exception as e:
+                            st.error(f"Error al procesar datos de MADI: {e}")
+                    else:
+                        st.warning("El área de texto está vacía. Pega tus datos para procesar.")
             
+            # Mostrar datos existentes (fuera del expander)
             df_madi_actual = get_datos_tabla('matriz_marketing', empresa_id, tipo_matriz_filter='MADI')
             if not df_madi_actual.empty:
                 st.write("**Datos Actuales:**")
                 st.dataframe(df_madi_actual.drop(columns=['id', 'empresa_id', 'tipo_matriz'], errors='ignore'), use_container_width=True)
             
             st.divider()
+            # Análisis con IA
             st.subheader("📊 Análisis de MADI")
             if st.button("🤖 Generar Análisis MADI con IA", key="gen_madi_ia", disabled=not puede_editar):
                 with st.spinner("Analizando Marketing Externo..."):
@@ -1094,4 +1100,5 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
