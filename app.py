@@ -471,13 +471,25 @@ def mostrar_ultimo_analisis_guardado(empresa_id, tipo_analisis):
 
 def aplicacion_principal():
     init_db()
+        # --- INICIO DEL BLOQUE DE REEMPLAZO PARA EL SIDEBAR ---
     with st.sidebar:
         st.header("Gestión de Empresas")
         empresas_df = get_empresas()
-        empresa_seleccionada = st.selectbox("Selecciona una Empresa", empresas_df['nombre'], index=None, placeholder="Elige una opción")
-        empresa_id = int(empresas_df[empresas_df['nombre'] == empresa_seleccionada]['id'].iloc[0]) if empresa_seleccionada else None
+        
+        # Manejo seguro por si empresas_df está vacío
+        nombres_empresas = []
+        if not empresas_df.empty:
+            nombres_empresas = empresas_df['nombre'].tolist()
+
+        empresa_seleccionada = st.selectbox("Selecciona una Empresa", nombres_empresas, index=None, placeholder="Elige una opción")
+        
+        empresa_id = None
+        if empresa_seleccionada and not empresas_df.empty:
+            empresa_id = int(empresas_df[empresas_df['nombre'] == empresa_seleccionada]['id'].iloc[0])
+
         st.divider()
-    with st.expander("➕ Crear Nueva Empresa"):
+
+        with st.expander("➕ Crear Nueva Empresa"):
             with st.form("new_empresa_form"):
                 new_empresa_name = st.text_input("Nombre de la nueva empresa")
                 if st.form_submit_button("Crear"):
@@ -495,16 +507,20 @@ def aplicacion_principal():
                     else:
                         st.warning("El nombre no puede estar vacío.")
 
-         if empresa_id and st.button("❌ Eliminar Empresa Seleccionada", type="primary"):
-            # La línea "if supabase:" y todo lo que sigue ahora está DENTRO del primer if.
-            if supabase:
-                try:
-                    # RLS se encarga de verificar que solo el propietario pueda borrar
-                    supabase.table('empresas').delete().eq('id', empresa_id).execute()
-                    st.success(f"Empresa '{empresa_seleccionada}' eliminada.")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error al eliminar la empresa: {e}")
+        if empresa_id:
+            # Este bloque solo se muestra si se ha seleccionado una empresa
+            if st.button("❌ Eliminar Empresa Seleccionada", type="primary"):
+                if supabase:
+                    try:
+                        # RLS se encarga de verificar que solo el propietario pueda borrar
+                        supabase.table('empresas').delete().eq('id', empresa_id).execute()
+                        st.success(f"Empresa '{empresa_seleccionada}' eliminada.")
+                        # Forzar un rerun para que la empresa desaparezca de la lista
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al eliminar la empresa: {e}")
+
+    # --- FIN DEL BLOQUE DE REEMPLAZO PARA EL SIDEBAR ---
                 
 if not empresa_id:
         st.info("👈 Por favor, selecciona o crea una empresa en el menú lateral para comenzar.")
@@ -887,5 +903,6 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
