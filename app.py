@@ -480,7 +480,7 @@ def mostrar_ultimo_analisis_guardado(empresa_id, tipo_analisis):
 def aplicacion_principal():
     # La línea init_db() ha sido eliminada.
     with st.sidebar:
-        st.header("Gestión de Empresas"))
+        st.header("Gestión de Empresas")
         empresas_df = get_empresas()
         
         # Manejo seguro por si empresas_df está vacío
@@ -1019,4 +1019,5 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
