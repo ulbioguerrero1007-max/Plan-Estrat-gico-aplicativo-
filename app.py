@@ -332,10 +332,13 @@ def generar_pdf_completo(empresa_id, version, coordinador):
         return None
     df_pest = get_datos_tabla('matrices', empresa_id, tipo_matriz_filter='PEST')
     df_foda = get_datos_tabla('foda_cruzado', empresa_id)
+    df_estrategias_pdf = get_datos_tabla('estrategias_generadas', empresa_id)
+    
     pdf_buffer = BytesIO()
     doc = SimpleDocTemplate(pdf_buffer, pagesize=A4, leftMargin=1*inch, rightMargin=1*inch, topMargin=1*inch, bottomMargin=1*inch)
     styles = get_apa_styles()
     story = []
+    
     story.append(Spacer(1, 2*inch))
     story.append(Paragraph("Plan Estratégico", styles['APA_H1']))
     story.append(Spacer(1, 0.2*inch))
@@ -440,6 +443,7 @@ if not df_estrategias_pdf.empty:
     pdf_buffer.seek(0)
     
     return pdf_buffer
+
 # NUEVA FUNCIÓN: Mostrar último análisis guardado desde la base de datos
 def mostrar_ultimo_analisis_guardado(empresa_id, tipo_analisis):
     """
@@ -1015,6 +1019,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
