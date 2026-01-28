@@ -743,7 +743,7 @@ def aplicacion_principal():
             "Matriz MADE", "Matriz MADI", "Matriz de Posicionamiento", "Matriz PEST", "Matriz FODA Numérico"
         ])
 
-                # --- INICIO DEL BLOQUE CORREGIDO ---
+        # --- INICIO DEL BLOQUE CORREGIDO ---
 
         with diag_tab1:
             st.subheader("Análisis de Marketing Interno (MADE)")
@@ -752,17 +752,18 @@ def aplicacion_principal():
                 if st.button("Procesar y Reemplazar Datos de MADE", key="process_made", disabled=not puede_editar):
                     if made_paste_data:
                         try:
-                            # 1. Procesar los datos para calcular 'total' y 'valor'
+                            # 1. Procesar los datos usando la función corregida.
+                            # df_made AHORA CONTIENE LAS COLUMNAS 'total' Y 'valor' CALCULADAS.
                             df_made = procesar_made_madi(made_paste_data, 'MADE')
                             
-                            # 2. Borrar los datos antiguos de la base de datos
+                            # 2. Borrar los datos antiguos de la base de datos.
                             supabase.table('matriz_marketing').delete().eq('empresa_id', empresa_id).eq('tipo_matriz', 'MADE').execute()
                             
-                            # 3. Añadir las columnas necesarias para la inserción
+                            # 3. Añadir las columnas de ID y tipo para la inserción.
                             df_made['empresa_id'] = empresa_id
                             df_made['tipo_matriz'] = 'MADE'
                             
-                            # 4. Insertar el DataFrame completo, incluyendo la columna 'total'
+                            # 4. Insertar el DataFrame COMPLETO (con 'total' y 'valor') en Supabase.
                             supabase.table('matriz_marketing').insert(df_made.to_dict(orient='records')).execute()
                             
                             st.success(f"¡{len(df_made)} filas importadas a MADE exitosamente!"); st.rerun()
@@ -771,7 +772,7 @@ def aplicacion_principal():
                     else:
                         st.warning("El área de texto está vacía. Pega tus datos para procesar.")
             
-            # El resto de la lógica no cambia
+            # Esta parte no cambia, solo muestra los datos que ya están en la BD.
             display_and_edit_matrix('MADE', empresa_data.get('analisis_made', ''))
             mostrar_ultimo_analisis_guardado(empresa_id, 'made')
 
@@ -782,17 +783,14 @@ def aplicacion_principal():
                 if st.button("Procesar y Reemplazar Datos de MADI", key="process_madi", disabled=not puede_editar):
                     if madi_paste_data:
                         try:
-                            # 1. Procesar los datos para calcular 'total' y 'valor'
+                            # Misma lógica que en MADE
                             df_madi = procesar_made_madi(madi_paste_data, 'MADI')
                             
-                            # 2. Borrar los datos antiguos
                             supabase.table('matriz_marketing').delete().eq('empresa_id', empresa_id).eq('tipo_matriz', 'MADI').execute()
                             
-                            # 3. Añadir columnas para la inserción
                             df_madi['empresa_id'] = empresa_id
                             df_madi['tipo_matriz'] = 'MADI'
                             
-                            # 4. Insertar el DataFrame completo
                             supabase.table('matriz_marketing').insert(df_madi.to_dict(orient='records')).execute()
                             
                             st.success(f"¡{len(df_madi)} filas importadas a MADI exitosamente!"); st.rerun()
@@ -801,12 +799,10 @@ def aplicacion_principal():
                     else:
                         st.warning("El área de texto está vacía. Pega tus datos para procesar.")
 
-            # El resto de la lógica no cambia
+            # Esta parte no cambia.
             display_and_edit_matrix('MADI', empresa_data.get('analisis_madi', ''))
             mostrar_ultimo_analisis_guardado(empresa_id, 'madi')
 
-        # --- FIN DEL BLOQUE CORREGIDO ---
-        
         # --- FIN DEL BLOQUE CORREGIDO ---
 
         with diag_tab3:
@@ -1142,6 +1138,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
