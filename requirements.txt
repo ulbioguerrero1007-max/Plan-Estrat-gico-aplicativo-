@@ -1,8 +1,8 @@
 streamlit
-openai>=1.0.0
+google-generativeai
 pandas
 reportlab
 matplotlib
+plotly
 numpy
 supabase
-google-generativeai
