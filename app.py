@@ -1026,130 +1026,234 @@ Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses enc
         else:
             st.warning("No hay estrategias disponibles para generar el CMI. Genera estrategias primero en la pestaña anterior.")
     
-    # --- PESTAÑA 6: OPERATIVIZACIÓN/PRESUPUESTO (MODIFICADA) ---
+    # --- PESTAÑA 6: OPERATIVIZACIÓN/PRESUPUESTO (CORREGIDA) ---
     with tab5:
         st.header("Operativización / Presupuesto")
         
-        # NUEVO: Selección de estrategias para operativizar
-        st.subheader("🔗 Vinculación de Estrategias a Operativización")
+        # Obtener estrategias generadas
         df_estrategias_oper = get_datos_tabla('estrategias_generadas', empresa_id)
         
-        if not df_estrategias_oper.empty:
-            st.info("Selecciona las estrategias que deseas operativizar (agregar plazo, responsable y costos):")
-            
-            # Mostrar estrategias disponibles con checkboxes
-            estrategias_seleccionadas = []
-            for idx, row in df_estrategias_oper.iterrows():
-                col1, col2 = st.columns([0.1, 0.9])
-                with col1:
-                    seleccionar = st.checkbox("", key=f"sel_est_{row['id']}")
-                with col2:
-                    st.write(f"**{row['estrategia']}** ({row['cuadrante']}) - {row['plan_asignado']}")
-                    if seleccionar:
-                        estrategias_seleccionadas.append(row)
-            
-            if estrategias_seleccionadas:
-                st.divider()
-                st.subheader("➕ Agregar Detalles de Operativización")
-                
-                with st.form("form_nueva_operativizacion"):
-                    st.write("**Detalles de Implementación:**")
-                    
-                    # Seleccionar qué estrategia vamos a operativizar
-                    opciones_estrategias = {f"{e['estrategia']} ({e['cuadrante']})": e for e in estrategias_seleccionadas}
-                    estrategia_key = st.selectbox("Estrategia a operativizar", list(opciones_estrategias.keys()))
-                    estrategia_sel = opciones_estrategias[estrategia_key]
-                    
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        plazo = st.text_input("Plazo (ej: 3 meses, 6 meses, 1 año)")
-                        responsable = st.text_input("Responsable/Área encargada")
-                    with col2:
-                        costo_estimado = st.number_input("Costo Estimado ($)", min_value=0.0, step=100.0)
-                        unidades_producir = st.number_input("Unidades a Producir/Implementar", min_value=0, step=1)
-                    
-                    recursos_necesarios = st.text_area("Recursos Necesarios (materiales, humanos, técnicos)")
-                    indicadores_exito = st.text_area("Indicadores de Éxito (KPIs específicos)")
-                    
-                    if st.form_submit_button("💾 Guardar Operativización de Estrategia", disabled=not puede_editar):
-                        try:
-                            nueva_oper = {
-                                'empresa_id': empresa_id,
-                                'estrategia_id': estrategia_sel['id'],
-                                'estrategia_nombre': estrategia_sel['estrategia'],
-                                'cuadrante': estrategia_sel['cuadrante'],
-                                'plan_asignado': estrategia_sel['plan_asignado'],
-                                'plazo': plazo,
-                                'responsable': responsable,
-                                'costo_estimado': costo_estimado,
-                                'unidades_producir': unidades_producir,
-                                'recursos_necesarios': recursos_necesarios,
-                                'indicadores_exito': indicadores_exito,
-                                'estado': 'Pendiente'
-                            }
-                            supabase.table('operativizacion').insert(nueva_oper).execute()
-                            st.success(f"✅ Estrategia '{estrategia_sel['estrategia']}' operativizada correctamente.")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Error al guardar operativización: {e}")
-        else:
+        if df_estrategias_oper.empty:
             st.warning("No hay estrategias disponibles. Genera estrategias primero en la pestaña 'Estrategia'.")
+            st.stop()
+        
+        st.info(f"📋 Se encontraron {len(df_estrategias_oper)} estrategias para operativizar.")
+        
+        # Botón para generar/poblar el cuadro de operativización automáticamente
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            if st.button("🔄 Generar/Actualizar Cuadro de Operativización", type="primary", disabled=not puede_editar):
+                with st.spinner("Desglosando estrategias en actividades..."):
+                    try:
+                        # Obtener operativización existente para preservar datos ya ingresados
+                        df_oper_existente = get_datos_tabla('operativizacion', empresa_id)
+                        datos_existentes = {}
+                        if not df_oper_existente.empty:
+                            for _, row in df_oper_existente.iterrows():
+                                key = f"{row.get('estrategia_id', '')}_{row.get('numero_actividad', '')}"
+                                datos_existentes[key] = {
+                                    'plazo': row.get('plazo', ''),
+                                    'responsable': row.get('responsable', ''),
+                                    'costo': row.get('costo', 0)
+                                }
+                        
+                        # Eliminar operativización anterior
+                        supabase.table('operativizacion').delete().eq('empresa_id', empresa_id).execute()
+                        
+                        nuevas_actividades = []
+                        
+                        for _, estrategia in df_estrategias_oper.iterrows():
+                            # Dividir las actividades de la estrategia (separadas por comas o saltos de línea)
+                            actividades_texto = estrategia.get('actividades', '')
+                            # Separar por coma, punto y coma, o salto de línea
+                            import re
+                            lista_actividades = re.split(r'[,;\n]+', actividades_texto)
+                            # Limpiar y filtrar actividades vacías
+                            lista_actividades = [act.strip() for act in lista_actividades if act.strip()]
+                            
+                            # Si no hay actividades definidas, crear una actividad genérica
+                            if not lista_actividades:
+                                lista_actividades = ["Implementación general de la estrategia"]
+                            
+                            for num_act, actividad in enumerate(lista_actividades, 1):
+                                # Buscar si hay datos existentes para esta actividad
+                                key = f"{estrategia['id']}_{num_act}"
+                                datos_previos = datos_existentes.get(key, {})
+                                
+                                nueva_act = {
+                                    'empresa_id': empresa_id,
+                                    'estrategia_id': estrategia['id'],
+                                    'cuadrante': estrategia['cuadrante'],
+                                    'estrategia_nombre': estrategia['estrategia'],
+                                    'plan_asignado': estrategia['plan_asignado'],
+                                    'numero_actividad': num_act,
+                                    'descripcion_actividad': actividad,
+                                    'plazo': datos_previos.get('plazo', ''),
+                                    'responsable': datos_previos.get('responsable', ''),
+                                    'costo': datos_previos.get('costo', 0),
+                                    'importancia': estrategia.get('importancia', 'Media')
+                                }
+                                nuevas_actividades.append(nueva_act)
+                        
+                        if nuevas_actividades:
+                            supabase.table('operativizacion').insert(nuevas_actividades).execute()
+                            st.success(f"✅ {len(nuevas_actividades)} actividades generadas de {len(df_estrategias_oper)} estrategias.")
+                            st.rerun()
+                    
+                    except Exception as e:
+                        st.error(f"Error al generar operativización: {e}")
+        
+        with col2:
+            st.caption("Este botón desglosa cada estrategia en sus actividades específicas para que solo edites plazo, responsable y costo.")
         
         st.divider()
         
-        # Mostrar tabla de operativización existente
-        st.subheader("📋 Cuadro de Operativización de Estrategias")
+        # Mostrar y editar el cuadro de operativización
+        st.subheader("📋 Cuadro de Operativización por Actividades")
+        
         df_oper = get_datos_tabla('operativizacion', empresa_id)
         
         if not df_oper.empty:
             # Calcular totales
-            total_inversion = pd.to_numeric(df_oper['costo_estimado'], errors='coerce').sum()
-            total_unidades = pd.to_numeric(df_oper['unidades_producir'], errors='coerce').sum()
+            total_costo = pd.to_numeric(df_oper['costo'], errors='coerce').fillna(0).sum()
+            total_actividades = len(df_oper)
             
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("💰 Inversión Total Estimada", f"${total_inversion:,.2f}")
-            with col2:
-                st.metric("📦 Total Unidades a Producir", f"{int(total_unidades):,}")
+            # Métricas resumen
+            col_met1, col_met2, col_met3, col_met4 = st.columns(4)
+            with col_met1:
+                st.metric("💰 Costo Total", f"${total_costo:,.2f}")
+            with col_met2:
+                st.metric("📊 Total Actividades", total_actividades)
+            with col_met3:
+                st.metric("🎯 Estrategias", df_oper['estrategia_id'].nunique())
+            with col_met4:
+                promedio_costo = total_costo / total_actividades if total_actividades > 0 else 0
+                st.metric("💵 Promedio por Actividad", f"${promedio_costo:,.2f}")
             
-            # Editor de operativización
-            edited_oper = st.data_editor(
-                df_oper.drop(columns=['id', 'empresa_id', 'estrategia_id'], errors='ignore'), 
-                num_rows="dynamic", 
-                key="editor_oper", 
-                use_container_width=True, 
+            st.divider()
+            
+            # Preparar datos para el editor
+            # Agregar columna de referencia para agrupar visualmente
+            df_oper['ref_estrategia'] = df_oper['cuadrante'] + " - " + df_oper['estrategia_nombre'].str[:50] + "..."
+            
+            # Ordenar por cuadrante y número de actividad
+            orden_cuadrantes = {'FO': 1, 'FA': 2, 'DO': 3, 'DA': 4}
+            df_oper['orden_cuadrante'] = df_oper['cuadrante'].map(orden_cuadrantes)
+            df_oper = df_oper.sort_values(['orden_cuadrante', 'estrategia_id', 'numero_actividad'])
+            
+            # Seleccionar y renombrar columnas para mostrar
+            columnas_mostrar = [
+                'ref_estrategia', 'numero_actividad', 'descripcion_actividad', 
+                'plazo', 'responsable', 'costo', 'plan_asignado', 'importancia'
+            ]
+            
+            df_display = df_oper[columnas_mostrar].copy()
+            df_display.columns = [
+                'Estrategia (Referencia)', 'N°', 'Actividad', 
+                'Plazo', 'Responsable', 'Costo ($)', 'Plan Asignado', 'Importancia'
+            ]
+            
+            # Editor de datos - SOLO ciertas columnas son editables
+            st.write("**Edita directamente el Plazo, Responsable y Costo de cada actividad:**")
+            
+            edited_df = st.data_editor(
+                df_display,
+                num_rows="fixed",  # No permitir agregar/eliminar filas manualmente
+                key="editor_oper_actividades",
+                use_container_width=True,
                 disabled=not puede_editar,
                 column_config={
-                    "estado": st.column_config.SelectboxColumn("Estado", options=["Pendiente", "En Progreso", "Completado", "Cancelado"]),
-                    "costo_estimado": st.column_config.NumberColumn("Costo ($)", format="$%.2f"),
-                    "unidades_producir": st.column_config.NumberColumn("Unidades", min_value=0)
-                }
+                    'Estrategia (Referencia)': st.column_config.TextColumn("Estrategia", disabled=True, width="medium"),
+                    'N°': st.column_config.NumberColumn("N°", disabled=True, width="small"),
+                    'Actividad': st.column_config.TextColumn("Descripción de la Actividad", disabled=True, width="large"),
+                    'Plazo': st.column_config.TextColumn("⏱️ Plazo", width="medium", help="Ej: 2 semanas, 1 mes, Q1 2024"),
+                    'Responsable': st.column_config.TextColumn("👤 Responsable", width="medium", help="Nombre del área o persona responsable"),
+                    'Costo ($)': st.column_config.NumberColumn("💰 Costo ($)", min_value=0, step=100, format="$%.2f", width="medium"),
+                    'Plan Asignado': st.column_config.TextColumn("Plan", disabled=True, width="small"),
+                    'Importancia': st.column_config.TextColumn("Importancia", disabled=True, width="small")
+                },
+                hide_index=True
             )
             
-            if st.button("💾 Guardar Cambios en Operativización", key="save_oper", disabled=not puede_editar):
+            # Botón para guardar cambios
+            if st.button("💾 Guardar Cambios del Cuadro de Operativización", type="primary", disabled=not puede_editar):
                 try:
+                    # Reconstruir el dataframe completo con IDs
+                    df_completo = df_oper.copy()
+                    
+                    # Actualizar solo las columnas editables
+                    df_completo['plazo'] = edited_df['Plazo'].values
+                    df_completo['responsable'] = edited_df['Responsable'].values
+                    df_completo['costo'] = edited_df['Costo ($)'].values
+                    
+                    # Eliminar datos anteriores
                     supabase.table('operativizacion').delete().eq('empresa_id', empresa_id).execute()
-                    if not edited_oper.empty:
-                        df_to_save = edited_oper.copy()
-                        df_to_save['empresa_id'] = empresa_id
-                        # Recuperar estrategia_id si existe en el dataframe original
-                        if 'estrategia_id' in df_oper.columns:
-                            df_to_save = df_to_save.merge(
-                                df_oper[['estrategia_nombre', 'estrategia_id']], 
-                                on='estrategia_nombre', 
-                                how='left'
-                            )
-                        supabase.table('operativizacion').insert(df_to_save.to_dict(orient='records')).execute()
-                    st.success("Operativización guardada."); 
+                    
+                    # Insertar datos actualizados
+                    columnas_guardar = [
+                        'empresa_id', 'estrategia_id', 'cuadrante', 'estrategia_nombre',
+                        'plan_asignado', 'numero_actividad', 'descripcion_actividad',
+                        'plazo', 'responsable', 'costo', 'importancia'
+                    ]
+                    
+                    datos_guardar = df_completo[columnas_guardar].to_dict(orient='records')
+                    supabase.table('operativizacion').insert(datos_guardar).execute()
+                    
+                    st.success("✅ Cuadro de operativización guardado correctamente.")
                     st.rerun()
+                    
                 except Exception as e:
                     st.error(f"Error al guardar: {e}")
+            
+            st.divider()
+            
+            # Vista resumen por estrategia
+            with st.expander("📊 Ver Resumen por Estrategia"):
+                resumen = df_oper.groupby(['cuadrante', 'estrategia_nombre']).agg({
+                    'costo': 'sum',
+                    'descripcion_actividad': 'count',
+                    'plazo': lambda x: list(x.unique()),
+                    'responsable': lambda x: list(x.dropna().unique())
+                }).reset_index()
+                
+                resumen.columns = ['Cuadrante', 'Estrategia', 'Costo Total', 'N° Actividades', 'Plazos', 'Responsables']
+                
+                for _, row in resumen.iterrows():
+                    with st.container():
+                        col_r1, col_r2, col_r3 = st.columns([3, 1, 1])
+                        with col_r1:
+                            st.write(f"**{row['Cuadrante']}**: {row['Estrategia'][:60]}...")
+                        with col_r2:
+                            st.write(f"💰 ${row['Costo Total']:,.2f}")
+                        with col_r3:
+                            st.write(f"📋 {int(row['N° Actividades'])} act.")
+                    st.divider()
+            
+            # Vista resumen por plan asignado
+            with st.expander("📈 Ver Distribución por Plan"):
+                fig = px.pie(
+                    df_oper, 
+                    names='plan_asignado', 
+                    values='costo',
+                    title='Distribución de Costos por Plan Estratégico',
+                    hole=0.4
+                )
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # Tabla resumen por plan
+                tabla_planes = df_oper.groupby('plan_asignado').agg({
+                    'costo': 'sum',
+                    'descripcion_actividad': 'count'
+                }).reset_index()
+                tabla_planes.columns = ['Plan', 'Costo Total', 'N° Actividades']
+                st.dataframe(tabla_planes, use_container_width=True, hide_index=True)
+        
         else:
-            st.info("No hay estrategias operativizadas aún. Usa el formulario de arriba para comenzar.")
+            st.info("👆 Haz clic en 'Generar/Actualizar Cuadro de Operativización' para crear el cuadro con todas las estrategias y sus actividades.")
         
         st.divider()
         
-        # Estado de Pérdidas y Ganancias del ÚLTIMO AÑO
+        # Estado de Pérdidas y Ganancias del ÚLTIMO AÑO (se mantiene igual)
         st.subheader("💰 Estado de Pérdidas y Ganancias (Último Año Real)")
         
         with st.expander("📊 Ingresar Datos del Último Año"):
@@ -1158,20 +1262,19 @@ Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses enc
                 
                 col1, col2 = st.columns(2)
                 with col1:
-                    ingresos_ventas = st.number_input("Ingresos por Ventas", min_value=0.0, step=1000.0)
-                    costos_ventas = st.number_input("Costos de Ventas (COGS)", min_value=0.0, step=1000.0)
-                    gastos_operativos = st.number_input("Gastos Operativos", min_value=0.0, step=1000.0)
+                    ingresos_ventas = st.number_input("Ingresos por Ventas", min_value=0.0, step=1000.0, key="pg_ingresos")
+                    costos_ventas = st.number_input("Costos de Ventas (COGS)", min_value=0.0, step=1000.0, key="pg_costos")
+                    gastos_operativos = st.number_input("Gastos Operativos", min_value=0.0, step=1000.0, key="pg_gop")
                 with col2:
-                    gastos_admin = st.number_input("Gastos Administrativos", min_value=0.0, step=1000.0)
-                    gastos_ventas = st.number_input("Gastos de Ventas y Marketing", min_value=0.0, step=1000.0)
-                    otros_ingresos = st.number_input("Otros Ingresos", min_value=0.0, step=1000.0)
+                    gastos_admin = st.number_input("Gastos Administrativos", min_value=0.0, step=1000.0, key="pg_gadm")
+                    gastos_ventas = st.number_input("Gastos de Ventas y Marketing", min_value=0.0, step=1000.0, key="pg_gvta")
+                    otros_ingresos = st.number_input("Otros Ingresos", min_value=0.0, step=1000.0, key="pg_oting")
                 
-                impuestos = st.number_input("Impuestos sobre la Renta", min_value=0.0, step=1000.0)
-                utilidad_retenida = st.number_input("Utilidad Retenida del Año Anterior", min_value=0.0, step=1000.0)
+                impuestos = st.number_input("Impuestos sobre la Renta", min_value=0.0, step=1000.0, key="pg_imp")
+                utilidad_retenida = st.number_input("Utilidad Retenida del Año Anterior", min_value=0.0, step=1000.0, key="pg_uti_ret")
                 
                 if st.form_submit_button("💾 Guardar Estado P&G", disabled=not puede_editar):
                     try:
-                        # Calcular totales
                         utilidad_bruta = ingresos_ventas - costos_ventas
                         utilidad_operativa = utilidad_bruta - gastos_operativos - gastos_admin - gastos_ventas
                         utilidad_antes_impuestos = utilidad_operativa + otros_ingresos
@@ -1193,7 +1296,6 @@ Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses enc
                             'utilidad_neta': utilidad_neta
                         }
                         
-                        # Eliminar registro anterior si existe
                         supabase.table('perdida_ganancia').delete().eq('empresa_id', empresa_id).execute()
                         supabase.table('perdida_ganancia').insert(datos_pg).execute()
                         st.success("✅ Estado de Pérdidas y Ganancias guardado.")
@@ -1201,7 +1303,6 @@ Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses enc
                     except Exception as e:
                         st.error(f"Error al guardar P&G: {e}")
         
-        # Mostrar resumen del último año
         df_pg = get_datos_tabla('perdida_ganancia', empresa_id)
         if not df_pg.empty:
             st.write("**Resumen del Último Año:**")
@@ -1219,10 +1320,10 @@ Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses enc
         
         st.divider()
         
-        # PROYECCIÓN (antes Flujo de Caja Proyectado) con Análisis Costo-Beneficio
+        # PROYECCIÓN con Análisis Costo-Beneficio (se mantiene igual)
         st.subheader("📈 Proyección y Análisis Costo-Beneficio")
         
-        if not df_pg.empty:
+        if not df_pg.empty and not df_oper.empty:
             datos_base = df_pg.iloc[0]
             
             with st.form("form_proyeccion"):
@@ -1230,24 +1331,22 @@ Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses enc
                 
                 col1, col2, col3 = st.columns(3)
                 with col1:
-                    crecimiento_ventas = st.slider("Crecimiento en Ventas (%)", -50, 100, 10) / 100
-                    reduccion_costos = st.slider("Reducción de Costos (%)", 0, 50, 5) / 100
+                    crecimiento_ventas = st.slider("Crecimiento en Ventas (%)", -50, 100, 10, key="proj_crec") / 100
+                    reduccion_costos = st.slider("Reducción de Costos (%)", 0, 50, 5, key="proj_red") / 100
                 with col2:
-                    periodos_proyeccion = st.selectbox("Período de Proyección", ["1 año", "2 años", "3 años", "5 años"])
-                    unidades_proyectadas = st.number_input("Unidades Totales Proyectadas", min_value=1, value=1000)
+                    periodos_proyeccion = st.selectbox("Período de Proyección", ["1 año", "2 años", "3 años", "5 años"], key="proj_per")
+                    unidades_proyectadas = st.number_input("Unidades Totales Proyectadas", min_value=1, value=1000, key="proj_unid")
                 with col3:
-                    inversion_total = st.number_input("Inversión Total Requerida ($)", min_value=0.0, value=float(total_inversion if not df_oper.empty else 0))
-                    tasa_descuento = st.slider("Tasa de Descuento Anual (%)", 0, 30, 10) / 100
+                    inversion_total = st.number_input("Inversión Total Requerida ($)", min_value=0.0, value=float(total_costo), key="proj_inv")
+                    tasa_descuento = st.slider("Tasa de Descuento Anual (%)", 0, 30, 10, key="proj_tasa") / 100
                 
                 if st.form_submit_button("🚀 Calcular Proyección y Costo-Beneficio", disabled=not puede_editar):
                     try:
-                        # Calcular proyección
                         años = int(periodos_proyeccion.split()[0])
                         
                         proyecciones = []
                         ingreso_actual = datos_base['ingresos_ventas']
                         costo_actual = datos_base['costos_ventas']
-                        utilidad_neta_actual = datos_base['utilidad_neta']
                         
                         flujos_futuros = []
                         
@@ -1255,9 +1354,8 @@ Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses enc
                             ingreso_proy = ingreso_actual * ((1 + crecimiento_ventas) ** año)
                             costo_proy = costo_actual * ((1 - reduccion_costos) ** año) * ((1 + crecimiento_ventas) ** año)
                             utilidad_bruta_proy = ingreso_proy - costo_proy
-                            # Asumir que gastos operativos crecen proporcionalmente
                             gastos_proy = (datos_base['gastos_operativos'] + datos_base['gastos_administrativos'] + datos_base['gastos_ventas']) * ((1 + crecimiento_ventas * 0.5) ** año)
-                            utilidad_neta_proy = utilidad_bruta_proy - gastos_proy - (utilidad_bruta_proy * 0.25)  # Asumir 25% impuestos
+                            utilidad_neta_proy = utilidad_bruta_proy - gastos_proy - (utilidad_bruta_proy * 0.25)
                             
                             flujos_futuros.append(utilidad_neta_proy)
                             
@@ -1270,30 +1368,25 @@ Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses enc
                         
                         df_proyeccion = pd.DataFrame(proyecciones)
                         
-                        # Guardar proyección
                         supabase.table('proyeccion_financiera').delete().eq('empresa_id', empresa_id).execute()
                         for _, row in df_proyeccion.iterrows():
                             row_dict = row.to_dict()
                             row_dict['empresa_id'] = empresa_id
                             supabase.table('proyeccion_financiera').insert(row_dict).execute()
                         
-                        # Calcular Costo-Beneficio en DÓLARES
-                        # VPN (Valor Presente Neto) de los flujos futuros
+                        # Calcular Costo-Beneficio
                         vpn = sum([f / ((1 + tasa_descuento) ** (i+1)) for i, f in enumerate(flujos_futuros)])
                         
-                        # Relación Costo-Beneficio en Dólares
                         if inversion_total > 0:
                             relacion_cb_dolares = vpn / inversion_total
                         else:
                             relacion_cb_dolares = float('inf') if vpn > 0 else 0
                         
-                        # Calcular Costo-Beneficio en TIEMPO (Payback period)
                         flujo_acumulado = 0
                         payback_años = 0
                         for i, flujo in enumerate(flujos_futuros):
                             flujo_acumulado += flujo
                             if flujo_acumulado >= inversion_total:
-                                # Interpolación para el año exacto
                                 exceso = flujo_acumulado - inversion_total
                                 fraccion_año = 1 - (exceso / flujo) if flujo > 0 else 0
                                 payback_años = i + fraccion_año
@@ -1301,9 +1394,8 @@ Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses enc
                             payback_años = i + 1
                         
                         if flujo_acumulado < inversion_total:
-                            payback_años = float('inf')
+                            payback_años = None
                         
-                        # Calcular Costo-Beneficio en UNIDADES
                         if unidades_proyectadas > 0 and inversion_total > 0:
                             beneficio_por_unidad = vpn / unidades_proyectadas
                             costo_por_unidad = inversion_total / unidades_proyectadas
@@ -1313,13 +1405,12 @@ Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses enc
                             costo_por_unidad = 0
                             relacion_cb_unidades = 0
                         
-                        # Guardar análisis CB
                         analisis_cb = {
                             'empresa_id': empresa_id,
                             'inversion_total': inversion_total,
                             'vpn_total': vpn,
                             'relacion_costo_beneficio_dolares': relacion_cb_dolares,
-                            'payback_periodo_años': payback_años if payback_años != float('inf') else None,
+                            'payback_periodo_años': payback_años,
                             'unidades_proyectadas': unidades_proyectadas,
                             'beneficio_por_unidad': beneficio_por_unidad,
                             'costo_por_unidad': costo_por_unidad,
@@ -1336,7 +1427,6 @@ Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses enc
                     except Exception as e:
                         st.error(f"Error en el cálculo: {e}")
             
-            # Mostrar resultados si existen
             if st.session_state.get('mostrar_resultados_cb', False):
                 df_cb = get_datos_tabla('analisis_costo_beneficio', empresa_id)
                 df_proy = get_datos_tabla('proyeccion_financiera', empresa_id)
@@ -1347,11 +1437,9 @@ Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses enc
                     st.divider()
                     st.subheader("📊 Resultados del Análisis Costo-Beneficio")
                     
-                    # Mostrar tabla de proyección
                     st.write("**Proyección Financiera:**")
-                    st.dataframe(df_proy, use_container_width=True)
+                    st.dataframe(df_proy, use_container_width=True, hide_index=True)
                     
-                    # Gráfico de proyección
                     fig = go.Figure()
                     fig.add_trace(go.Scatter(x=df_proy['Año'], y=df_proy['Ingresos Proyectados'], 
                                            mode='lines+markers', name='Ingresos', line=dict(color='green')))
@@ -1362,18 +1450,13 @@ Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses enc
                     fig.update_layout(title="Proyección Financiera", xaxis_title="Año", yaxis_title="Monto ($)")
                     st.plotly_chart(fig, use_container_width=True)
                     
-                    # Métricas de Costo-Beneficio
                     st.write("**Indicadores Costo-Beneficio:**")
                     
                     col1, col2, col3 = st.columns(3)
                     
                     with col1:
                         st.markdown("### 💵 En DÓLARES")
-                        st.metric(
-                            "Relación C-B", 
-                            f"{datos_cb['relacion_costo_beneficio_dolares']:.2f}",
-                            help="Cuántos dólares se generan por cada dólar invertido. >1 es rentable."
-                        )
+                        st.metric("Relación C-B", f"{datos_cb['relacion_costo_beneficio_dolares']:.2f}")
                         st.write(f"**Inversión:** ${datos_cb['inversion_total']:,.2f}")
                         st.write(f"**VPN Total:** ${datos_cb['vpn_total']:,.2f}")
                         if datos_cb['relacion_costo_beneficio_dolares'] >= 1:
@@ -1384,76 +1467,44 @@ Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses enc
                     with col2:
                         st.markdown("### ⏱️ En TIEMPO")
                         if datos_cb['payback_periodo_años']:
-                            st.metric(
-                                "Periodo de Recuperación", 
-                                f"{datos_cb['payback_periodo_años']:.1f} años",
-                                help="Tiempo en años para recuperar la inversión inicial"
-                            )
+                            st.metric("Periodo de Recuperación", f"{datos_cb['payback_periodo_años']:.1f} años")
                             if datos_cb['payback_periodo_años'] <= 2:
-                                st.success("✅ Recuperación rápida (< 2 años)")
+                                st.success("✅ Recuperación rápida")
                             elif datos_cb['payback_periodo_años'] <= 5:
-                                st.info("ℹ️ Recuperación moderada (2-5 años)")
+                                st.info("ℹ️ Recuperación moderada")
                             else:
-                                st.warning("⚠️ Recuperación lenta (> 5 años)")
+                                st.warning("⚠️ Recuperación lenta")
                         else:
                             st.metric("Periodo de Recuperación", "No recuperable")
-                            st.error("❌ La inversión no se recupera en el período proyectado")
+                            st.error("❌ Inversión no recuperable")
                     
                     with col3:
                         st.markdown("### 📦 En UNIDADES")
-                        st.metric(
-                            "Beneficio por Unidad", 
-                            f"${datos_cb['beneficio_por_unidad']:,.2f}"
-                        )
-                        st.metric(
-                            "Costo por Unidad", 
-                            f"${datos_cb['costo_por_unidad']:,.2f}"
-                        )
-                        st.metric(
-                            "Relación C-B por Unidad", 
-                            f"{datos_cb['relacion_cb_unidades']:.2f}",
-                            help="Eficiencia de la inversión por unidad producida"
-                        )
+                        st.metric("Beneficio/Unidad", f"${datos_cb['beneficio_por_unidad']:,.2f}")
+                        st.metric("Costo/Unidad", f"${datos_cb['costo_por_unidad']:,.2f}")
+                        st.metric("Relación C-B", f"{datos_cb['relacion_cb_unidades']:.2f}")
                         if datos_cb['relacion_cb_unidades'] >= 1:
                             st.success("✅ Rentable por unidad")
                         else:
                             st.error("❌ No rentable por unidad")
                     
-                    # Interpretación
                     st.divider()
                     st.subheader("📝 Interpretación Ejecutiva")
                     
                     interpretaciones = []
-                    
-                    # Análisis en dólares
                     if datos_cb['relacion_costo_beneficio_dolares'] >= 1.5:
-                        interpretaciones.append(f"**Rentabilidad Excellente:** La inversión de ${datos_cb['inversion_total']:,.2f} generará un retorno significativo, recuperando ${datos_cb['relacion_costo_beneficio_dolares']:.2f} por cada dólar invertido.")
+                        interpretaciones.append("**Rentabilidad Excelente:** Retorno significativo de la inversión.")
                     elif datos_cb['relacion_costo_beneficio_dolares'] >= 1:
-                        interpretaciones.append(f"**Rentabilidad Aceptable:** El proyecto es viable, generando ${datos_cb['relacion_costo_beneficio_dolares']:.2f} por cada dólar invertido.")
+                        interpretaciones.append("**Rentabilidad Aceptable:** El proyecto es viable.")
                     else:
-                        interpretaciones.append(f"**Alerta de Rentabilidad:** El proyecto no es viable financieramente. Se perderían ${1 - datos_cb['relacion_costo_beneficio_dolares']:.2f} por cada dólar invertido.")
+                        interpretaciones.append("**Alerta:** El proyecto no es viable financieramente.")
                     
-                    # Análisis en tiempo
                     if datos_cb['payback_periodo_años'] and datos_cb['payback_periodo_años'] <= 3:
-                        interpretaciones.append(f"**Recuperación Rápida:** Se recupera la inversión en {datos_cb['payback_periodo_años']:.1f} años, lo cual es excelente para la liquidez.")
-                    elif datos_cb['payback_periodo_años'] and datos_cb['payback_periodo_años'] <= 5:
-                        interpretaciones.append(f"**Recuperación Moderada:** El capital se recupera en {datos_cb['payback_periodo_años']:.1f} años, dentro de un horizonte razonable.")
-                    else:
-                        interpretaciones.append("**Riesgo de Liquidez:** El período de recuperación excede los estándares aceptables o la inversión no se recupera.")
-                    
-                    # Análisis en unidades
-                    if datos_cb['relacion_cb_unidades'] >= 1.2:
-                        interpretaciones.append(f"**Eficiencia Operativa:** Cada unidad genera ${datos_cb['beneficio_por_unidad']:,.2f} de valor, superando ampliamente su costo de ${datos_cb['costo_por_unidad']:,.2f}.")
-                    elif datos_cb['relacion_cb_unidades'] >= 1:
-                        interpretaciones.append(f"**Eficiencia Marginal:** Las unidades son rentables pero con margen estrecho (${datos_cb['beneficio_por_unidad']:,.2f} vs ${datos_cb['costo_por_unidad']:,.2f}).")
-                    else:
-                        interpretaciones.append(f"**Ineficiencia:** Cada unidad cuesta más (${datos_cb['costo_por_unidad']:,.2f}) de lo que genera (${datos_cb['beneficio_por_unidad']:,.2f}).")
+                        interpretaciones.append("**Liquidez:** Recuperación rápida del capital.")
                     
                     for interp in interpretaciones:
                         st.write(f"• {interp}")
                     
-                    # Recomendación final
-                    st.divider()
                     puntos_positivos = sum([
                         datos_cb['relacion_costo_beneficio_dolares'] >= 1,
                         datos_cb['payback_periodo_años'] is not None and datos_cb['payback_periodo_años'] <= 5,
@@ -1461,58 +1512,14 @@ Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses enc
                     ])
                     
                     if puntos_positivos >= 2:
-                        st.success("### ✅ RECOMENDACIÓN: APROBAR PROYECTO\nEl análisis costo-beneficio indica que la inversión es viable bajo la mayoría de los criterios evaluados.")
+                        st.success("### ✅ RECOMENDACIÓN: APROBAR PROYECTO")
                     elif puntos_positivos == 1:
-                        st.warning("### ⚠️ RECOMENDACIÓN: EVALUAR CON PRECAUCIÓN\nEl proyecto presenta riesgos. Se recomienda revisar los parámetros o buscar optimizaciones antes de aprobar.")
+                        st.warning("### ⚠️ RECOMENDACIÓN: EVALUAR CON PRECAUCIÓN")
                     else:
-                        st.error("### ❌ RECOMENDACIÓN: RECHAZAR PROYECTO\nEl análisis indica que la inversión no es viable bajo las condiciones actuales. Se sugiere revisar la estrategia o buscar alternativas.")
+                        st.error("### ❌ RECOMENDACIÓN: RECHAZAR PROYECTO")
         else:
-            st.warning("Primero debes ingresar el Estado de Pérdidas y Ganancias del último año para realizar la proyección.")
-        
-        st.divider()
-        
-        # Punto de Equilibrio (se mantiene)
-        st.subheader("⚖️ Análisis de Punto de Equilibrio")
-        
-        if not df_pg.empty and not df_oper.empty:
-            datos_pg = df_pg.iloc[0]
-            costos_fijos = datos_pg['gastos_operativos'] + datos_pg['gastos_administrativos']
-            costo_variable_unitario = datos_pg['costos_ventas'] / 1000 if datos_pg['costos_ventas'] > 0 else 0  # Asumiendo 1000 unidades base
-            precio_venta_unitario = datos_pg['ingresos_ventas'] / 1000 if datos_pg['ingresos_ventas'] > 0 else 0
+            st.warning("Completa el Estado de Pérdidas y Ganancias y genera el Cuadro de Operativización para realizar la proyección.")
             
-            if precio_venta_unitario > costo_variable_unitario:
-                pe_unidades = costos_fijos / (precio_venta_unitario - costo_variable_unitario)
-                pe_dolares = pe_unidades * precio_venta_unitario
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.metric("Punto de Equilibrio (Unidades)", f"{pe_unidades:,.0f}")
-                with col2:
-                    st.metric("Punto de Equilibrio ($)", f"${pe_dolares:,.2f}")
-                
-                # Gráfico del punto de equilibrio
-                unidades_range = np.linspace(0, max(pe_unidades * 2, 2000), 100)
-                ingresos = unidades_range * precio_venta_unitario
-                costos_totales = costos_fijos + (unidades_range * costo_variable_unitario)
-                
-                fig, ax = plt.subplots()
-                ax.plot(unidades_range, ingresos, label='Ingresos', color='green')
-                ax.plot(unidades_range, costos_totales, label='Costos Totales', color='red')
-                ax.axvline(pe_unidades, color='blue', linestyle='--', label=f'PE = {pe_unidades:,.0f} unid.')
-                ax.fill_between(unidades_range, costos_totales, ingresos, 
-                               where=(ingresos > costos_totales), alpha=0.3, color='green', label='Ganancia')
-                ax.fill_between(unidades_range, costos_totales, ingresos, 
-                               where=(ingresos < costos_totales), alpha=0.3, color='red', label='Pérdida')
-                ax.set_xlabel('Unidades')
-                ax.set_ylabel('Monto ($)')
-                ax.set_title('Análisis de Punto de Equilibrio')
-                ax.legend()
-                st.pyplot(fig)
-            else:
-                st.error("El precio de venta debe ser mayor que el costo variable unitario para calcular el punto de equilibrio.")
-        else:
-            st.info("Completa el Estado de Pérdidas y Ganancias y la Operativización para ver el análisis de punto de equilibrio.")
-
     # --- PESTAÑA 7: DASHBOARD ---
     with tab_dash:
         st.header("📊 Dashboard de Análisis Estratégico")
@@ -1612,3 +1619,4 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
