@@ -854,7 +854,7 @@ with tab_est:
                 pass
     
     # --- PESTAÑA 4: PLANES ESTRATÉGICOS ---
-    with tab3:
+with tab3:
         st.header("Planes Estratégicos")
         with st.form("form_planes"):
             if st.form_submit_button("🤖 Generar Planes con IA"):
@@ -868,9 +868,9 @@ with tab_est:
                 guardar_analisis_db(empresa_id, 'operativo', analisis_propio_operativo)
         
         mostrar_ultimo_analisis_guardado(empresa_data, 'operativo')
-
+    
     # --- PESTAÑA 5: CMI/INDICADORES ---
-    with tab4:
+with tab4:
         st.header("CMI / Indicadores")
         with st.form("form_cmi"):
             if st.form_submit_button("🤖 Generar CMI con IA"):
@@ -884,7 +884,7 @@ with tab_est:
                 guardar_analisis_db(empresa_id, 'cmi', analisis_propio_cmi)
         
         mostrar_ultimo_analisis_guardado(empresa_data, 'cmi')
-
+    
     # --- PESTAÑA 6: OPERATIVIZACIÓN/PRESUPUESTO ---
     with tab5:
         st.header("Operativización / Presupuesto")
@@ -934,7 +934,7 @@ with tab_est:
         # ... (Tu lógica de C/B y punto de equilibrio, usando 'pe_data')
         
     # --- PESTAÑA 7: DASHBOARD DE ANÁLISIS ---
-    with tab_dash:
+with tab_dash:
         st.header("📊 Dashboard de Análisis Estratégico")
         df_est_dash = get_datos_tabla('estrategias_generadas', empresa_id)
         df_pg_dash = get_datos_tabla('perdida_ganancia', empresa_id)
@@ -942,7 +942,7 @@ with tab_est:
         # ... (Toda tu lógica de visualización con Plotly se mantiene intacta)
         
     # --- PESTAÑA 8: RESUMEN Y CONCLUSIONES ---
-    with tab6:
+with tab6:
         st.header("Resumen, Conclusiones y Exportación")
         with st.form("pdf_form"):
             pdf_version = st.text_input("Versión del Plan", value="1.0")
@@ -1011,6 +1011,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
