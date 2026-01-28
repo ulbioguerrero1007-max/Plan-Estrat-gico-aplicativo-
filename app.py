@@ -13,6 +13,8 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.colors import navy, grey, red, green, black
 from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
 import matplotlib.pyplot as plt
+import plotly.express as px
+import plotly.graph_objects as go
 import numpy as np
 import unicodedata
 import time
@@ -503,7 +505,7 @@ def aplicacion_principal():
     if not empresa_id:
         st.info("👈 Por favor, selecciona o crea una empresa en el menú lateral para comenzar.")
         st.stop()
-    tab1, tab2, tab_est, tab3, tab4, tab5, tab6 = st.tabs(["1. Introducción", "2. Diagnóstico Situacional", "3. Estrategia", "4. Planes Estratégicos", "5. CMI/Indicadores", "6. Operativización/Presupuesto", "7. Resumen y Conclusiones"])
+    tab1, tab2, tab_est, tab3, tab4, tab5, tab_dash, tab6 = st.tabs(["1. Introducción", "2. Diagnóstico Situacional", "3. Estrategia", "4. Planes Estratégicos", "5. CMI/Indicadores", "6. Operativización/Presupuesto", "7. Dashboard de Análisis", "8. Resumen y Conclusiones"])
     with tab1:
         st.header("Introducción y Cultura Organizacional")
         with get_connection() as conn:
@@ -1121,6 +1123,65 @@ def aplicacion_principal():
                 st.write(f"**Análisis:** Para recuperar la inversión de **${cf:,.2f}**, la empresa debe vender al menos **{pe_unidades:,.0f} unidades**, lo que representa una facturación de **${pe_dolares:,.2f}**.")
             else:
                 st.warning("El Precio de Venta debe ser mayor al Costo Variable para calcular el Punto de Equilibrio.")
+        
+        with tab_dash:
+            st.header("📊 Dashboard de Análisis Estratégico")
+            st.info("Visualización interactiva de los indicadores clave de la empresa.")
+            
+            with get_connection() as conn:
+                df_est_dash = pd.read_sql(f"SELECT cuadrante, importancia, plan_asignado FROM estrategias_generadas WHERE empresa_id={empresa_id}", conn)
+                df_pg_dash = pd.read_sql(f"SELECT anio, ingresos, egresos, resultado FROM perdida_ganancia WHERE empresa_id={empresa_id}", conn)
+                df_fc_dash = pd.read_sql(f"SELECT anio_proyeccion, flujo_neto, saldo_final FROM flujo_caja WHERE empresa_id={empresa_id}", conn)
+            
+            col_d1, col_d2, col_d3 = st.columns(3)
+            if not df_pg_dash.empty:
+                total_ingresos = df_pg_dash['ingresos'].sum()
+                total_egresos = df_pg_dash['egresos'].sum()
+                margen = ((total_ingresos - total_egresos) / total_ingresos * 100) if total_ingresos > 0 else 0
+                col_d1.metric("Ingresos Totales", f"${total_ingresos:,.2f}")
+                col_d2.metric("Egresos Totales", f"${total_egresos:,.2f}")
+                col_d3.metric("Margen Global", f"{margen:.1f}%")
+
+            st.divider()
+            
+            c1, c2 = st.columns(2)
+            with c1:
+                st.subheader("🎯 Distribución de Estrategias")
+                if not df_est_dash.empty:
+                    fig_pie = px.pie(df_est_dash, names='cuadrante', title='Estrategias por Cuadrante', hole=0.4, color_discrete_sequence=px.colors.qualitative.Pastel)
+                    st.plotly_chart(fig_pie, use_container_width=True)
+                else:
+                    st.warning("No hay datos de estrategias.")
+            
+            with c2:
+                st.subheader("💰 Proyección de Flujo Neto")
+                if not df_fc_dash.empty:
+                    fig_line = px.line(df_fc_dash, x='anio_proyeccion', y='flujo_neto', title='Flujo Neto por Año', markers=True)
+                    fig_line.update_traces(line_color='green')
+                    st.plotly_chart(fig_line, use_container_width=True)
+                else:
+                    st.warning("No hay datos de flujo de caja.")
+
+            st.divider()
+            
+            c3, c4 = st.columns(2)
+            with c3:
+                st.subheader("📈 Ingresos vs Egresos")
+                if not df_pg_dash.empty:
+                    df_melted = df_pg_dash.melt(id_vars='anio', value_vars=['ingresos', 'egresos'], var_name='Tipo', value_name='Monto')
+                    fig_bar = px.bar(df_melted, x='anio', y='Monto', color='Tipo', barmode='group', title='Comparativa Anual')
+                    st.plotly_chart(fig_bar, use_container_width=True)
+                else:
+                    st.warning("No hay datos financieros.")
+            
+            with c4:
+                st.subheader("📋 Planes Maestros")
+                if not df_est_dash.empty:
+                    fig_sun = px.sunburst(df_est_dash, path=['plan_asignado', 'importancia'], title='Jerarquía de Planes e Importancia')
+                    st.plotly_chart(fig_sun, use_container_width=True)
+                else:
+                    st.warning("No hay datos de planes.")
+
         with tab6:
             st.header("Resumen, Conclusiones y Exportación")
             with st.form("pdf_form"):
