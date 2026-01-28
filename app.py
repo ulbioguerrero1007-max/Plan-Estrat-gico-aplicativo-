@@ -318,7 +318,7 @@ def get_apa_styles():
             
             if st.form_submit_button("🚀 Generar PDF Profesional"):
                 with st.spinner("Generando documento con formato APA. Esto puede tomar un momento..."):
-                    pdf_bytes = generar_pdf_completo_mejorado((empresa_id, pdf_version, pdf_elaborado, pdf_revisado, pdf_aprobado)
+                    pdf_bytes = generar_pdf_completo_mejorado(
                         empresa_id, 
                         pdf_version, 
                         pdf_elaborado, 
@@ -1574,6 +1574,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
