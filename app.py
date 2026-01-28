@@ -549,7 +549,7 @@ puede_editar = es_propietario or es_editor
 tab1, tab2, tab_est, tab3, tab4, tab5, tab_dash, tab6 = st.tabs(["1. Introducción", "2. Diagnóstico Situacional", "3. Estrategia", "4. Planes Estratégicos", "5. CMI/Indicadores", "6. Operativización/Presupuesto", "7. Dashboard de Análisis", "8. Resumen y Conclusiones"])
 
     # --- PESTAÑA 1: INTRODUCCIÓN ---
-    with tab1:
+with tab1:
         st.header("Introducción y Cultura Organizacional")
         with st.form("form_intro"):
             st.subheader("Datos Generales")
@@ -846,7 +846,7 @@ tab1, tab2, tab_est, tab3, tab4, tab5, tab_dash, tab6 = st.tabs(["1. Introducci�
         
         if 'pdf_file' in st.session_state:
             st.download_button(label="✅ Descargar PDF Ahora", data=st.session_state['pdf_file'], file_name=f"Plan_Estrategico_V{pdf_version}.pdf", mime="application/pdf")
-
+    
     # --- FIN DEL BLOQUE DE REEMPLAZO ---
 def pantalla_acceso():
     st.sidebar.title("Estratega Pro")
@@ -903,6 +903,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
