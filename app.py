@@ -1404,6 +1404,9 @@ def create_table_pdf(data, col_widths=None, style=None):
             with col2:
                 st.success(f"Documento listo: {st.session_state.get('pdf_nombre', 'plan_estrategico.pdf')}")
                 st.caption("El documento incluye encabezado con logo, pie de página con firmas, y todas las secciones requeridas.")
+
+def mostrar_ultimo_analisis_guardado(empresa_data, tipo_analisis):
+    """
     Muestra el último análisis guardado desde el diccionario de datos de la empresa.
     """
     contenido = empresa_data.get(f'analisis_{tipo_analisis}')
@@ -2630,16 +2633,4 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
-
-
-
-
-
-
-
-
-
-
-
-
 
