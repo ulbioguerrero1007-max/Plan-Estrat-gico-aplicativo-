@@ -600,7 +600,7 @@ with tab1:
                     st.error(f"Error al guardar: {e}")
 
     # --- PESTAÑA 2: DIAGNÓSTICO SITUACIONAL (CORREGIDA) ---
-    with tab2:
+with tab2:
         st.header("Diagnóstico Situacional (Análisis de Matrices)")
 
         # La variable 'empresa_data' ya está cargada al principio de aplicacion_principal()
@@ -819,8 +819,7 @@ with tab1:
                 if st.form_submit_button("Guardar Análisis", disabled=not puede_editar):
                     guardar_analisis_db(empresa_id, 'foda', analisis_propio_foda)
             
-            mostrar_ultimo_analisis_guardado(empresa_id, 'foda')
-            
+            mostrar_ultimo_analisis_guardado(empresa_id, 'foda')            
     # --- PESTAÑA 3: ESTRATEGIA ---
     with tab_est:
         st.header("🎯 Formulación de Estrategias")
@@ -1012,6 +1011,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
