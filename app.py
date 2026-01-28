@@ -620,37 +620,76 @@ def aplicacion_principal():
         # La variable 'puede_editar' también está definida y disponible.
 
         # Función interna para procesar datos pegados (se mantiene igual)
+                # --- INICIO DEL BLOQUE CORREGIDO ---
+
         def procesar_made_madi(data_str, tipo):
-            # ... (Tu lógica original para procesar datos de Excel va aquí)
-            # Asegúrate de que esta función devuelva un DataFrame de Pandas.
-            # Por ejemplo:
+            # Esta función debe devolver un DataFrame con columnas en minúsculas
             df = pd.read_csv(StringIO(data_str), sep='\t', header=0)
-            # ... más procesamiento ...
-            return df # df_to_db en tu código original
+            
+            # Normalizar nombres de columnas a minúsculas y sin espacios
+            df.columns = [c.lower().replace(' ', '_').replace('%', 'percent') for c in df.columns]
+            
+            # Asegurarse de que las columnas esperadas por la BD existan
+            columnas_bd = ['variable', 'factor', 'producto', 'precio', 'plaza', 'promocion', 'rating', 'weight_percent']
+            for col in columnas_bd:
+                if col not in df.columns:
+                    df[col] = None # O un valor por defecto apropiado
+
+            # Tu lógica de cálculo original
+            p_cols = ['producto', 'precio', 'plaza', 'promocion']
+            df['total'] = df[p_cols].apply(lambda row: row.str.contains('si', na=False, case=False)).sum(axis=1)
+            
+            numeric_cols = ['rating', 'weight_percent']
+            for col in numeric_cols:
+                df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
+            
+            df['valor'] = df.get('rating', 0) * (df.get('weight_percent', 0) / 100.0)
+            
+            # Devolver solo las columnas que existen en la tabla de la BD
+            columnas_finales = ['variable', 'factor', 'producto', 'precio', 'plaza', 'promocion', 'rating', 'weight_percent', 'valor', 'total']
+            return df[columnas_finales]
 
         def display_and_edit_matrix(tipo_matriz, analisis_propio_data):
             df_db = get_datos_tabla('matriz_marketing', empresa_id, tipo_matriz_filter=tipo_matriz)
             
             if not df_db.empty:
                 st.info("Puedes editar los datos directamente en la tabla.")
-                df_display = df_db.drop(columns=['id', 'empresa_id', 'tipo_matriz'], errors='ignore')
-                edited_df = st.data_editor(df_display, key=f"editor_{tipo_matriz}", num_rows="dynamic", use_container_width=True, disabled=not puede_editar)
+                # Renombrar columnas para que se vean bien en la UI (con mayúsculas)
+                df_display = df_db.rename(columns={
+                    'variable': 'Variable', 'factor': 'Factor', 'producto': 'Producto', 'precio': 'Precio',
+                    'plaza': 'Plaza', 'promocion': 'Promoción', 'rating': 'Rating', 'weight_percent': 'Weight %',
+                    'valor': 'Valor', 'total': 'Total'
+                })
+                
+                # Excluimos las columnas que no queremos que el usuario edite
+                columnas_a_mostrar = [c for c in df_display.columns if c not in ['id', 'empresa_id', 'tipo_matriz']]
+                
+                edited_df_display = st.data_editor(df_display[columnas_a_mostrar], key=f"editor_{tipo_matriz}", num_rows="dynamic", use_container_width=True, disabled=not puede_editar)
                 
                 if st.button(f"💾 Guardar Cambios en {tipo_matriz}", disabled=not puede_editar, key=f"save_{tipo_matriz}"):
                     try:
+                        # ANTES de guardar, revertimos los nombres de las columnas a minúsculas
+                        df_to_save = edited_df_display.rename(columns={
+                            'Variable': 'variable', 'Factor': 'factor', 'Producto': 'producto', 'Precio': 'precio',
+                            'Plaza': 'plaza', 'Promoción': 'promocion', 'Rating': 'rating', 'Weight %': 'weight_percent',
+                            'Valor': 'valor', 'Total': 'total'
+                        })
+
+                        # Re-procesar para recalcular 'valor' y 'total' por si algo cambió
+                        df_to_save = procesar_made_madi(df_to_save.to_csv(sep='\t', index=False), tipo_matriz)
+
                         supabase.table('matriz_marketing').delete().eq('empresa_id', empresa_id).eq('tipo_matriz', tipo_matriz).execute()
-                        if not edited_df.empty:
-                            df_to_save = procesar_made_madi(edited_df.to_csv(sep='\t', index=False), tipo_matriz) # Re-procesar para asegurar consistencia
-                            df_to_save['empresa_id'] = empresa_id
-                            df_to_save['tipo_matriz'] = tipo_matriz
-                            supabase.table('matriz_marketing').insert(df_to_save.to_dict(orient='records')).execute()
+                        
+                        df_to_save['empresa_id'] = empresa_id
+                        df_to_save['tipo_matriz'] = tipo_matriz
+                        supabase.table('matriz_marketing').insert(df_to_save.to_dict(orient='records')).execute()
+                        
                         st.success(f"Cambios en {tipo_matriz} guardados."); st.rerun()
                     except Exception as e:
                         st.error(f"Error al guardar {tipo_matriz}: {e}")
                 
-                total_score = df_db['total'].sum() if 'total' in df_db.columns else 0
+                total_score = pd.to_numeric(df_db['total'], errors='coerce').sum()
                 st.metric(f"Puntaje Total {tipo_matriz}", f"{total_score}")
-                # ... (resto de tu lógica de análisis automático)
             else:
                 st.info(f"Aún no hay datos para la Matriz {tipo_matriz}. Pega los datos desde Excel para comenzar.")
         
@@ -691,6 +730,8 @@ def aplicacion_principal():
                         st.error(f"Error al procesar datos de MADI: {e}")
             display_and_edit_matrix('MADI', empresa_data.get('analisis_madi', ''))
             mostrar_ultimo_analisis_guardado(empresa_id, 'madi')
+        
+        # --- FIN DEL BLOQUE CORREGIDO ---
 
         with diag_tab3:
             st.subheader("Matriz de Posicionamiento")
@@ -1025,6 +1066,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
