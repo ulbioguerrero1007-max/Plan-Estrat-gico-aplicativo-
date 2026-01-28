@@ -599,13 +599,21 @@ with tab1:
                 except Exception as e:
                     st.error(f"Error al guardar: {e}")
 
-    # --- PESTAÑA 2: DIAGNÓSTICO SITUACIONAL ---
+    # --- PESTAÑA 2: DIAGNÓSTICO SITUACIONAL (CORREGIDA) ---
     with tab2:
-        st.header("Diagnóstico Situacional (Análisis de Matrices)")        
+        st.header("Diagnóstico Situacional (Análisis de Matrices)")
+
+        # La variable 'empresa_data' ya está cargada al principio de aplicacion_principal()
+        # La variable 'puede_editar' también está definida y disponible.
+
         # Función interna para procesar datos pegados (se mantiene igual)
         def procesar_made_madi(data_str, tipo):
-            # ... (tu lógica original)
-            return df_to_db # Asegúrate que esta función retorne el dataframe procesado
+            # ... (Tu lógica original para procesar datos de Excel va aquí)
+            # Asegúrate de que esta función devuelva un DataFrame de Pandas.
+            # Por ejemplo:
+            df = pd.read_csv(StringIO(data_str), sep='\t', header=0)
+            # ... más procesamiento ...
+            return df # df_to_db en tu código original
 
         def display_and_edit_matrix(tipo_matriz, analisis_propio_data):
             df_db = get_datos_tabla('matriz_marketing', empresa_id, tipo_matriz_filter=tipo_matriz)
@@ -615,55 +623,119 @@ with tab1:
                 df_display = df_db.drop(columns=['id', 'empresa_id', 'tipo_matriz'], errors='ignore')
                 edited_df = st.data_editor(df_display, key=f"editor_{tipo_matriz}", num_rows="dynamic", use_container_width=True, disabled=not puede_editar)
                 
-                if st.button(f"💾 Guardar Cambios en {tipo_matriz}", disabled=not puede_editar):
+                if st.button(f"💾 Guardar Cambios en {tipo_matriz}", disabled=not puede_editar, key=f"save_{tipo_matriz}"):
                     try:
                         supabase.table('matriz_marketing').delete().eq('empresa_id', empresa_id).eq('tipo_matriz', tipo_matriz).execute()
                         if not edited_df.empty:
-                            df_to_save = procesar_made_madi(edited_df, tipo_matriz)
+                            df_to_save = procesar_made_madi(edited_df.to_csv(sep='\t', index=False), tipo_matriz) # Re-procesar para asegurar consistencia
+                            df_to_save['empresa_id'] = empresa_id
+                            df_to_save['tipo_matriz'] = tipo_matriz
                             supabase.table('matriz_marketing').insert(df_to_save.to_dict(orient='records')).execute()
                         st.success(f"Cambios en {tipo_matriz} guardados."); st.rerun()
                     except Exception as e:
                         st.error(f"Error al guardar {tipo_matriz}: {e}")
                 
-                total_score = df_db['total'].sum()
+                total_score = df_db['total'].sum() if 'total' in df_db.columns else 0
                 st.metric(f"Puntaje Total {tipo_matriz}", f"{total_score}")
                 # ... (resto de tu lógica de análisis automático)
             else:
                 st.info(f"Aún no hay datos para la Matriz {tipo_matriz}. Pega los datos desde Excel para comenzar.")
         
-        diag_tab1, diag_tab2, diag_tab3, diag_tab4, diag_tab5 = st.tabs(["Matriz MADE", "Matriz MADI", "Matriz de Posicionamiento", "Matriz PEST", "Matriz FODA Numérico"])
+        diag_tab1, diag_tab2, diag_tab3, diag_tab4, diag_tab5 = st.tabs([
+            "Matriz MADE", "Matriz MADI", "Matriz de Posicionamiento", "Matriz PEST", "Matriz FODA Numérico"
+        ])
 
         with diag_tab1:
             st.subheader("Análisis de Marketing Interno (MADE)")
-            # ... (Tu lógica para pegar datos y llamar a display_and_edit_matrix)
-            mostrar_ultimo_analisis_guardado(empresa_data, 'made')
+            with st.expander("📋 Pegar datos de MADE desde Excel"):
+                made_paste_data = st.text_area("Pega tus datos de MADE aquí", height=200, key="paste_MADE")
+                if st.button("Procesar y Reemplazar Datos de MADE", key="process_made", disabled=not puede_editar):
+                    try:
+                        df_made = procesar_made_madi(made_paste_data, 'MADE')
+                        supabase.table('matriz_marketing').delete().eq('empresa_id', empresa_id).eq('tipo_matriz', 'MADE').execute()
+                        df_made['empresa_id'] = empresa_id
+                        df_made['tipo_matriz'] = 'MADE'
+                        supabase.table('matriz_marketing').insert(df_made.to_dict(orient='records')).execute()
+                        st.success(f"¡{len(df_made)} filas importadas a MADE exitosamente!"); st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al procesar datos de MADE: {e}")
+            display_and_edit_matrix('MADE', empresa_data.get('analisis_made', ''))
+            mostrar_ultimo_analisis_guardado(empresa_id, 'made')
 
         with diag_tab2:
             st.subheader("Análisis de Marketing Externo (MADI)")
-            # ... (Tu lógica para pegar datos y llamar a display_and_edit_matrix)
-            mostrar_ultimo_analisis_guardado(empresa_data, 'madi')
+            with st.expander("📋 Pegar datos de MADI desde Excel"):
+                madi_paste_data = st.text_area("Pega tus datos de MADI aquí", height=200, key="paste_MADI")
+                if st.button("Procesar y Reemplazar Datos de MADI", key="process_madi", disabled=not puede_editar):
+                    try:
+                        df_madi = procesar_made_madi(madi_paste_data, 'MADI')
+                        supabase.table('matriz_marketing').delete().eq('empresa_id', empresa_id).eq('tipo_matriz', 'MADI').execute()
+                        df_madi['empresa_id'] = empresa_id
+                        df_madi['tipo_matriz'] = 'MADI'
+                        supabase.table('matriz_marketing').insert(df_madi.to_dict(orient='records')).execute()
+                        st.success(f"¡{len(df_madi)} filas importadas a MADI exitosamente!"); st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al procesar datos de MADI: {e}")
+            display_and_edit_matrix('MADI', empresa_data.get('analisis_madi', ''))
+            mostrar_ultimo_analisis_guardado(empresa_id, 'madi')
 
         with diag_tab3:
             st.subheader("Matriz de Posicionamiento")
+            # Los datos ya no se leen aquí, se usan los de 'empresa_data'
+            coord_x_val = float(empresa_data.get('posicionamiento_x') or 0)
+            coord_y_val = float(empresa_data.get('posicionamiento_y') or 0)
+
             with st.form("form_posicionamiento"):
-                coord_x = st.number_input("Coordenada X", value=float(empresa_data.get('posicionamiento_x') or 0), disabled=not puede_editar)
-                coord_y = st.number_input("Coordenada Y", value=float(empresa_data.get('posicionamiento_y') or 0), disabled=not puede_editar)
+                coord_x = st.number_input("Coordenada X", value=coord_x_val, disabled=not puede_editar)
+                coord_y = st.number_input("Coordenada Y", value=coord_y_val, disabled=not puede_editar)
                 if st.form_submit_button("Guardar y Generar Gráfico", disabled=not puede_editar):
                     try:
                         supabase.table('empresas').update({"posicionamiento_x": coord_x, "posicionamiento_y": coord_y}).eq('id', empresa_id).execute()
                         st.success("Coordenadas guardadas."); st.rerun()
                     except Exception as e:
                         st.error(f"Error al guardar coordenadas: {e}")
-            # ... (Resto de tu lógica de gráficos y análisis de posicionamiento)
-            mostrar_ultimo_analisis_guardado(empresa_data, 'posicionamiento')
+            
+            fig, ax = plt.subplots()
+            ax.axhline(0, color='gray', lw=1); ax.axvline(0, color='gray', lw=1)
+            ax.plot(coord_x_val, coord_y_val, 'ro', markersize=10)
+            ax.set_title("Matriz de Posicionamiento"); ax.set_xlabel("Eje X"); ax.set_ylabel("Eje Y")
+            ax.grid(True, which='both', linestyle='--', linewidth=0.5)
+            st.pyplot(fig)
+            
+            st.subheader("📌 Diagnóstico Estratégico de Posicionamiento")
+            # ... (Tu lógica de interpretaciones se mantiene igual)
+            
+            with st.form("form_analisis_pos"):
+                st.subheader("Análisis Estratégico")
+                if st.form_submit_button("🤖 Generar Análisis con IA"):
+                    with st.spinner("La IA está analizando la posición..."):
+                        # ... (Tu lógica de generación de análisis con IA)
+                        pass
+                
+                current_analisis_pos = st.session_state.get("ia_analisis_posicionamiento", empresa_data.get('analisis_posicionamiento', ''))
+                analisis_propio_pos = st.text_area("Conclusiones sobre el posicionamiento.", value=current_analisis_pos, height=300, disabled=not puede_editar)
+                if st.form_submit_button("Guardar Análisis de Posicionamiento", disabled=not puede_editar):
+                    guardar_analisis_db(empresa_id, 'posicionamiento', analisis_propio_pos)
+            
+            mostrar_ultimo_analisis_guardado(empresa_id, 'posicionamiento')
 
         with diag_tab4:
             st.subheader("Análisis PEST")
             with st.expander("📋 Pegar datos desde Excel"):
                 pest_paste_data = st.text_area("Pega tus datos aquí", height=200, key="pest_input_secondary")
                 if st.button("Procesar Datos Pegados de PEST", disabled=not puede_editar):
-                    # ... (Tu lógica de procesar datos pegados)
-                    pass
+                    try:
+                        df_pasted = pd.read_csv(StringIO(pest_paste_data), sep='\t', header=0)
+                        df_pasted.columns = ['categoria', 'factor', 'tipo_foda', 'puntaje', 'importancia']
+                        df_pasted['valor_ponderado'] = pd.to_numeric(df_pasted['puntaje'], errors='coerce') * (pd.to_numeric(df_pasted['importancia'], errors='coerce') / 100.0)
+                        df_pasted['empresa_id'] = empresa_id
+                        df_pasted['tipo_matriz'] = 'PEST'
+                        
+                        supabase.table('matrices').delete().eq('empresa_id', empresa_id).eq('tipo_matriz', 'PEST').execute()
+                        supabase.table('matrices').insert(df_pasted.to_dict(orient='records')).execute()
+                        st.success(f"¡{len(df_pasted)} filas importadas a PEST exitosamente!"); st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al procesar los datos: {e}.")
             
             df_pest = get_datos_tabla('matrices', empresa_id, tipo_matriz_filter='PEST')
             if not df_pest.empty:
@@ -678,23 +750,41 @@ with tab1:
                         st.success("Cambios en PEST guardados."); st.rerun()
                     except Exception as e:
                         st.error(f"Error al guardar PEST: {e}")
+                
+                total_ponderado = pd.to_numeric(df_pest['valor_ponderado'], errors='coerce').sum()
+                st.metric("Puntaje Ponderado Total PEST", f"{total_ponderado:.2f}")
+                # ... (Tu lógica de análisis de perfil)
             
             with st.form("form_analisis_pest"):
+                st.subheader("Análisis Estratégico")
                 if st.form_submit_button("🤖 Generar Análisis con IA"):
-                    # ...
-                    pass
+                    with st.spinner("La IA está analizando el entorno PEST..."):
+                        # ... (Tu lógica de generación de análisis)
+                        pass
+                
                 current_analisis_pest = st.session_state.get("ia_analisis_pest", empresa_data.get('analisis_pest', ''))
                 analisis_propio_pest = st.text_area("Conclusiones sobre la matriz PEST.", value=current_analisis_pest, height=300, disabled=not puede_editar)
                 if st.form_submit_button("Guardar Análisis", disabled=not puede_editar):
                     guardar_analisis_db(empresa_id, 'pest', analisis_propio_pest)
             
-            mostrar_ultimo_analisis_guardado(empresa_data, 'pest')
+            mostrar_ultimo_analisis_guardado(empresa_id, 'pest')
 
         with diag_tab5:
             st.subheader("Análisis FODA Cruzado (Numérico)")
             with st.expander("📋 Pegar datos de FODA Cruzado desde Excel"):
-                # ... (Tu lógica de pegar datos)
-                pass
+                foda_paste_data = st.text_area("Pega tus datos de FODA aquí", height=200, key="foda_paste_area")
+                if st.button("Procesar Datos Pegados de FODA", disabled=not puede_editar):
+                    try:
+                        df_foda_pasted = pd.read_csv(StringIO(foda_paste_data), sep='\t', header=0)
+                        df_foda_pasted.columns = ['cuadrante', 'factor_fila', 'factor_columna', 'impacto']
+                        df_foda_pasted['impacto'] = pd.to_numeric(df_foda_pasted['impacto'], errors='coerce').fillna(0).astype(int)
+                        df_foda_pasted['empresa_id'] = empresa_id
+                        
+                        supabase.table('foda_cruzado').delete().eq('empresa_id', empresa_id).execute()
+                        supabase.table('foda_cruzado').insert(df_foda_pasted.to_dict(orient='records')).execute()
+                        st.success(f"¡{len(df_foda_pasted)} filas importadas a FODA Cruzado!"); st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al procesar los datos: {e}.")
             
             df_foda = get_datos_tabla('foda_cruzado', empresa_id)
             if not df_foda.empty:
@@ -708,9 +798,29 @@ with tab1:
                         st.success("Cambios en FODA guardados."); st.rerun()
                     except Exception as e:
                         st.error(f"Error al guardar FODA: {e}")
-            # ... (Resto de tu lógica de análisis FODA)
-            mostrar_ultimo_analisis_guardado(empresa_data, 'foda')
-
+                
+                analisis_df, _, estrategia_principal, puntajes_foda = analizar_foda(df_foda)
+                if analisis_df is not None:
+                    st.subheader("🎯 Postura Competitiva Sugerida")
+                    st.info(f"Estrategia Principal: {estrategia_principal}")
+                    st.dataframe(analisis_df, use_container_width=True)
+                    grafico_foda = generar_grafico_foda_radar(puntajes_foda)
+                    if grafico_foda: st.image(grafico_foda)
+            
+            with st.form("form_analisis_foda"):
+                st.subheader("Análisis Estratégico")
+                if st.form_submit_button("🤖 Generar Análisis con IA"):
+                    with st.spinner("La IA está analizando el FODA Cruzado..."):
+                        # ... (Tu lógica de generación de análisis)
+                        pass
+                
+                current_analisis_foda = st.session_state.get("ia_analisis_foda", empresa_data.get('analisis_foda', ''))
+                analisis_propio_foda = st.text_area("Conclusiones sobre la matriz FODA.", value=current_analisis_foda, height=300, disabled=not puede_editar)
+                if st.form_submit_button("Guardar Análisis", disabled=not puede_editar):
+                    guardar_analisis_db(empresa_id, 'foda', analisis_propio_foda)
+            
+            mostrar_ultimo_analisis_guardado(empresa_id, 'foda')
+            
     # --- PESTAÑA 3: ESTRATEGIA ---
     with tab_est:
         st.header("🎯 Formulación de Estrategias")
@@ -902,6 +1012,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
