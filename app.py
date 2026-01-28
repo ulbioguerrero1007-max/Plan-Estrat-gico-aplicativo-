@@ -422,7 +422,7 @@ if not df_estrategias_pdf.empty:
 else:
         story.append(Paragraph("No hay estrategias generadas para construir el CMI.", styles['APA_Body']))
 
-    story.append(PageBreak())
+story.append(PageBreak())
 
     logo_bytes_data = empresa.get('logo')
     logo_bytes = None
@@ -1019,4 +1019,5 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
