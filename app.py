@@ -1350,7 +1350,7 @@ def create_table_pdf(data, col_widths=None, style=None):
     
 # AQUÍ VA LA FUNCIÓN mostrar_ultimo_analisis_guardado (ya existe en tu código)
 
-    # --- PESTAÑA 8: RESUMEN Y CONCLUSIONES (MODIFICADA) ---
+    # --- PESTAÑA 8: RESUMEN Y CONCLUSIONES ---
     with tab6:
         st.header("Resumen, Conclusiones y Exportación")
         
@@ -1374,19 +1374,23 @@ def create_table_pdf(data, col_widths=None, style=None):
             **Formato:** Tamaño carta (A4), Times New Roman 12pt, interlineado doble, márgenes de 1 pulgada
             """)
             
-            if st.form_submit_button("🚀 Generar PDF Profesional"):
-                with st.spinner("Generando documento con formato APA. Esto puede tomar un momento..."):
-                    pdf_bytes = generar_pdf_completo_mejorado(
-                        empresa_id, 
-                        pdf_version, 
-                        pdf_elaborado, 
-                        pdf_revisado, 
-                        pdf_aprobado
-                    )
-                    if pdf_bytes:
-                        st.session_state['pdf_file'] = pdf_bytes
-                        st.session_state['pdf_nombre'] = f"Plan_Estrategico_{empresa.get('nombre', 'Empresa')}_V{pdf_version}.pdf"
-                        st.success("✅ PDF generado correctamente con formato APA.")
+            submitted_pdf = st.form_submit_button("🚀 Generar PDF Profesional")
+        
+        # El procesamiento va FUERA del with st.form()
+        if submitted_pdf:
+            with st.spinner("Generando documento con formato APA. Esto puede tomar un momento..."):
+                pdf_bytes = generar_pdf_completo_mejorado(
+                    empresa_id, 
+                    pdf_version, 
+                    pdf_elaborado, 
+                    pdf_revisado, 
+                    pdf_aprobado
+                )
+                if pdf_bytes:
+                    st.session_state['pdf_file'] = pdf_bytes
+                    st.session_state['pdf_nombre'] = f"Plan_Estrategico_{empresa_data.get('nombre', 'Empresa')}_V{pdf_version}.pdf"
+                    st.success("✅ PDF generado correctamente con formato APA.")
+                    st.rerun()
         
         if 'pdf_file' in st.session_state:
             col1, col2 = st.columns([1, 3])
@@ -1400,9 +1404,8 @@ def create_table_pdf(data, col_widths=None, style=None):
                 )
             with col2:
                 st.success(f"Documento listo: {st.session_state.get('pdf_nombre', 'plan_estrategico.pdf')}")
-                st.caption("El documento incluye encabezado con logo, pie de página con firmas, y todas las secciones requeridas.")
-def mostrar_ultimo_analisis_guardado(empresa_data, tipo_analisis):
-    """
+                st.caption("El documento incluye encabezado con logo, pie de página con firmas, y todas las secciones requeridas.")    """
+
     Muestra el último análisis guardado desde el diccionario de datos de la empresa.
     """
     contenido = empresa_data.get(f'analisis_{tipo_analisis}')
@@ -2632,6 +2635,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
