@@ -1875,27 +1875,24 @@ def aplicacion_principal():
                         # Obtener factores por cuadrante para contexto
                         contexto_foda = df_foda_estrategia.to_string()
                         
-                        prompt_estrategias = f"""Basado en el siguiente análisis FODA Cruzado:
-{contexto_foda}
-
-Genera exactamente 3 estrategias para cada uno de los 4 cuadrantes (FO, FA, DO, DA), total 12 estrategias.
-Para cada estrategia proporciona:
-1. Cuadrante (FO, FA, DO, o DA)
-2. Estrategia: Descripción clara y específica de la estrategia
-3. Importancia: Selecciona una de (Alta, Media Alta, Media Baja, Baja)
-4. Actividades: Lista de actividades clave para implementarla (máximo 3 líneas)
-5. Plan Asignado: Selecciona uno de (Plan Administrativo, Plan Operativo, Plan Tecnológico, Plan Financiero, Plan de Monitoreo y control, Plan de Mejora, Plan de Contingencia)
-
-Formato de salida EXACTO (una estrategia por línea):
-CUADRANTE|ESTRATEGIA|IMPORTANCIA|ACTIVIDADES|PLAN_ASIGNADO
-
-Ejemplo:
-FO|Expandir mercado en nuevas regiones utilizando fortalezas tecnológicas|Alta|Investigar mercados potenciales, Adaptar producto, Lanzar campaña marketing|Plan Operativo
-FO|Alianza estratégica con proveedores clave|Media Alta|Identificar proveedores, Negociar contratos, Implementar integración|Plan Administrativo
-FA|Programa de retención de clientes ante nueva competencia|Alta|Analizar churn, Crear programa fidelización, Capacitar equipo ventas|Plan de Mejora
-
-Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses encabezados."""
-                        
+                        prompt_estrategias = (
+                            "Basado en el siguiente análisis FODA Cruzado:\n"
+                            f"{contexto_foda}\n\n"
+                            "Genera exactamente 3 estrategias para cada uno de los 4 cuadrantes (FO, FA, DO, DA), total 12 estrategias.\n"
+                            "Para cada estrategia proporciona:\n"
+                            "1. Cuadrante (FO, FA, DO, o DA)\n"
+                            "2. Estrategia: Descripción clara y específica de la estrategia\n"
+                            "3. Importancia: Selecciona una de (Alta, Media Alta, Media Baja, Baja)\n"
+                            "4. Actividades: Lista de actividades clave para implementarla (máximo 3 líneas)\n"
+                            "5. Plan Asignado: Selecciona uno de (Plan Administrativo, Plan Operativo, Plan Tecnológico, Plan Financiero, Plan de Monitoreo y control, Plan de Mejora, Plan de Contingencia)\n\n"
+                            "Formato de salida EXACTO (una estrategia por línea):\n"
+                            "CUADRANTE|ESTRATEGIA|IMPORTANCIA|ACTIVIDADES|PLAN_ASIGNADO\n\n"
+                            "Ejemplo:\n"
+                            "FO|Expandir mercado en nuevas regiones utilizando fortalezas tecnológicas|Alta|Investigar mercados potenciales, Adaptar producto, Lanzar campaña marketing|Plan Operativo\n"
+                            "FO|Alianza estratégica con proveedores clave|Media Alta|Identificar proveedores, Negociar contratos, Implementar integración|Plan Administrativo\n"
+                            "FA|Programa de retención de clientes ante nueva competencia|Alta|Analizar churn, Crear programa fidelización, Capacitar equipo ventas|Plan de Mejora\n\n"
+                            "Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). No uses encabezados."
+                        )                        
                         resultado = generar_analisis(prompt_estrategias)
                         
                         # Parsear resultado
@@ -2633,6 +2630,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
