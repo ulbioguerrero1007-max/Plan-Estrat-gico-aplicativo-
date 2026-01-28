@@ -627,74 +627,60 @@ def aplicacion_principal():
             if isinstance(data_str, pd.DataFrame):
                 df = data_str.copy()
             else:
-                # Usamos un manejador de errores para el pegado desde Excel
                 try:
                     df = pd.read_csv(StringIO(data_str), sep='\t', header=0)
                 except Exception as e:
                     st.error(f"Error al leer los datos pegados. Asegúrate de que estén separados por tabulaciones. Error: {e}")
                     return pd.DataFrame()
 
-            # --- INICIO DE LA CORRECCIÓN CLAVE ---
-            
+            # --- INICIO DE LA CORRECCIÓN ---
+
             # 1. Normalizar nombres de columnas de forma robusta
             def normalizar_nombre(nombre):
-                # Quita tildes y caracteres especiales
                 nombre_sin_tildes = unicodedata.normalize('NFKD', str(nombre)).encode('ascii', 'ignore').decode('utf-8')
-                # Convierte a minúsculas, reemplaza espacios y símbolos
                 return nombre_sin_tildes.lower().replace(' ', '_').replace('%', '_percent').replace('°', '')
 
             df.columns = [normalizar_nombre(c) for c in df.columns]
 
             # 2. Mapeo de nombres de columna flexibles a nombres de BD estándar
             mapeo_columnas = {
-                'n': 'n_temp', # Ignorar columna N°
+                'n': 'n_temp',
                 'variable': 'variable',
                 'factor': 'factor',
                 'producto': 'producto',
                 'precio': 'precio',
                 'plaza': 'plaza',
-                'promocion': 'promocion', # Ahora encontrará "Promoción" con tilde
+                'promocion': 'promocion',
                 'rating': 'rating',
-                'weight__percent': 'weight_percent', # Maneja el nombre normalizado de "Weight %"
-                'weight_percent': 'weight_percent'
+                'weight__percent': 'weight_percent',
+                'weight_percent': 'weight_percent',
+                'valor': 'valor',
+                'total': 'total' # Aseguramos que la columna 'total' se mapee correctamente
             }
             df.rename(columns=mapeo_columnas, inplace=True)
 
-            # 3. Lógica de cálculo del TOTAL a prueba de errores
-            p_cols = ['producto', 'precio', 'plaza', 'promocion']
-            
-            # Asegurarse de que las columnas existan antes de usarlas
-            for col in p_cols:
-                if col not in df.columns:
-                    df[col] = "No" # Si falta una columna, asumimos "No"
+            # 3. ELIMINAMOS EL CÁLCULO INCORRECTO DEL TOTAL.
+            # La columna 'total' ahora vendrá directamente de tus datos pegados.
 
-            def es_afirmativo(valor):
-                if isinstance(valor, bool): return valor
-                if isinstance(valor, str): return 'si' in valor.lower()
-                return False
+            # 4. Asegurar que las columnas numéricas sean del tipo correcto
+            numeric_cols = ['rating', 'weight_percent', 'valor', 'total']
+            for col in numeric_cols:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
 
-            # Usamos applymap para contar sin modificar las columnas originales
-            df['total'] = df[p_cols].applymap(es_afirmativo).sum(axis=1)
-
-            # 4. Lógica de cálculo de VALOR a prueba de errores
-            df['rating'] = pd.to_numeric(df.get('rating'), errors='coerce')
-            df['weight_percent'] = pd.to_numeric(df.get('weight_percent'), errors='coerce')
-            
-            # Reemplazar NaNs con None para que sea compatible con JSON
+            # 5. Reemplazar NaNs con None para que sea compatible con JSON
             df.replace({np.nan: None}, inplace=True)
-
-            # Para el cálculo, usamos 0 si el valor es None
-            rating_calc = df['rating'].fillna(0)
-            weight_calc = df['weight_percent'].fillna(0)
-            df['valor'] = rating_calc * (weight_calc / 100.0)
-
-            # 5. Seleccionar y devolver solo las columnas que necesita la base de datos
+            
+            # 6. Seleccionar y devolver solo las columnas que necesita la base de datos
             columnas_finales_bd = ['variable', 'factor', 'producto', 'precio', 'plaza', 'promocion', 'rating', 'weight_percent', 'valor', 'total']
             
-            # Filtrar el DataFrame para que solo contenga las columnas que vamos a insertar
-            df_final = df[[c for c in columnas_finales_bd if c in df.columns]]
+            # Asegurarse de que todas las columnas finales existan, rellenando con None si faltan
+            for col in columnas_finales_bd:
+                if col not in df.columns:
+                    df[col] = None
             
-            return df_final
+            return df[columnas_finales_bd]
+
         def display_and_edit_matrix(tipo_matriz, analisis_propio_data):
             df_db = get_datos_tabla('matriz_marketing', empresa_id, tipo_matriz_filter=tipo_matriz)
             
@@ -1138,6 +1124,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
