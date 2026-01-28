@@ -761,8 +761,7 @@ def aplicacion_principal():
             
             # Esta parte no cambia, solo muestra los datos que ya están en la BD.
             display_and_edit_matrix('MADE', empresa_data.get('analisis_made', ''))
-            mostrar_ultimo_analisis_guardado(empresa_id, 'made')
-
+            mostrar_ultimo_analisis_guardado(empresa_data, 'made') # <--- CORREGIDO
         with diag_tab2:
             st.subheader("Análisis de Marketing Externo (MADI)")
             with st.expander("📋 Pegar datos de MADI desde Excel"):
@@ -787,9 +786,8 @@ def aplicacion_principal():
                         st.warning("El área de texto está vacía. Pega tus datos para procesar.")
 
             # Esta parte no cambia.
-            display_and_edit_matrix('MADI', empresa_data.get('analisis_madi', ''))
-            mostrar_ultimo_analisis_guardado(empresa_id, 'madi')
-
+           display_and_edit_matrix('MADI', empresa_data.get('analisis_madi', ''))
+           mostrar_ultimo_analisis_guardado(empresa_data, 'madi') # <--- CORREGIDO
         # --- FIN DEL BLOQUE CORREGIDO ---
 
         with diag_tab3:
@@ -830,8 +828,8 @@ def aplicacion_principal():
                 if st.form_submit_button("Guardar Análisis de Posicionamiento", disabled=not puede_editar):
                     guardar_analisis_db(empresa_id, 'posicionamiento', analisis_propio_pos)
             
-            mostrar_ultimo_analisis_guardado(empresa_id, 'posicionamiento')
-
+            mostrar_ultimo_analisis_guardado(empresa_data, 'posicionamiento') # <--- CORREGIDO
+            
         with diag_tab4:
             st.subheader("Análisis PEST")
             with st.expander("📋 Pegar datos desde Excel"):
@@ -880,8 +878,8 @@ def aplicacion_principal():
                 if st.form_submit_button("Guardar Análisis", disabled=not puede_editar):
                     guardar_analisis_db(empresa_id, 'pest', analisis_propio_pest)
             
-            mostrar_ultimo_analisis_guardado(empresa_id, 'pest')
-
+            mostrar_ultimo_analisis_guardado(empresa_data, 'pest') 
+            
         with diag_tab5:
             st.subheader("Análisis FODA Cruzado (Numérico)")
             with st.expander("📋 Pegar datos de FODA Cruzado desde Excel"):
@@ -932,7 +930,8 @@ def aplicacion_principal():
                 if st.form_submit_button("Guardar Análisis", disabled=not puede_editar):
                     guardar_analisis_db(empresa_id, 'foda', analisis_propio_foda)
             
-            mostrar_ultimo_analisis_guardado(empresa_id, 'foda')            
+             mostrar_ultimo_analisis_guardado(empresa_data, 'foda') # <--- CORREGIDO
+            
     # --- PESTAÑA 3: ESTRATEGIA ---
     with tab_est:
         st.header("🎯 Formulación de Estrategias")
@@ -1125,6 +1124,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
