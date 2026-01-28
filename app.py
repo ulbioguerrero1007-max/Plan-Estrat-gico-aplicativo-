@@ -588,30 +588,31 @@ def aplicacion_principal():
                 except: pass
 
             if st.form_submit_button("Guardar Introducción", disabled=not puede_editar):
-    update_data = {
-        "nombre": nombre, "giro": giro, "objetivo_plan": objetivo_plan, "mision": mision, 
-        "vision": vision, "obj_general": obj_gen, "obj_especificos": obj_esp, 
-        "politicas": politicas, "valores": valores
-    }
+               update_data = {
+                   "nombre": nombre, "giro": giro, "objetivo_plan": objetivo_plan, "mision": mision, 
+                   "vision": vision, "obj_general": obj_gen, "obj_especificos": obj_esp, 
+                   "politicas": politicas, "valores": valores
+               }
     
-    # --- INICIO DE LA CORRECCIÓN ---
-    # Si se sube un nuevo logo, lo leemos como bytes y lo codificamos a hexadecimal.
-    if logo_file:
-        logo_bytes = save_image(logo_file)
-        update_data['logo'] = logo_bytes.hex() # <--- ¡LA MAGIA ESTÁ AQUÍ!
+               # --- INICIO DE LA CORRECCIÓN ---
+               # Si se sube un nuevo logo, lo leemos como bytes y lo codificamos a hexadecimal.
+               if logo_file:
+                  logo_bytes = save_image(logo_file)
+                  update_data['logo'] = logo_bytes.hex() # <--- ¡LA MAGIA ESTÁ AQUÍ!
 
-    # Hacemos lo mismo para el organigrama.
-    if organigrama_file:
-        org_bytes = save_image(organigrama_file)
-        update_data['organigrama'] = org_bytes.hex() # <--- ¡Y AQUÍ!
+               # Hacemos lo mismo para el organigrama.
+               if organigrama_file:
+                  org_bytes = save_image(organigrama_file)
+                  update_data['organigrama'] = org_bytes.hex() # <--- ¡Y AQUÍ!
     # --- FIN DE LA CORRECCIÓN ---
 
-    try:
-        supabase.table('empresas').update(update_data).eq('id', empresa_id).execute()
-        st.success("Datos de introducción guardados en la nube."); st.rerun()
-    except Exception as e:
-        st.error(f"Error al guardar: {e}")
-    # --- PESTAÑA 2: DIAGNÓSTICO SITUACIONAL (CORREGIDA) ---
+               try:
+                   supabase.table('empresas').update(update_data).eq('id', empresa_id).execute()
+                   st.success("Datos de introducción guardados en la nube."); st.rerun()
+               except Exception as e:
+                   st.error(f"Error al guardar: {e}")
+
+# --- PESTAÑA 2: DIAGNÓSTICO SITUACIONAL (CORREGIDA) ---
     with tab2:
         st.header("Diagnóstico Situacional (Análisis de Matrices)")
 
@@ -1024,6 +1025,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
