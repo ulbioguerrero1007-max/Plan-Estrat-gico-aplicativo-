@@ -930,7 +930,7 @@ def aplicacion_principal():
                 if st.form_submit_button("Guardar Análisis", disabled=not puede_editar):
                     guardar_analisis_db(empresa_id, 'foda', analisis_propio_foda)
             
-             mostrar_ultimo_analisis_guardado(empresa_data, 'foda') # <--- CORREGIDO
+        mostrar_ultimo_analisis_guardado(empresa_data, 'foda') # <--- CORREGIDO
             
     # --- PESTAÑA 3: ESTRATEGIA ---
     with tab_est:
@@ -1124,4 +1124,5 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
