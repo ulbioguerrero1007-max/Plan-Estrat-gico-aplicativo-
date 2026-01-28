@@ -629,7 +629,7 @@ def aplicacion_principal():
             else:
                 df = pd.read_csv(StringIO(data_str), sep='\t', header=0)
 
-            # Normalizar nombres de columnas a minúsculas, como antes
+            # Normalizar nombres de columnas a minúsculas
             df.columns = [str(c).lower().replace(' ', '_').replace('%', 'percent') for c in df.columns]
             
             columnas_bd = ['variable', 'factor', 'producto', 'precio', 'plaza', 'promocion', 'rating', 'weight_percent']
@@ -639,27 +639,30 @@ def aplicacion_principal():
 
             # --- INICIO DE LA CORRECCIÓN CLAVE ---
             p_cols = ['producto', 'precio', 'plaza', 'promocion']
-            for col in p_cols:
-                # Convertimos la columna a string y luego buscamos 'si'. Esto maneja tanto texto como booleanos.
-                # O, una forma más robusta, es mapear los posibles valores a 1 y 0.
-                # Mapeamos 'si' (insensible a mayúsculas) y True a 1, todo lo demás a 0.
-                df[col] = df[col].apply(lambda x: 1 if str(x).lower() == 'si' or x is True else 0)
+            
+            # Función auxiliar para determinar si un valor es "afirmativo"
+            def es_afirmativo(valor):
+                if isinstance(valor, bool):
+                    return valor
+                if isinstance(valor, str):
+                    return 'si' in valor.lower()
+                return False
 
-            # Ahora, simplemente sumamos los 1s.
-            df['total'] = df[p_cols].sum(axis=1)
+            # Aplicamos esta lógica para contar, pero NO modificamos las columnas originales
+            df['total'] = df[p_cols].applymap(es_afirmativo).sum(axis=1)
             # --- FIN DE LA CORRECCIÓN CLAVE ---
 
             numeric_cols = ['rating', 'weight_percent']
             for col in numeric_cols:
-                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+                # Asegurarse de que la columna exista antes de intentar convertirla
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
             
             df['valor'] = df.get('rating', 0) * (df.get('weight_percent', 0) / 100.0)
             
             columnas_finales = ['variable', 'factor', 'producto', 'precio', 'plaza', 'promocion', 'rating', 'weight_percent', 'valor', 'total']
             
-            # Asegurarse de que las columnas de 'p_cols' vuelvan a ser texto para la BD si es necesario, o dejarlas como 0/1.
-            # Por simplicidad, las dejamos como 0/1, la base de datos las aceptará como números.
-            
+            # Devolvemos el DataFrame con las columnas originales intactas y las calculadas
             return df[[c for c in columnas_finales if c in df.columns]]
 
         def display_and_edit_matrix(tipo_matriz, analisis_propio_data):
@@ -1079,6 +1082,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
