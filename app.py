@@ -2880,7 +2880,7 @@ def generar_pdf_formato_uea(empresa_id, version, elaborado, revisado, aprobado):
         from datetime import datetime
 
         # Obtener datos
-        empresa = get_empresa(empresa_id)
+        empresa = get_datos_empresa(empresa_id)
         if not empresa:
             return None
 
@@ -3173,7 +3173,7 @@ def generar_word_formato_uea(empresa_id, version, elaborado, revisado, aprobado)
         from datetime import datetime
 
         # Obtener datos
-        empresa = get_empresa(empresa_id)
+        empresa = get_datos_empresa(empresa_id)
         if not empresa:
             return None
 
