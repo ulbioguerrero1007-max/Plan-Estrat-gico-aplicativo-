@@ -2880,7 +2880,7 @@ def generar_pdf_formato_uea(empresa_id, version, elaborado, revisado, aprobado):
         from datetime import datetime
 
         # Obtener datos
-        empresa = db.get_empresa(empresa_id)
+        empresa = get_empresa(empresa_id)
         if not empresa:
             return None
 
@@ -3168,15 +3168,12 @@ def generar_word_formato_uea(empresa_id, version, elaborado, revisado, aprobado)
     Genera documento Word (.docx) con formato similar al Plan Estratégico UEA.
     """
     try:
-        from docx import Document
-        from docx.shared import Inches, Pt, RGBColor
-        from docx.enum.text import WD_ALIGN_PARAGRAPH
-        from docx.enum.style import WD_STYLE_TYPE
+        # Importaciones de docx se manejan dentro de la función
         from io import BytesIO
         from datetime import datetime
 
         # Obtener datos
-        empresa = db.get_empresa(empresa_id)
+        empresa = get_empresa(empresa_id)
         if not empresa:
             return None
 
