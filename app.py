@@ -3167,8 +3167,17 @@ def generar_word_formato_uea(empresa_id, version, elaborado, revisado, aprobado)
     """
     Genera documento Word (.docx) con formato similar al Plan Estratégico UEA.
     """
+    # Verificar e importar docx PRIMERO
     try:
-        # Importaciones de docx se manejan dentro de la función
+        from docx import Document
+        from docx.shared import Inches, Pt, RGBColor
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        from docx.enum.style import WD_STYLE_TYPE
+    except ImportError:
+        st.error("⚠️ 'python-docx' no instalado. Agrega 'python-docx==0.8.11' a requirements.txt")
+        return None
+
+    try:
         from io import BytesIO
         from datetime import datetime
 
