@@ -271,11 +271,11 @@ def encabezado_pie_pagina(canvas, doc, logo_bytes, nombre_empresa, version, coor
     canvas.setFont('Helvetica-Bold', 14)
     if logo_bytes:
         logo = Image(logo_bytes, width=0.7*inch, height=0.7*inch, hAlign='LEFT')
-        logo.drawOn(canvas, doc.leftMargin, doc.height + doc.topMargin - 0.4*inch)
-    canvas.drawString(doc.leftMargin + 0.8*inch, doc.height + doc.topMargin - 0.35*inch, nombre_empresa)
+        logo.drawOn(canvas, doc.leftMargin, doc.height + doc.topMargin - 0.2*inch)
+    canvas.drawString(doc.leftMargin + 0.8*inch, doc.height + doc.topMargin - 0.15*inch, nombre_empresa)
     canvas.setFont('Helvetica', 10)
-    canvas.drawRightString(doc.width + doc.leftMargin, doc.height + doc.topMargin - 0.35*inch, f"Versión: {version}")
-    canvas.line(doc.leftMargin, doc.height + doc.topMargin - 0.5*inch, doc.width + doc.leftMargin, doc.height + doc.topMargin - 0.5*inch)
+    canvas.drawRightString(doc.width + doc.leftMargin, doc.height + doc.topMargin - 0.15*inch, f"Versión: {version}")
+    canvas.line(doc.leftMargin, doc.height + doc.topMargin - 0.3*inch, doc.width + doc.leftMargin, doc.height + doc.topMargin - 0.3*inch)
     canvas.restoreState()
     canvas.saveState()
     canvas.setFont('Helvetica', 8)
@@ -416,20 +416,20 @@ def encabezado_pie_pagina(canvas, doc, logo_bytes, nombre_empresa, version, elab
     if logo_bytes:
         try:
             logo = Image(logo_bytes, width=0.6*inch, height=0.6*inch)
-            logo.drawOn(canvas, doc.leftMargin, doc.height + doc.topMargin - 0.9*inch)
+            logo.drawOn(canvas, doc.leftMargin, doc.height + doc.topMargin - 0.2*inch)
         except:
             pass
     
     # Nombre de empresa (centro)
     canvas.setFont('Times-Bold', 11)
     canvas.drawCentredString(doc.width/2 + doc.leftMargin, 
-                            doc.height + doc.topMargin - 0.5*inch, 
+                            doc.height + doc.topMargin - 0.3*inch, 
                             nombre_empresa[:50])
     
     # Versión y fecha (derecha)
     canvas.setFont('Times-Roman', 9)
     canvas.drawRightString(doc.width + doc.leftMargin, 
-                          doc.height + doc.topMargin - 0.5*inch, 
+                          doc.height + doc.topMargin - 0.3*inch, 
                           f"Versión: {version}")
     canvas.drawRightString(doc.width + doc.leftMargin, 
                           doc.height + doc.topMargin - 0.7*inch, 
@@ -1192,20 +1192,20 @@ def encabezado_pie_pagina(canvas, doc, logo_bytes, nombre_empresa, version, elab
     if logo_bytes:
         try:
             logo = Image(logo_bytes, width=0.6*inch, height=0.6*inch)
-            logo.drawOn(canvas, doc.leftMargin, doc.height + doc.topMargin - 0.9*inch)
+            logo.drawOn(canvas, doc.leftMargin, doc.height + doc.topMargin - 0.2*inch)
         except:
             pass
     
     # Nombre de empresa (centro)
     canvas.setFont('Times-Bold', 11)
     canvas.drawCentredString(doc.width/2 + doc.leftMargin, 
-                            doc.height + doc.topMargin - 0.5*inch, 
+                            doc.height + doc.topMargin - 0.3*inch, 
                             nombre_empresa[:50])
     
     # Versión y fecha (derecha)
     canvas.setFont('Times-Roman', 9)
     canvas.drawRightString(doc.width + doc.leftMargin, 
-                          doc.height + doc.topMargin - 0.5*inch, 
+                          doc.height + doc.topMargin - 0.3*inch, 
                           f"Versión: {version}")
     canvas.drawRightString(doc.width + doc.leftMargin, 
                           doc.height + doc.topMargin - 0.7*inch, 
