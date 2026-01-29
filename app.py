@@ -2540,25 +2540,29 @@ def aplicacion_principal():
         # El procesamiento va FUERA del with st.form()
         if submitted_pdf:
             with st.spinner("Generando documento con formato APA. Esto puede tomar un momento..."):
-                pdf_bytes = generar_pdf_completo_mejorado(
+                pdf_buffer = generar_pdf_completo_mejorado(
                     empresa_id, 
                     pdf_version, 
                     pdf_elaborado, 
                     pdf_revisado, 
                     pdf_aprobado
                 )
-                if pdf_bytes:
-                    st.session_state['pdf_file'] = pdf_bytes
+                if pdf_buffer:
+                    # Convertir BytesIO a bytes para mejor compatibilidad
+                    st.session_state['pdf_bytes'] = pdf_buffer.getvalue()
                     st.session_state['pdf_nombre'] = f"Plan_Estrategico_{empresa_data.get('nombre', 'Empresa')}_V{pdf_version}.pdf"
+                    st.session_state['pdf_generado'] = True
                     st.success("✅ PDF generado correctamente con formato APA.")
-                    st.rerun()
         
-        if 'pdf_file' in st.session_state:
+        # Mostrar botón de descarga si el PDF fue generado
+        if st.session_state.get('pdf_generado', False) and 'pdf_bytes' in st.session_state:
             col1, col2 = st.columns([1, 3])
             with col1:
+                # Convertir bytes de vuelta a BytesIO para el download_button
+                download_buffer = BytesIO(st.session_state['pdf_bytes'])
                 st.download_button(
                     label="⬇️ Descargar PDF", 
-                    data=st.session_state['pdf_file'], 
+                    data=download_buffer, 
                     file_name=st.session_state.get('pdf_nombre', 'plan_estrategico.pdf'), 
                     mime="application/pdf",
                     type="primary"
@@ -2566,6 +2570,13 @@ def aplicacion_principal():
             with col2:
                 st.success(f"Documento listo: {st.session_state.get('pdf_nombre', 'plan_estrategico.pdf')}")
                 st.caption("El documento incluye encabezado con logo, pie de página con firmas, y todas las secciones requeridas.")
+
+            # Botón para generar nuevo PDF
+            if st.button("🔄 Generar Nuevo PDF", type="secondary"):
+                del st.session_state['pdf_bytes']
+                del st.session_state['pdf_nombre']
+                st.session_state['pdf_generado'] = False
+                st.rerun()
 
 def pantalla_acceso():
     st.sidebar.title("Estratega Pro")
