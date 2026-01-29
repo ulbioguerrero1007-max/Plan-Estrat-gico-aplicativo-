@@ -2795,43 +2795,597 @@ def aplicacion_principal():
         # El procesamiento va FUERA del with st.form()
         if submitted_pdf:
             with st.spinner("Generando documento con formato APA. Esto puede tomar un momento..."):
-                pdf_buffer = generar_pdf_completo_mejorado(
+                # Generar PDF con formato profesional
+                pdf_buffer = generar_pdf_formato_uea(
                     empresa_id, 
                     pdf_version, 
                     pdf_elaborado, 
                     pdf_revisado, 
                     pdf_aprobado
                 )
-                if pdf_buffer:
-                    # Convertir BytesIO a bytes para mejor compatibilidad
+
+                # Generar Word con formato profesional
+                word_buffer = generar_word_formato_uea(
+                    empresa_id, 
+                    pdf_version, 
+                    pdf_elaborado, 
+                    pdf_revisado, 
+                    pdf_aprobado
+                )
+
+                if pdf_buffer and word_buffer:
+                    # Guardar PDF
                     st.session_state['pdf_bytes'] = pdf_buffer.getvalue()
                     st.session_state['pdf_nombre'] = f"Plan_Estrategico_{empresa_data.get('nombre', 'Empresa')}_V{pdf_version}.pdf"
+
+                    # Guardar Word
+                    st.session_state['word_bytes'] = word_buffer.getvalue()
+                    st.session_state['word_nombre'] = f"Plan_Estrategico_{empresa_data.get('nombre', 'Empresa')}_V{pdf_version}.docx"
+
                     st.session_state['pdf_generado'] = True
-                    st.success("✅ PDF generado correctamente con formato APA.")
+                    st.success("✅ Documentos generados correctamente (PDF y Word).")
         
-        # Mostrar botón de descarga si el PDF fue generado
+        # Mostrar botones de descarga si el documento fue generado
         if st.session_state.get('pdf_generado', False) and 'pdf_bytes' in st.session_state:
-            col1, col2 = st.columns([1, 3])
+            col1, col2, col3 = st.columns([1, 1, 2])
             with col1:
-                # Convertir bytes de vuelta a BytesIO para el download_button
+                # Botón descargar PDF
                 download_buffer = BytesIO(st.session_state['pdf_bytes'])
                 st.download_button(
-                    label="⬇️ Descargar PDF", 
+                    label="⬇️ PDF", 
                     data=download_buffer, 
                     file_name=st.session_state.get('pdf_nombre', 'plan_estrategico.pdf'), 
                     mime="application/pdf",
                     type="primary"
                 )
             with col2:
+                # Botón descargar Word
+                if 'word_bytes' in st.session_state:
+                    word_buffer = BytesIO(st.session_state['word_bytes'])
+                    st.download_button(
+                        label="📝 Word", 
+                        data=word_buffer, 
+                        file_name=st.session_state.get('word_nombre', 'plan_estrategico.docx'), 
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        type="secondary"
+                    )
+            with col3:
                 st.success(f"Documento listo: {st.session_state.get('pdf_nombre', 'plan_estrategico.pdf')}")
-                st.caption("El documento incluye encabezado con logo, pie de página con firmas, y todas las secciones requeridas.")
+                st.caption("Formato profesional con encabezado, pie de página y todas las secciones.")
 
-            # Botón para generar nuevo PDF
-            if st.button("🔄 Generar Nuevo PDF", type="secondary"):
+            # Botón para generar nuevo documento
+            if st.button("🔄 Generar Nuevo", type="secondary"):
                 del st.session_state['pdf_bytes']
+                del st.session_state['word_bytes']
                 del st.session_state['pdf_nombre']
+                del st.session_state['word_nombre']
                 st.session_state['pdf_generado'] = False
                 st.rerun()
+
+
+
+def generar_pdf_formato_uea(empresa_id, version, elaborado, revisado, aprobado):
+    """
+    Genera PDF con formato similar al Plan Estratégico UEA EP 2022-2026.
+    Formato profesional con encabezado, pie de página y estructura visual mejorada.
+    """
+    try:
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib.units import inch
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY, TA_RIGHT
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
+        from reportlab.lib import colors
+        from io import BytesIO
+        from datetime import datetime
+
+        # Obtener datos
+        empresa = db.get_empresa(empresa_id)
+        if not empresa:
+            return None
+
+        empresa_nombre = empresa.get('nombre', 'EMPRESA')
+        fecha_actual = datetime.now().strftime("%d/%m/%Y")
+
+        # Crear buffer
+        buffer = BytesIO()
+
+        # Configurar documento con márgenes similares al ejemplo
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=letter,
+            rightMargin=1*inch,
+            leftMargin=1*inch,
+            topMargin=1.2*inch,
+            bottomMargin=1*inch
+        )
+
+        # Estilos basados en el documento ejemplo
+        styles = getSampleStyleSheet()
+
+        # Estilo para título principal (PORTADA)
+        styles.add(ParagraphStyle(
+            name='PortadaTitulo',
+            fontName='Times-Bold',
+            fontSize=18,
+            alignment=TA_CENTER,
+            spaceAfter=30,
+            leading=22
+        ))
+
+        # Estilo para subtítulo de portada
+        styles.add(ParagraphStyle(
+            name='PortadaSubtitulo',
+            fontName='Times-Bold',
+            fontSize=14,
+            alignment=TA_CENTER,
+            spaceAfter=12,
+            leading=16
+        ))
+
+        # Estilo para encabezados principales (mayúsculas, negrita, centrado)
+        styles.add(ParagraphStyle(
+            name='TituloPrincipal',
+            fontName='Times-Bold',
+            fontSize=14,
+            alignment=TA_CENTER,
+            spaceBefore=24,
+            spaceAfter=12,
+            leading=18
+        ))
+
+        # Estilo para subtítulos (negrita, izquierda)
+        styles.add(ParagraphStyle(
+            name='Subtitulo',
+            fontName='Times-Bold',
+            fontSize=12,
+            alignment=TA_LEFT,
+            spaceBefore=18,
+            spaceAfter=8,
+            leading=14
+        ))
+
+        # Estilo para sub-subtítulos
+        styles.add(ParagraphStyle(
+            name='SubSubtitulo',
+            fontName='Times-Bold',
+            fontSize=11,
+            alignment=TA_LEFT,
+            spaceBefore=12,
+            spaceAfter=6,
+            leading=13
+        ))
+
+        # Estilo para cuerpo de texto (justificado)
+        styles.add(ParagraphStyle(
+            name='CuerpoTexto',
+            fontName='Times-Roman',
+            fontSize=11,
+            alignment=TA_JUSTIFY,
+            spaceBefore=6,
+            spaceAfter=6,
+            leading=14,
+            firstLineIndent=20
+        ))
+
+        # Estilo para texto sin sangría
+        styles.add(ParagraphStyle(
+            name='CuerpoNoIndent',
+            fontName='Times-Roman',
+            fontSize=11,
+            alignment=TA_JUSTIFY,
+            spaceBefore=6,
+            spaceAfter=6,
+            leading=14
+        ))
+
+        # Estilo para pie de página
+        styles.add(ParagraphStyle(
+            name='PiePagina',
+            fontName='Times-Roman',
+            fontSize=9,
+            alignment=TA_CENTER,
+            textColor=colors.grey
+        ))
+
+        # Función para encabezado y pie de página
+        def header_footer(canvas, doc):
+            canvas.saveState()
+
+            # Encabezado
+            canvas.setFont('Times-Roman', 9)
+            canvas.setFillColor(colors.grey)
+
+            # Línea superior delgada
+            canvas.setStrokeColor(colors.grey)
+            canvas.line(doc.leftMargin, letter[1] - 0.6*inch, 
+                       doc.width + doc.leftMargin, letter[1] - 0.6*inch)
+
+            # Texto izquierda (nombre empresa)
+            canvas.drawString(doc.leftMargin, letter[1] - 0.5*inch, empresa_nombre)
+
+            # Texto derecha (versión y fecha)
+            canvas.drawRightString(doc.width + doc.leftMargin, letter[1] - 0.5*inch, 
+                                  f"Versión: {version}")
+
+            # Pie de página
+            canvas.line(doc.leftMargin, 0.7*inch, 
+                       doc.width + doc.leftMargin, 0.7*inch)
+
+            # Número de página
+            canvas.drawCentredString(doc.width/2 + doc.leftMargin, 0.5*inch,
+                                    f"Página {canvas.getPageNumber()}")
+
+            canvas.restoreState()
+
+        # Construir contenido
+        story = []
+
+        # ========== PORTADA ==========
+        story.append(Spacer(1, 2*inch))
+        story.append(Paragraph(f"PLAN ESTRATÉGICO", styles['PortadaTitulo']))
+        story.append(Spacer(1, 0.3*inch))
+        story.append(Paragraph(f"{empresa_nombre}", styles['PortadaSubtitulo']))
+        story.append(Spacer(1, 0.2*inch))
+        story.append(Paragraph(f"{version}", styles['PortadaSubtitulo']))
+        story.append(Spacer(1, 2*inch))
+
+        # Información de elaboración
+        story.append(Paragraph(f"Elaborado por: {elaborado}", styles['CuerpoNoIndent']))
+        story.append(Paragraph(f"Revisado por: {revisado}", styles['CuerpoNoIndent']))
+        story.append(Paragraph(f"Aprobado por: {aprobado}", styles['CuerpoNoIndent']))
+        story.append(Paragraph(f"Fecha: {fecha_actual}", styles['CuerpoNoIndent']))
+
+        story.append(PageBreak())
+
+        # ========== CONTENIDO PRINCIPAL ==========
+        # Aquí se mantiene TODO el contenido existente de la empresa
+        # pero con el nuevo formato visual
+
+        # 1. INTRODUCCIÓN
+        story.append(Paragraph("INTRODUCCIÓN", styles['TituloPrincipal']))
+        introduccion = empresa.get('introduccion', '')
+        if introduccion:
+            story.append(Paragraph(introduccion, styles['CuerpoTexto']))
+        story.append(Spacer(1, 0.2*inch))
+
+        # 2. ANTECEDENTES
+        story.append(Paragraph("ANTECEDENTES", styles['TituloPrincipal']))
+        antecedentes = empresa.get('antecedentes', '')
+        if antecedentes:
+            story.append(Paragraph(antecedentes, styles['CuerpoTexto']))
+        story.append(Spacer(1, 0.2*inch))
+
+        # 3. MARCO LEGAL
+        story.append(Paragraph("MARCO LEGAL", styles['TituloPrincipal']))
+        marco_legal = empresa.get('marco_legal', '')
+        if marco_legal:
+            story.append(Paragraph(marco_legal, styles['CuerpoTexto']))
+        story.append(Spacer(1, 0.2*inch))
+
+        # 4. MISIÓN Y VISIÓN
+        story.append(Paragraph("ELEMENTOS ORIENTADORES", styles['TituloPrincipal']))
+
+        story.append(Paragraph("MISIÓN", styles['Subtitulo']))
+        mision = empresa.get('mision', '')
+        if mision:
+            story.append(Paragraph(mision, styles['CuerpoTexto']))
+
+        story.append(Paragraph("VISIÓN", styles['Subtitulo']))
+        vision = empresa.get('vision', '')
+        if vision:
+            story.append(Paragraph(vision, styles['CuerpoTexto']))
+
+        story.append(Paragraph("VALORES", styles['Subtitulo']))
+        valores = empresa.get('valores', '')
+        if valores:
+            story.append(Paragraph(valores, styles['CuerpoTexto']))
+
+        story.append(PageBreak())
+
+        # 5. ANÁLISIS SITUACIONAL (FODA)
+        story.append(Paragraph("ANÁLISIS SITUACIONAL", styles['TituloPrincipal']))
+
+        # Fortalezas
+        story.append(Paragraph("FORTALEZAS", styles['Subtitulo']))
+        fortalezas = empresa.get('fortalezas', '').split('\n')
+        for f in fortalezas:
+            if f.strip():
+                story.append(Paragraph(f"• {f.strip()}", styles['CuerpoNoIndent']))
+
+        # Debilidades
+        story.append(Paragraph("DEBILIDADES", styles['Subtitulo']))
+        debilidades = empresa.get('debilidades', '').split('\n')
+        for d in debilidades:
+            if d.strip():
+                story.append(Paragraph(f"• {d.strip()}", styles['CuerpoNoIndent']))
+
+        # Oportunidades
+        story.append(Paragraph("OPORTUNIDADES", styles['Subtitulo']))
+        oportunidades = empresa.get('oportunidades', '').split('\n')
+        for o in oportunidades:
+            if o.strip():
+                story.append(Paragraph(f"• {o.strip()}", styles['CuerpoNoIndent']))
+
+        # Amenazas
+        story.append(Paragraph("AMENAZAS", styles['Subtitulo']))
+        amenazas = empresa.get('amenazas', '').split('\n')
+        for a in amenazas:
+            if a.strip():
+                story.append(Paragraph(f"• {a.strip()}", styles['CuerpoNoIndent']))
+
+        story.append(PageBreak())
+
+        # 6. OBJETIVOS ESTRATÉGICOS
+        story.append(Paragraph("OBJETIVOS ESTRATÉGICOS", styles['TituloPrincipal']))
+
+        objetivos = empresa.get('objetivos_estrategicos', [])
+        if objetivos:
+            for i, obj in enumerate(objetivos, 1):
+                story.append(Paragraph(f"OBJETIVO ESTRATÉGICO {i}", styles['Subtitulo']))
+                story.append(Paragraph(obj.get('descripcion', ''), styles['CuerpoTexto']))
+
+                # Indicadores
+                if obj.get('indicadores'):
+                    story.append(Paragraph("Indicadores:", styles['SubSubtitulo']))
+                    for ind in obj['indicadores']:
+                        story.append(Paragraph(f"• {ind}", styles['CuerpoNoIndent']))
+
+                story.append(Spacer(1, 0.1*inch))
+
+        story.append(PageBreak())
+
+        # 7. ESTRATEGIAS
+        story.append(Paragraph("ESTRATEGIAS", styles['TituloPrincipal']))
+
+        estrategias = empresa.get('estrategias', [])
+        if estrategias:
+            for i, est in enumerate(estrategias, 1):
+                story.append(Paragraph(f"Estrategia {i}", styles['Subtitulo']))
+                story.append(Paragraph(est.get('descripcion', ''), styles['CuerpoTexto']))
+                story.append(Spacer(1, 0.1*inch))
+
+        # 8. CONCLUSIONES
+        story.append(Paragraph("CONCLUSIONES", styles['TituloPrincipal']))
+        conclusiones = empresa.get('conclusiones', '')
+        if conclusiones:
+            story.append(Paragraph(conclusiones, styles['CuerpoTexto']))
+
+        # Construir PDF
+        doc.build(story, onFirstPage=header_footer, onLaterPages=header_footer)
+        buffer.seek(0)
+        return buffer
+
+    except Exception as e:
+        st.error(f"Error al generar PDF: {e}")
+        import traceback
+        st.error(traceback.format_exc())
+        return None
+
+
+def generar_word_formato_uea(empresa_id, version, elaborado, revisado, aprobado):
+    """
+    Genera documento Word (.docx) con formato similar al Plan Estratégico UEA.
+    """
+    try:
+        from docx import Document
+        from docx.shared import Inches, Pt, RGBColor
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        from docx.enum.style import WD_STYLE_TYPE
+        from io import BytesIO
+        from datetime import datetime
+
+        # Obtener datos
+        empresa = db.get_empresa(empresa_id)
+        if not empresa:
+            return None
+
+        empresa_nombre = empresa.get('nombre', 'EMPRESA')
+        fecha_actual = datetime.now().strftime("%d/%m/%Y")
+
+        # Crear documento
+        doc = Document()
+
+        # Configurar márgenes
+        sections = doc.sections
+        for section in sections:
+            section.top_margin = Inches(1.2)
+            section.bottom_margin = Inches(1)
+            section.left_margin = Inches(1)
+            section.right_margin = Inches(1)
+
+        # Configurar estilos
+        style = doc.styles['Normal']
+        font = style.font
+        font.name = 'Times New Roman'
+        font.size = Pt(11)
+
+        # Estilo para títulos principales
+        titulo_style = doc.styles.add_style('TituloPrincipal', WD_STYLE_TYPE.PARAGRAPH)
+        titulo_style.font.name = 'Times New Roman'
+        titulo_style.font.size = Pt(14)
+        titulo_style.font.bold = True
+        titulo_style.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        titulo_style.paragraph_format.space_before = Pt(24)
+        titulo_style.paragraph_format.space_after = Pt(12)
+
+        # Estilo para subtítulos
+        subtitulo_style = doc.styles.add_style('Subtitulo', WD_STYLE_TYPE.PARAGRAPH)
+        subtitulo_style.font.name = 'Times New Roman'
+        subtitulo_style.font.size = Pt(12)
+        subtitulo_style.font.bold = True
+        subtitulo_style.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        subtitulo_style.paragraph_format.space_before = Pt(18)
+        subtitulo_style.paragraph_format.space_after = Pt(8)
+
+        # ========== PORTADA ==========
+        doc.add_paragraph()
+        doc.add_paragraph()
+        doc.add_paragraph()
+
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = p.add_run("PLAN ESTRATÉGICO")
+        run.bold = True
+        run.font.size = Pt(18)
+        run.font.name = 'Times New Roman'
+
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = p.add_run(empresa_nombre)
+        run.bold = True
+        run.font.size = Pt(14)
+        run.font.name = 'Times New Roman'
+
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = p.add_run(version)
+        run.bold = True
+        run.font.size = Pt(14)
+        run.font.name = 'Times New Roman'
+
+        doc.add_paragraph()
+        doc.add_paragraph()
+
+        p = doc.add_paragraph(f"Elaborado por: {elaborado}")
+        p = doc.add_paragraph(f"Revisado por: {revisado}")
+        p = doc.add_paragraph(f"Aprobado por: {aprobado}")
+        p = doc.add_paragraph(f"Fecha: {fecha_actual}")
+
+        # Salto de página
+        doc.add_page_break()
+
+        # ========== CONTENIDO ==========
+        # 1. INTRODUCCIÓN
+        p = doc.add_paragraph("INTRODUCCIÓN")
+        p.style = 'TituloPrincipal'
+
+        introduccion = empresa.get('introduccion', '')
+        if introduccion:
+            doc.add_paragraph(introduccion)
+
+        # 2. ANTECEDENTES
+        p = doc.add_paragraph("ANTECEDENTES")
+        p.style = 'TituloPrincipal'
+
+        antecedentes = empresa.get('antecedentes', '')
+        if antecedentes:
+            doc.add_paragraph(antecedentes)
+
+        # 3. MARCO LEGAL
+        p = doc.add_paragraph("MARCO LEGAL")
+        p.style = 'TituloPrincipal'
+
+        marco_legal = empresa.get('marco_legal', '')
+        if marco_legal:
+            doc.add_paragraph(marco_legal)
+
+        # 4. MISIÓN Y VISIÓN
+        p = doc.add_paragraph("ELEMENTOS ORIENTADORES")
+        p.style = 'TituloPrincipal'
+
+        p = doc.add_paragraph("MISIÓN")
+        p.style = 'Subtitulo'
+        mision = empresa.get('mision', '')
+        if mision:
+            doc.add_paragraph(mision)
+
+        p = doc.add_paragraph("VISIÓN")
+        p.style = 'Subtitulo'
+        vision = empresa.get('vision', '')
+        if vision:
+            doc.add_paragraph(vision)
+
+        p = doc.add_paragraph("VALORES")
+        p.style = 'Subtitulo'
+        valores = empresa.get('valores', '')
+        if valores:
+            doc.add_paragraph(valores)
+
+        # Salto de página
+        doc.add_page_break()
+
+        # 5. ANÁLISIS SITUACIONAL
+        p = doc.add_paragraph("ANÁLISIS SITUACIONAL")
+        p.style = 'TituloPrincipal'
+
+        # Fortalezas
+        p = doc.add_paragraph("FORTALEZAS")
+        p.style = 'Subtitulo'
+        fortalezas = empresa.get('fortalezas', '').split('\n')
+        for f in fortalezas:
+            if f.strip():
+                doc.add_paragraph(f"• {f.strip()}")
+
+        # Debilidades
+        p = doc.add_paragraph("DEBILIDADES")
+        p.style = 'Subtitulo'
+        debilidades = empresa.get('debilidades', '').split('\n')
+        for d in debilidades:
+            if d.strip():
+                doc.add_paragraph(f"• {d.strip()}")
+
+        # Oportunidades
+        p = doc.add_paragraph("OPORTUNIDADES")
+        p.style = 'Subtitulo'
+        oportunidades = empresa.get('oportunidades', '').split('\n')
+        for o in oportunidades:
+            if o.strip():
+                doc.add_paragraph(f"• {o.strip()}")
+
+        # Amenazas
+        p = doc.add_paragraph("AMENAZAS")
+        p.style = 'Subtitulo'
+        amenazas = empresa.get('amenazas', '').split('\n')
+        for a in amenazas:
+            if a.strip():
+                doc.add_paragraph(f"• {a.strip()}")
+
+        # Salto de página
+        doc.add_page_break()
+
+        # 6. OBJETIVOS ESTRATÉGICOS
+        p = doc.add_paragraph("OBJETIVOS ESTRATÉGICOS")
+        p.style = 'TituloPrincipal'
+
+        objetivos = empresa.get('objetivos_estrategicos', [])
+        if objetivos:
+            for i, obj in enumerate(objetivos, 1):
+                p = doc.add_paragraph(f"OBJETIVO ESTRATÉGICO {i}")
+                p.style = 'Subtitulo'
+                doc.add_paragraph(obj.get('descripcion', ''))
+
+        # 7. ESTRATEGIAS
+        p = doc.add_paragraph("ESTRATEGIAS")
+        p.style = 'TituloPrincipal'
+
+        estrategias = empresa.get('estrategias', [])
+        if estrategias:
+            for i, est in enumerate(estrategias, 1):
+                p = doc.add_paragraph(f"Estrategia {i}")
+                p.style = 'Subtitulo'
+                doc.add_paragraph(est.get('descripcion', ''))
+
+        # 8. CONCLUSIONES
+        p = doc.add_paragraph("CONCLUSIONES")
+        p.style = 'TituloPrincipal'
+
+        conclusiones = empresa.get('conclusiones', '')
+        if conclusiones:
+            doc.add_paragraph(conclusiones)
+
+        # Guardar en buffer
+        buffer = BytesIO()
+        doc.save(buffer)
+        buffer.seek(0)
+        return buffer
+
+    except Exception as e:
+        st.error(f"Error al generar Word: {e}")
+        import traceback
+        st.error(traceback.format_exc())
+        return None
+
 
 def pantalla_acceso():
     st.sidebar.title("Estratega Pro")
