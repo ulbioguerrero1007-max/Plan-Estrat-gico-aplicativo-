@@ -114,13 +114,133 @@ def guardar_analisis_db(empresa_id, tipo_analisis, contenido):
             st.error(f"Error al guardar análisis: {e}")
 
 def get_empresas():
+    """
+    Obtiene las empresas del usuario actual:
+    - Empresas creadas por el usuario
+    - Empresas compartidas con el usuario (como lector o editor)
+    """
     if supabase and st.session_state.get("user"):
         try:
-            response = supabase.table('empresas').select('id, nombre').execute()
-            return pd.DataFrame(response.data) if response.data else pd.DataFrame(columns=['id', 'nombre'])
+            user_id = st.session_state.user.id
+
+            # 1. Obtener empresas creadas por el usuario
+            response_propias = supabase.table('empresas').select('id, nombre, propietario_id').eq('propietario_id', user_id).execute()
+            empresas_propias = response_propias.data if response_propias.data else []
+
+            # 2. Obtener empresas compartidas con el usuario
+            response_compartidas = supabase.table('empresas_compartidas').select('empresa_id, permiso').eq('usuario_compartido_id', user_id).execute()
+            compartidas = response_compartidas.data if response_compartidas.data else []
+
+            # 3. Obtener detalles de las empresas compartidas
+            empresas_compartidas_list = []
+            for comp in compartidas:
+                try:
+                    resp_emp = supabase.table('empresas').select('id, nombre, propietario_id').eq('id', comp['empresa_id']).single().execute()
+                    if resp_emp.data:
+                        emp_data = resp_emp.data
+                        emp_data['permiso_compartido'] = comp['permiso']  # 'lector' o 'editor'
+                        empresas_compartidas_list.append(emp_data)
+                except:
+                    continue
+
+            # 4. Combinar y marcar propiedad
+            todas_empresas = []
+
+            # Agregar propias
+            for emp in empresas_propias:
+                emp['es_propietario'] = True
+                emp['permiso'] = 'propietario'
+                todas_empresas.append(emp)
+
+            # Agregar compartidas (evitar duplicados si es propietario y compartida)
+            ids_existentes = {e['id'] for e in todas_empresas}
+            for emp in empresas_compartidas_list:
+                if emp['id'] not in ids_existentes:
+                    emp['es_propietario'] = False
+                    emp['permiso'] = emp.get('permiso_compartido', 'lector')
+                    todas_empresas.append(emp)
+
+            return pd.DataFrame(todas_empresas) if todas_empresas else pd.DataFrame(columns=['id', 'nombre', 'es_propietario', 'permiso'])
+
         except Exception as e:
             st.error(f"Error al cargar empresas: {e}")
-    return pd.DataFrame(columns=['id', 'nombre'])
+    return pd.DataFrame(columns=['id', 'nombre', 'es_propietario', 'permiso'])
+
+def compartir_empresa(empresa_id, email_usuario, permiso='lector'):
+    """
+    Comparte una empresa con otro usuario.
+    permiso: 'lector' o 'editor'
+    """
+    if supabase and empresa_id and email_usuario:
+        try:
+            # Buscar el usuario por email
+            resp_usuario = supabase.table('usuarios').select('id').eq('email', email_usuario).single().execute()
+            if not resp_usuario.data:
+                return False, "Usuario no encontrado"
+
+            usuario_compartir_id = resp_usuario.data['id']
+
+            # Verificar que no sea el propietario
+            resp_empresa = supabase.table('empresas').select('propietario_id').eq('id', empresa_id).single().execute()
+            if resp_empresa.data and resp_empresa.data['propietario_id'] == usuario_compartir_id:
+                return False, "No puedes compartir con el propietario"
+
+            # Verificar si ya está compartida
+            resp_existente = supabase.table('empresas_compartidas').select('*').eq('empresa_id', empresa_id).eq('usuario_compartido_id', usuario_compartir_id).execute()
+            if resp_existente.data:
+                # Actualizar permiso
+                supabase.table('empresas_compartidas').update({'permiso': permiso}).eq('empresa_id', empresa_id).eq('usuario_compartido_id', usuario_compartir_id).execute()
+                return True, "Permiso actualizado"
+
+            # Crear nuevo registro de compartir
+            supabase.table('empresas_compartidas').insert({
+                'empresa_id': empresa_id,
+                'usuario_compartido_id': usuario_compartir_id,
+                'permiso': permiso
+            }).execute()
+
+            return True, f"Empresa compartida con {email_usuario} como {permiso}"
+
+        except Exception as e:
+            return False, f"Error al compartir: {e}"
+    return False, "Datos incompletos"
+
+
+def eliminar_compartir(empresa_id, usuario_compartido_id):
+    """Elimina el acceso compartido a un usuario."""
+    if supabase and empresa_id and usuario_compartido_id:
+        try:
+            supabase.table('empresas_compartidas').delete().eq('empresa_id', empresa_id).eq('usuario_compartido_id', usuario_compartido_id).execute()
+            return True, "Acceso eliminado"
+        except Exception as e:
+            return False, f"Error: {e}"
+    return False, "Datos incompletos"
+
+
+def get_usuarios_compartidos(empresa_id):
+    """Obtiene la lista de usuarios con quienes se compartió la empresa."""
+    if supabase and empresa_id:
+        try:
+            resp = supabase.table('empresas_compartidas').select('usuario_compartido_id, permiso').eq('empresa_id', empresa_id).execute()
+            if resp.data:
+                usuarios = []
+                for comp in resp.data:
+                    try:
+                        resp_user = supabase.table('usuarios').select('email, full_name').eq('id', comp['usuario_compartido_id']).single().execute()
+                        if resp_user.data:
+                            usuarios.append({
+                                'usuario_id': comp['usuario_compartido_id'],
+                                'email': resp_user.data['email'],
+                                'nombre': resp_user.data.get('full_name', 'Sin nombre'),
+                                'permiso': comp['permiso']
+                            })
+                    except:
+                        continue
+                return usuarios
+        except Exception as e:
+            st.error(f"Error al cargar usuarios compartidos: {e}")
+    return []
+
 
 def save_image(uploaded_file):
     if uploaded_file:
@@ -1411,14 +1531,56 @@ def aplicacion_principal():
     with st.sidebar:
         st.header("Gestión de Empresas")
         empresas_df = get_empresas()
-        nombres_empresas = []
+
+        # Mostrar empresas con indicador de permiso
+        opciones_empresas = []
+        empresa_info = {}
+
         if not empresas_df.empty:
-            nombres_empresas = empresas_df['nombre'].tolist()
-        empresa_seleccionada = st.selectbox("Selecciona una Empresa", nombres_empresas, index=None, placeholder="Elige una opción")
+            for _, row in empresas_df.iterrows():
+                es_propietario = row.get('es_propietario', False)
+                permiso = row.get('permiso', 'lector')
+
+                if es_propietario:
+                    label = f"👑 {row['nombre']} (Propietario)"
+                elif permiso == 'editor':
+                    label = f"✏️ {row['nombre']} (Editor)"
+                else:
+                    label = f"👁️ {row['nombre']} (Lector)"
+
+                opciones_empresas.append(label)
+                empresa_info[label] = {
+                    'id': row['id'],
+                    'nombre': row['nombre'],
+                    'es_propietario': es_propietario,
+                    'permiso': permiso
+                }
+
+        empresa_seleccionada_label = st.selectbox("Selecciona una Empresa", opciones_empresas, index=None, placeholder="Elige una opción")
+
         empresa_id = None
-        if empresa_seleccionada and not empresas_df.empty:
-            empresa_id = int(empresas_df[empresas_df['nombre'] == empresa_seleccionada]['id'].iloc[0])
+        empresa_seleccionada = None
+        es_propietario = False
+        permiso_actual = None
+
+        if empresa_seleccionada_label and empresa_seleccionada_label in empresa_info:
+            info = empresa_info[empresa_seleccionada_label]
+            empresa_id = info['id']
+            empresa_seleccionada = info['nombre']
+            es_propietario = info['es_propietario']
+            permiso_actual = info['permiso']
+
+            # Mostrar badge de permiso
+            if es_propietario:
+                st.success("👑 Eres el propietario de esta empresa")
+            elif permiso_actual == 'editor':
+                st.info("✏️ Tienes permiso de Editor")
+            else:
+                st.info("👁️ Tienes permiso de Lector (solo ver)")
+
         st.divider()
+
+        # Sección de crear empresa (solo para propietarios)
         with st.expander("➕ Crear Nueva Empresa"):
             with st.form("new_empresa_form"):
                 new_empresa_name = st.text_input("Nombre de la nueva empresa")
@@ -1436,15 +1598,64 @@ def aplicacion_principal():
                             st.error(f"Error al crear la empresa: {e}")
                     else:
                         st.warning("El nombre no puede estar vacío.")
-        if empresa_id:
-            if st.button("❌ Eliminar Empresa Seleccionada", type="primary"):
+
+        # Opciones solo para propietarios
+        if empresa_id and es_propietario:
+            st.divider()
+
+            # Compartir empresa
+            with st.expander("🔗 Compartir Empresa"):
+                st.write("Comparte esta empresa con otros usuarios:")
+
+                with st.form("form_compartir"):
+                    email_compartir = st.text_input("Email del usuario")
+                    permiso_compartir = st.selectbox("Permiso", ["lector", "editor"], 
+                                                    format_func=lambda x: "👁️ Lector (solo ver)" if x == "lector" else "✏️ Editor (puede modificar)")
+
+                    if st.form_submit_button("Compartir"):
+                        if email_compartir:
+                            exito, mensaje = compartir_empresa(empresa_id, email_compartir, permiso_compartir)
+                            if exito:
+                                st.success(mensaje)
+                            else:
+                                st.error(mensaje)
+                        else:
+                            st.warning("Ingresa un email")
+
+                # Mostrar usuarios con quienes se compartió
+                usuarios_comp = get_usuarios_compartidos(empresa_id)
+                if usuarios_comp:
+                    st.write("**Usuarios con acceso:**")
+                    for uc in usuarios_comp:
+                        col_uc1, col_uc2 = st.columns([3, 1])
+                        with col_uc1:
+                            permiso_icon = "✏️" if uc['permiso'] == 'editor' else "👁️"
+                            st.write(f"{permiso_icon} {uc['email']} ({uc['permiso']})")
+                        with col_uc2:
+                            if st.button("❌", key=f"del_{uc['usuario_id']}"):
+                                exito_del, msg_del = eliminar_compartir(empresa_id, uc['usuario_id'])
+                                if exito_del:
+                                    st.success(msg_del)
+                                    st.rerun()
+                                else:
+                                    st.error(msg_del)
+
+            # Eliminar empresa (solo propietario)
+            if st.button("❌ Eliminar Empresa", type="primary"):
                 if supabase:
                     try:
+                        # Primero eliminar registros compartidos
+                        supabase.table('empresas_compartidas').delete().eq('empresa_id', empresa_id).execute()
+                        # Luego eliminar empresa
                         supabase.table('empresas').delete().eq('id', empresa_id).execute()
                         st.success(f"Empresa '{empresa_seleccionada}' eliminada.")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error al eliminar la empresa: {e}")
+
+        elif empresa_id and not es_propietario:
+            st.divider()
+            st.info("ℹ️ Solo el propietario puede compartir o eliminar esta empresa")
                 
     if not empresa_id:
         st.info("👈 Por favor, selecciona o crea una empresa en el menú lateral para comenzar.")
@@ -1455,15 +1666,24 @@ def aplicacion_principal():
         st.error("No se pudieron cargar los datos de la empresa. Verifica tus permisos.")
         st.stop()
 
+    # Verificar permisos usando la información ya obtenida en get_empresas
     es_propietario = empresa_data.get('propietario_id') == st.session_state.user.id
-    es_editor = False
+
+    # Si no es propietario, verificar si tiene acceso compartido
     if not es_propietario:
         try:
             res = supabase.table('empresas_compartidas').select('permiso').eq('empresa_id', empresa_id).eq('usuario_compartido_id', st.session_state.user.id).single().execute()
-            if res.data and res.data['permiso'] == 'editor':
-                es_editor = True
+            if not res.data:
+                st.error("No tienes permiso para ver esta empresa.")
+                st.stop()
+            permiso_usuario = res.data['permiso']
+            es_editor = (permiso_usuario == 'editor')
         except:
-            es_editor = False
+            st.error("No tienes permiso para ver esta empresa.")
+            st.stop()
+    else:
+        es_editor = False
+
     puede_editar = es_propietario or es_editor
 
     tab1, tab2, tab_est, tab3, tab4, tab5, tab_dash, tab6 = st.tabs([
