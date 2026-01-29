@@ -6,7 +6,7 @@ import sqlite3
 import io
 from io import StringIO, BytesIO
 from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
+from reportlab.lib.pagesizes import A4, letter
 from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -272,17 +272,17 @@ def encabezado_pie_pagina(canvas, doc, logo_bytes, nombre_empresa, version, coor
     if logo_bytes:
         logo = Image(logo_bytes, width=0.7*inch, height=0.7*inch, hAlign='LEFT')
         logo.drawOn(canvas, doc.leftMargin, doc.height + doc.topMargin - 0.2*inch)
-    canvas.drawString(doc.leftMargin + 0.8*inch, doc.height + doc.topMargin - 0.05*inch, nombre_empresa)
+    canvas.drawString(doc.leftMargin + 0.8*inch, letter[1] - 0.5*inch, nombre_empresa)
     canvas.setFont('Helvetica', 10)
-    canvas.drawRightString(doc.width + doc.leftMargin, doc.height + doc.topMargin - 0.05*inch, f"Versión: {version}")
-    canvas.line(doc.leftMargin, doc.height + doc.topMargin - 0.15*inch, doc.width + doc.leftMargin, doc.height + doc.topMargin - 0.15*inch)
+    canvas.drawRightString(doc.width + doc.leftMargin, letter[1] - 0.5*inch, f"Versión: {version}")
+    canvas.line(doc.leftMargin, letter[1] - 0.6*inch, doc.width + doc.leftMargin, letter[1] - 0.6*inch)
     canvas.restoreState()
     canvas.saveState()
     canvas.setFont('Helvetica', 8)
-    canvas.line(doc.leftMargin, doc.bottomMargin + 0.2*inch, doc.width + doc.leftMargin, doc.bottomMargin + 0.2*inch)
-    canvas.drawString(doc.leftMargin, 0.4*inch, f"Elaborado por: {elaborado}")
+    canvas.line(doc.leftMargin, 0.8*inch, doc.width + doc.leftMargin, 0.8*inch)
+    canvas.drawString(doc.leftMargin, 0.6*inch, f"Elaborado por: {elaborado}")
     canvas.drawCentredString(doc.width/2 + doc.leftMargin, 0.75*inch, f"Revisado por: {revisado}")
-    canvas.drawRightString(doc.width + doc.leftMargin, 0.4*inch, f"Aprobado por: {aprobado}")
+    canvas.drawRightString(doc.width + doc.leftMargin, 0.6*inch, f"Aprobado por: {aprobado}")
     canvas.restoreState()
 
 def get_apa_styles():
@@ -409,8 +409,8 @@ def encabezado_pie_pagina(canvas, doc, logo_bytes, nombre_empresa, version, elab
     
     # ENCABEZADO
     # Línea superior
-    canvas.line(doc.leftMargin, doc.height + doc.topMargin - 0.15*inch, 
-                doc.width + doc.leftMargin, doc.height + doc.topMargin - 0.15*inch)
+    canvas.line(doc.leftMargin, letter[1] - 0.6*inch, 
+                doc.width + doc.leftMargin, letter[1] - 0.6*inch)
     
     # Logo (izquierda)
     if logo_bytes:
@@ -423,13 +423,13 @@ def encabezado_pie_pagina(canvas, doc, logo_bytes, nombre_empresa, version, elab
     # Nombre de empresa (centro)
     canvas.setFont('Times-Bold', 11)
     canvas.drawCentredString(doc.width/2 + doc.leftMargin, 
-                            doc.height + doc.topMargin - 0.15*inch, 
+                            letter[1] - 0.6*inch, 
                             nombre_empresa[:50])
     
     # Versión y fecha (derecha)
     canvas.setFont('Times-Roman', 9)
     canvas.drawRightString(doc.width + doc.leftMargin, 
-                          doc.height + doc.topMargin - 0.15*inch, 
+                          letter[1] - 0.6*inch, 
                           f"Versión: {version}")
     canvas.drawRightString(doc.width + doc.leftMargin, 
                           doc.height + doc.topMargin - 0.7*inch, 
@@ -441,8 +441,8 @@ def encabezado_pie_pagina(canvas, doc, logo_bytes, nombre_empresa, version, elab
     
     # PIE DE PÁGINA
     # Línea superior del pie
-    canvas.line(doc.leftMargin, doc.bottomMargin + 0.2*inch, 
-                doc.width + doc.leftMargin, doc.bottomMargin + 0.2*inch)
+    canvas.line(doc.leftMargin, 0.8*inch, 
+                doc.width + doc.leftMargin, 0.8*inch)
     
     # Texto del pie (tres columnas)
     canvas.setFont('Times-Roman', 9)
@@ -625,8 +625,8 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         pagesize=A4,
         leftMargin=1*inch,
         rightMargin=1*inch,
-        topMargin=3.0*inch,  # Aumentado a 3.0 pulgadas (más espacio para header)
-        bottomMargin=2.5*inch,  # Aumentado a 2.5 pulgadas (más espacio para footer)
+        topMargin=1.5*inch,  # Reducido a 1.5 pulgadas (menos espacio vacío)
+        bottomMargin=1.2*inch,  # Reducido a 1.2 pulgadas (menos espacio vacío)
     )
 
     # Crear Frame para limitar el área de contenido (evita solapamiento con header/footer)
@@ -635,7 +635,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         doc.leftMargin,  # x
         doc.bottomMargin,  # y
         doc.width,  # width
-        doc.height,  # height
+        letter[1] - doc.topMargin - doc.bottomMargin,  # height (página - márgenes)
         id='content_frame',
         showBoundary=0  # 0 = no mostrar borde, 1 = debug
     )
@@ -1208,8 +1208,8 @@ def encabezado_pie_pagina(canvas, doc, logo_bytes, nombre_empresa, version, elab
     
     # ENCABEZADO
     # Línea superior
-    canvas.line(doc.leftMargin, doc.height + doc.topMargin - 0.15*inch, 
-                doc.width + doc.leftMargin, doc.height + doc.topMargin - 0.15*inch)
+    canvas.line(doc.leftMargin, letter[1] - 0.6*inch, 
+                doc.width + doc.leftMargin, letter[1] - 0.6*inch)
     
     # Logo (izquierda)
     if logo_bytes:
@@ -1222,13 +1222,13 @@ def encabezado_pie_pagina(canvas, doc, logo_bytes, nombre_empresa, version, elab
     # Nombre de empresa (centro)
     canvas.setFont('Times-Bold', 11)
     canvas.drawCentredString(doc.width/2 + doc.leftMargin, 
-                            doc.height + doc.topMargin - 0.15*inch, 
+                            letter[1] - 0.6*inch, 
                             nombre_empresa[:50])
     
     # Versión y fecha (derecha)
     canvas.setFont('Times-Roman', 9)
     canvas.drawRightString(doc.width + doc.leftMargin, 
-                          doc.height + doc.topMargin - 0.15*inch, 
+                          letter[1] - 0.6*inch, 
                           f"Versión: {version}")
     canvas.drawRightString(doc.width + doc.leftMargin, 
                           doc.height + doc.topMargin - 0.7*inch, 
@@ -1240,8 +1240,8 @@ def encabezado_pie_pagina(canvas, doc, logo_bytes, nombre_empresa, version, elab
     
     # PIE DE PÁGINA
     # Línea superior del pie
-    canvas.line(doc.leftMargin, doc.bottomMargin + 0.2*inch, 
-                doc.width + doc.leftMargin, doc.bottomMargin + 0.2*inch)
+    canvas.line(doc.leftMargin, 0.8*inch, 
+                doc.width + doc.leftMargin, 0.8*inch)
     
     # Texto del pie (tres columnas)
     canvas.setFont('Times-Roman', 9)
