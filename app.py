@@ -275,14 +275,14 @@ def encabezado_pie_pagina(canvas, doc, logo_bytes, nombre_empresa, version, coor
     canvas.drawString(doc.leftMargin + 0.8*inch, doc.height + doc.topMargin - 0.35*inch, nombre_empresa)
     canvas.setFont('Helvetica', 10)
     canvas.drawRightString(doc.width + doc.leftMargin, doc.height + doc.topMargin - 0.35*inch, f"Versión: {version}")
-    canvas.line(doc.leftMargin, doc.height + doc.topMargin - 0.6*inch, doc.width + doc.leftMargin, doc.height + doc.topMargin - 0.6*inch)
+    canvas.line(doc.leftMargin, doc.height + doc.topMargin - 0.5*inch, doc.width + doc.leftMargin, doc.height + doc.topMargin - 0.5*inch)
     canvas.restoreState()
     canvas.saveState()
     canvas.setFont('Helvetica', 8)
-    canvas.line(doc.leftMargin, doc.bottomMargin - 0.1*inch, doc.width + doc.leftMargin, doc.bottomMargin - 0.1*inch)
-    canvas.drawString(doc.leftMargin, 0.5*inch, "Elaborado por: AE4-002")
-    canvas.drawCentredString(doc.width/2 + doc.leftMargin, 0.5*inch, f"Revisado por: {coordinador}")
-    canvas.drawRightString(doc.width + doc.leftMargin, 0.5*inch, "Aprobado por: Ing. Monica Legarda")
+    canvas.line(doc.leftMargin, doc.bottomMargin + 0.25*inch, doc.width + doc.leftMargin, doc.bottomMargin + 0.25*inch)
+    canvas.drawString(doc.leftMargin, 0.75*inch, f"Elaborado por: {elaborado}")
+    canvas.drawCentredString(doc.width/2 + doc.leftMargin, 0.75*inch, f"Revisado por: {revisado}")
+    canvas.drawRightString(doc.width + doc.leftMargin, 0.75*inch, f"Aprobado por: {aprobado}")
     canvas.restoreState()
 
 def get_apa_styles():
@@ -423,7 +423,7 @@ def encabezado_pie_pagina(canvas, doc, logo_bytes, nombre_empresa, version, elab
     # Nombre de empresa (centro)
     canvas.setFont('Times-Bold', 11)
     canvas.drawCentredString(doc.width/2 + doc.leftMargin, 
-                            doc.height + doc.topMargin - 0.6*inch, 
+                            doc.height + doc.topMargin - 0.5*inch, 
                             nombre_empresa[:50])
     
     # Versión y fecha (derecha)
@@ -624,8 +624,8 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         pagesize=A4,
         leftMargin=1*inch,
         rightMargin=1*inch,
-        topMargin=1.3*inch,  # Más espacio para el encabezado
-        bottomMargin=1*inch,
+        topMargin=1.8*inch,  # Más espacio para el encabezado (era 1.3)
+        bottomMargin=1.5*inch,  # Más espacio para el pie de página (era 1.0)
     )
     
     styles = get_apa_styles()
@@ -1199,7 +1199,7 @@ def encabezado_pie_pagina(canvas, doc, logo_bytes, nombre_empresa, version, elab
     # Nombre de empresa (centro)
     canvas.setFont('Times-Bold', 11)
     canvas.drawCentredString(doc.width/2 + doc.leftMargin, 
-                            doc.height + doc.topMargin - 0.6*inch, 
+                            doc.height + doc.topMargin - 0.5*inch, 
                             nombre_empresa[:50])
     
     # Versión y fecha (derecha)
