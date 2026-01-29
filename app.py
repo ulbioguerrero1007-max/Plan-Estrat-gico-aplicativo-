@@ -302,7 +302,7 @@ def get_apa_styles():
         leading=24,  # Interlineado doble
         alignment=TA_JUSTIFY,
         spaceAfter=12,
-        firstLineIndent=0.5*inch,  # Sangría de primera línea
+        firstLineIndent=0,  # Sin sangría en base
     ))
     
     # Título principal (Portada)
@@ -322,9 +322,10 @@ def get_apa_styles():
         name='APA_H1',
         parent=styles['APA_Base'],
         fontName='Times-Bold',
+        fontSize=13,
         alignment=TA_CENTER,
-        spaceBefore=24,
-        spaceAfter=12,
+        spaceBefore=48,
+        spaceAfter=18,
         leading=24,
         firstLineIndent=0,
     ))
@@ -334,8 +335,9 @@ def get_apa_styles():
         name='APA_H2',
         parent=styles['APA_Base'],
         fontName='Times-Bold',
+        fontSize=12,
         alignment=TA_LEFT,
-        spaceBefore=12,
+        spaceBefore=24,
         spaceAfter=12,
         leading=24,
         firstLineIndent=0,
@@ -347,7 +349,7 @@ def get_apa_styles():
         parent=styles['APA_Base'],
         fontName='Times-Bold',
         alignment=TA_LEFT,
-        spaceBefore=12,
+        spaceBefore=24,
         spaceAfter=12,
         leading=24,
         firstLineIndent=0.5*inch,
