@@ -173,12 +173,21 @@ def compartir_empresa(empresa_id, email_usuario, permiso='lector'):
     """
     if supabase and empresa_id and email_usuario:
         try:
-            # Buscar el usuario por email
-            resp_usuario = supabase.table('usuarios').select('id').eq('email', email_usuario).single().execute()
-            if not resp_usuario.data:
-                return False, "Usuario no encontrado"
+            # Buscar el usuario por email usando auth.admin.list_users()
+            # O alternativamente, crear una función RPC en Supabase
+            # Por ahora, usaremos un método alternativo: buscar en empresas_compartidas
+            # o crear una tabla de usuarios públicos
 
-            usuario_compartir_id = resp_usuario.data['id']
+            # Método alternativo: usar una consulta directa con service role
+            # o pedir al usuario que ingrese el UUID directamente
+
+            # Por ahora, buscaremos en la tabla auth.users mediante RPC o función
+            resp_usuario = supabase.rpc('get_user_id_by_email', {'email_input': email_usuario}).execute()
+
+            if not resp_usuario.data:
+                return False, "Usuario no encontrado. Asegúrate de que el email esté registrado."
+
+            usuario_compartir_id = resp_usuario.data
 
             # Verificar que no sea el propietario
             resp_empresa = supabase.table('empresas').select('propietario_id').eq('id', empresa_id).single().execute()
@@ -226,11 +235,12 @@ def get_usuarios_compartidos(empresa_id):
                 usuarios = []
                 for comp in resp.data:
                     try:
-                        resp_user = supabase.table('usuarios').select('email, full_name').eq('id', comp['usuario_compartido_id']).single().execute()
+                        # Usar RPC para obtener datos del usuario
+                        resp_user = supabase.rpc('get_user_by_id', {'user_id': comp['usuario_compartido_id']}).execute()
                         if resp_user.data:
                             usuarios.append({
                                 'usuario_id': comp['usuario_compartido_id'],
-                                'email': resp_user.data['email'],
+                                'email': resp_user.data.get('email', 'Sin email'),
                                 'nombre': resp_user.data.get('full_name', 'Sin nombre'),
                                 'permiso': comp['permiso']
                             })
