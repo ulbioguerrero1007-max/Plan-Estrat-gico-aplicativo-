@@ -619,13 +619,25 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     pdf_buffer = BytesIO()
     
     # Configuración de márgenes APA (1 pulgada = 2.54 cm en todos los lados)
+    # Crear documento con márgenes grandes
     doc = SimpleDocTemplate(
         pdf_buffer, 
         pagesize=A4,
         leftMargin=1*inch,
         rightMargin=1*inch,
-        topMargin=2.2*inch,  # MUCHO más espacio para el encabezado (era 1.8)
-        bottomMargin=2.0*inch,  # MUCHO más espacio para el pie de página (era 1.5)
+        topMargin=2.5*inch,  # Aumentado a 2.5 pulgadas
+        bottomMargin=2.2*inch,  # Aumentado a 2.2 pulgadas
+    )
+
+    # Crear Frame para limitar el área de contenido (evita solapamiento con header/footer)
+    from reportlab.platypus import Frame
+    content_frame = Frame(
+        doc.leftMargin,  # x
+        doc.bottomMargin,  # y
+        doc.width,  # width
+        doc.height,  # height
+        id='content_frame',
+        showBoundary=0  # 0 = no mostrar borde, 1 = debug
     )
     
     styles = get_apa_styles()
@@ -1170,7 +1182,18 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     
     # Construir el PDF
     try:
-        doc.build(story, onFirstPage=header_footer, onLaterPages=header_footer)
+        from reportlab.platypus import PageTemplate
+
+        # Crear PageTemplate con Frame para limitar área de contenido
+        page_template = PageTemplate(
+            id='content_page', 
+            frames=content_frame, 
+            onPage=header_footer
+        )
+        doc.addPageTemplates([page_template])
+
+        # Construir documento - el Frame limita el contenido al área útil
+        doc.build(story)
         pdf_buffer.seek(0)
         return pdf_buffer
     except Exception as e:
