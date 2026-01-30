@@ -174,20 +174,10 @@ def compartir_empresa(empresa_id, email_usuario, permiso='lector'):
     if supabase and empresa_id and email_usuario:
         try:
             # Buscar el usuario por email
-            # Nota: Esto requiere una función RPC o tabla de usuarios públicos
-            # Por ahora, usaremos un método alternativo
-            
-            # Método: Crear entrada con email y esperar que el usuario se registre
-            # o buscar en una tabla de usuarios si existe
-            
-            # Opción alternativa: Guardar el email directamente y buscar usuario después
             resp_usuario = supabase.rpc('get_user_id_by_email', {'email_input': email_usuario}).execute()
             
             if not resp_usuario.data:
-                # Si no existe la función RPC, guardamos con email para referencia
-                # y creamos un registro temporal
-                st.warning(f"Usuario {email_usuario} no encontrado en el sistema. Asegúrate de que esté registrado.")
-                return False, "Usuario no encontrado. El email debe estar registrado en el sistema."
+                return False, "Usuario no encontrado. Asegúrate de que el email esté registrado."
             
             usuario_compartir_id = resp_usuario.data
             
@@ -199,11 +189,10 @@ def compartir_empresa(empresa_id, email_usuario, permiso='lector'):
             # Verificar si ya está compartida
             resp_existente = supabase.table('empresas_compartidas').select('*').eq('empresa_id', empresa_id).eq('usuario_compartido_id', usuario_compartir_id).execute()
             if resp_existente.data:
-                # Actualizar permiso
                 supabase.table('empresas_compartidas').update({'permiso': permiso}).eq('empresa_id', empresa_id).eq('usuario_compartido_id', usuario_compartir_id).execute()
                 return True, "Permiso actualizado"
 
-            # Crear nuevo registro de compartir
+            # Crear nuevo registro
             supabase.table('empresas_compartidas').insert({
                 'empresa_id': empresa_id,
                 'usuario_compartido_id': usuario_compartir_id,
@@ -215,10 +204,6 @@ def compartir_empresa(empresa_id, email_usuario, permiso='lector'):
         except Exception as e:
             return False, f"Error al compartir: {e}"
     return False, "Datos incompletos"
-        except Exception as e:
-            return False, f"Error al compartir: {e}"
-    return False, "Datos incompletos"
-
 
 def eliminar_compartir(empresa_id, usuario_compartido_id):
     """Elimina el acceso compartido a un usuario."""
@@ -235,27 +220,26 @@ def get_usuarios_compartidos(empresa_id):
     """Obtiene la lista de usuarios con quienes se compartió la empresa."""
     if supabase and empresa_id:
         try:
-            resp = supabase.table('empresas_compartidas').select('usuario_compartido_id, permiso').eq('empresa_id', empresa_id).execute()
+            resp = supabase.table('empresas_compartidas').select('*').eq('empresa_id', empresa_id).execute()
+            
             if resp.data:
                 usuarios = []
                 for comp in resp.data:
                     try:
-                        # Usar RPC para obtener datos del usuario
-                        resp_user = supabase.rpc('get_user_by_id', {'user_id': comp['usuario_compartido_id']}).execute()
-                        if resp_user.data:
-                            usuarios.append({
-                                'usuario_id': comp['usuario_compartido_id'],
-                                'email': resp_user.data.get('email', 'Sin email'),
-                                'nombre': resp_user.data.get('full_name', 'Sin nombre'),
-                                'permiso': comp['permiso']
-                            })
-                    except:
+                        usuario_id = comp['usuario_compartido_id']
+                        usuarios.append({
+                            'usuario_id': usuario_id,
+                            'email': f"Usuario: {usuario_id[:8]}...",
+                            'nombre': 'Usuario externo',
+                            'permiso': comp['permiso']
+                        })
+                    except Exception as e:
+                        print(f"Error procesando usuario: {e}")
                         continue
                 return usuarios
         except Exception as e:
             st.error(f"Error al cargar usuarios compartidos: {e}")
     return []
-
 
 def save_image(uploaded_file):
     if uploaded_file:
@@ -4688,6 +4672,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
