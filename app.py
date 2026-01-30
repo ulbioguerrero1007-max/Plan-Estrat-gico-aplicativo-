@@ -454,25 +454,6 @@ def generar_grafico_pest_bar(df_pest):
     buf.seek(0)
     return buf
 
-def generar_pdf_formato_pie_pagina(canvas, doc, logo_bytes, nombre_empresa, version, coordinador):
-    canvas.saveState()
-    canvas.setFont('Helvetica-Bold', 14)
-    if logo_bytes:
-        logo = Image(logo_bytes, width=0.7*inch, height=0.7*inch, hAlign='LEFT')
-        logo.drawOn(canvas, doc.leftMargin, doc.height + doc.topMargin - 0.2*inch)
-    canvas.drawString(doc.leftMargin + 0.8*inch, letter[1] - 0.5*inch, nombre_empresa)
-    canvas.setFont('Helvetica', 10)
-    canvas.drawRightString(doc.width + doc.leftMargin, letter[1] - 0.5*inch, f"Versión: {version}")
-    canvas.line(doc.leftMargin, letter[1] - 0.6*inch, doc.width + doc.leftMargin, letter[1] - 0.6*inch)
-    canvas.restoreState()
-    canvas.saveState()
-    canvas.setFont('Helvetica', 8)
-    canvas.line(doc.leftMargin, 0.8*inch, doc.width + doc.leftMargin, 0.8*inch)
-    canvas.drawString(doc.leftMargin, 0.6*inch, f"Elaborado por: {elaborado}")
-    canvas.drawCentredString(doc.width/2 + doc.leftMargin, 0.75*inch, f"Revisado por: {revisado}")
-    canvas.drawRightString(doc.width + doc.leftMargin, 0.6*inch, f"Aprobado por: {aprobado}")
-    canvas.restoreState()
-
 def get_apa_styles():
     """
     Estilos según normas APA 7ma edición:
@@ -1760,7 +1741,24 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         st.error(f"Error al generar PDF: {e}")
         import traceback
         st.error(traceback.format_exc())
-        return None    
+        return None
+
+def mostrar_ultimo_analisis_guardado(empresa_data, tipo_analisis):
+    """
+    Muestra el último análisis guardado desde el diccionario de datos de la empresa.
+    """
+    contenido = empresa_data.get(f'analisis_{tipo_analisis}')
+    if contenido and str(contenido).strip():
+        st.markdown("---")
+        st.markdown(f"**📄 Último análisis de {tipo_analisis.upper()} guardado:**")
+        if tipo_analisis == 'cmi' and '|' in str(contenido):
+            try:
+                df_view = pd.read_csv(io.StringIO(contenido), sep="|")
+                st.table(df_view)
+            except Exception as e:
+                st.text_area(f"contenido_guardado_{tipo_analisis}", value=contenido, height=200, disabled=True, label_visibility="collapsed")
+        else:
+            st.text_area(f"contenido_guardado_{tipo_analisis}", value=contenido, height=200, disabled=True, label_visibility="collapsed")
 
 def aplicacion_principal():
     with st.sidebar:
@@ -3216,7 +3214,8 @@ Lenguaje ejecutivo y directo."""
                 if st.button("📊 Generar Resumen Ejecutivo con IA"):
                     with st.spinner("Generando..."):
                         resumen_ejecutivo = generar_analisis(prompt_resumen)
-                        st.markdown(resumen_ejecutivo)
+                        st.markdown("### 📋 Análisis Generado:")
+                        st.info(resumen_ejecutivo)
                         
                         # Botón para guardar en BD
                         if st.button("💾 Guardar Resumen en Empresa"):
@@ -4381,5 +4380,6 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
