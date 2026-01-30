@@ -1539,7 +1539,7 @@ def mostrar_ultimo_analisis_guardado(empresa_data, tipo_analisis):
             st.text_area(f"contenido_guardado_{tipo_analisis}", value=contenido, height=200, disabled=True, label_visibility="collapsed")
 
 def aplicacion_principal():
-    with st.sidebar:
+        with st.sidebar:
         st.header("Estratega Pro UG-UCE")
         empresas_df = get_empresas()
 
@@ -1701,11 +1701,12 @@ def aplicacion_principal():
                     except Exception as e:
                         st.error(f"Error al eliminar la empresa: {e}")
 
+        # Mensaje para no propietarios
         elif empresa_id and not es_propietario:
             st.divider()
             st.info("ℹ️ Solo el propietario puede compartir o eliminar esta empresa")
-            
-# BOTÓN DE CERRAR SESIÓN (AGREGADO AL FINAL)
+        
+        # BOTÓN DE CERRAR SESIÓN (AL FINAL DEL SIDEBAR)
         st.divider()
         st.subheader("Sesión")
         
@@ -1715,12 +1716,11 @@ def aplicacion_principal():
         
         if st.button("🚪 Cerrar Sesión", type="secondary", use_container_width=True):
             # Limpiar toda la sesión
-            keys_to_delete = [k for k in st.session_state.keys() if k not in ['__initialized__']]
+            keys_to_delete = [k for k in st.session_state.keys()]
             for key in keys_to_delete:
                 del st.session_state[key]
             st.success("Sesión cerrada correctamente")
             st.rerun()
-
             with col2:
                 if st.button("Cancelar", use_container_width=True):
                     st.rerun()
@@ -4690,6 +4690,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
