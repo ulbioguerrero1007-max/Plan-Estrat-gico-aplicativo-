@@ -1539,7 +1539,7 @@ def mostrar_ultimo_analisis_guardado(empresa_data, tipo_analisis):
             st.text_area(f"contenido_guardado_{tipo_analisis}", value=contenido, height=200, disabled=True, label_visibility="collapsed")
 
 def aplicacion_principal():
-        with st.sidebar:
+    with st.sidebar:
         st.header("Estratega Pro UG-UCE")
         empresas_df = get_empresas()
 
@@ -4690,6 +4690,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
