@@ -1721,17 +1721,11 @@ def aplicacion_principal():
                 del st.session_state[key]
             st.success("Sesión cerrada correctamente")
             st.rerun()
-            with col2:
-                if st.button("Cancelar", use_container_width=True):
-                    st.rerun()
-  
-        el and not es_propietario:
-            st.divider()
-            st.info("ℹ️ Solo el propietario puede compartir o eliminar esta empresa")
                 
     if not empresa_id:
         st.info("👈 Por favor, selecciona o crea una empresa en el menú lateral para comenzar.")
         st.stop()
+
 
     empresa_data = get_datos_empresa(empresa_id)
     if not empresa_data:
@@ -4690,6 +4684,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
