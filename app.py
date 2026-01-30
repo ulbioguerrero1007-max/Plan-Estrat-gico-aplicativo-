@@ -254,9 +254,66 @@ def get_usuarios_compartidos(empresa_id):
     return []
     
 def save_image(uploaded_file):
-    if uploaded_file:
-        return uploaded_file.getvalue()
+    """
+    Guarda una imagen subida y retorna los bytes listos para guardar en BD.
+    """
+    if uploaded_file is not None:
+        try:
+            # Leer los bytes directamente
+            bytes_data = uploaded_file.getvalue()
+            return bytes_data  # Retornar bytes directamente, no hex
+        except Exception as e:
+            st.error(f"Error al procesar imagen: {e}")
+            return None
     return None
+
+def mostrar_imagen_bd(imagen_bytes, caption="Imagen", width=None):
+    """
+    Muestra una imagen guardada en la base de datos.
+    Maneja múltiples formatos de almacenamiento.
+    """
+    if not imagen_bytes:
+        return False
+    
+    try:
+        # Caso 1: Si es bytes directamente
+        if isinstance(imagen_bytes, bytes):
+            st.image(imagen_bytes, caption=caption, width=width)
+            return True
+        
+        # Caso 2: Si es string (hex o base64)
+        if isinstance(imagen_bytes, str):
+            # Intentar convertir desde hex
+            try:
+                hex_clean = imagen_bytes.replace('\\x', '').replace('0x', '').replace("'", "").strip()
+                if all(c in '0123456789abcdefABCDEF' for c in hex_clean):
+                    image_bytes = bytes.fromhex(hex_clean)
+                    st.image(image_bytes, caption=caption, width=width)
+                    return True
+            except:
+                pass
+            
+            # Intentar como base64
+            try:
+                import base64
+                image_bytes = base64.b64decode(imagen_bytes)
+                st.image(image_bytes, caption=caption, width=width)
+                return True
+            except:
+                pass
+        
+        # Caso 3: Si es memoryview u otro tipo buffer
+        try:
+            image_bytes = bytes(imagen_bytes)
+            st.image(image_bytes, caption=caption, width=width)
+            return True
+        except:
+            pass
+            
+    except Exception as e:
+        st.warning(f"No se pudo mostrar imagen: {e}")
+    
+    return False
 
 def analizar_foda(df_foda):
     if df_foda.empty: 
@@ -4708,6 +4765,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
