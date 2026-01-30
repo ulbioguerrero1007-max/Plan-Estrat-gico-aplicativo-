@@ -217,7 +217,6 @@ def eliminar_compartir(empresa_id, usuario_compartido_id):
 
 
 def get_usuarios_compartidos(empresa_id):
-    """Obtiene la lista de usuarios con quienes se compartió la empresa."""
     if supabase and empresa_id:
         try:
             resp = supabase.table('empresas_compartidas').select('*').eq('empresa_id', empresa_id).execute()
@@ -225,22 +224,17 @@ def get_usuarios_compartidos(empresa_id):
             if resp.data:
                 usuarios = []
                 for comp in resp.data:
-                    try:
-                        usuario_id = comp['usuario_compartido_id']
-                        usuarios.append({
-                            'usuario_id': usuario_id,
-                            'email': f"Usuario: {usuario_id[:8]}...",
-                            'nombre': 'Usuario externo',
-                            'permiso': comp['permiso']
-                        })
-                    except Exception as e:
-                        print(f"Error procesando usuario: {e}")
-                        continue
+                    usuarios.append({
+                        'usuario_id': comp['usuario_compartido_id'],
+                        'email': comp.get('email_compartido', comp['usuario_compartido_id'][:8] + '...'),
+                        'nombre': 'Usuario',
+                        'permiso': comp['permiso']
+                    })
                 return usuarios
         except Exception as e:
             st.error(f"Error al cargar usuarios compartidos: {e}")
     return []
-
+    
 def save_image(uploaded_file):
     if uploaded_file:
         return uploaded_file.getvalue()
@@ -4701,6 +4695,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
