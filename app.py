@@ -2258,53 +2258,233 @@ def aplicacion_principal():
                         for idx, row in df_estrategias_planes.iterrows():
                             contexto_estrategias += f"\n{idx+1}. [{row['cuadrante']}] {row['estrategia']} -> {row['plan_asignado']}"
                     
-                    prompt_planes_maestros = f"""Actúa como un consultor senior de estrategia empresarial con 20 años de experiencia. 
-Elabora 7 PLANES FUNCIONALES ESTRATÉGICOS de alto nivel para {contexto_empresa['nombre']}, 
-empresa del sector {contexto_empresa['giro']}.
-
-CONTEXTO ESTRATÉGICO:
-- Estrategia principal FODA: {contexto_empresa['estrategia_principal']}
-- Postura estratégica: {contexto_empresa['postura']}
-- Entorno PEST score: {contexto_empresa['pest_total']:.2f}
-- Estrategias generadas: {contexto_estrategias if contexto_estrategias else 'No hay estrategias previas'}
-
-ESTRUCTURA REQUERIDA PARA CADA PLAN (7 planes totales):
-
-1. PLAN ADMINISTRATIVO
-2. PLAN OPERATIVO  
-3. PLAN TECNOLÓGICO
-4. PLAN FINANCIERO
-5. PLAN DE MONITOREO Y CONTROL
-6. PLAN DE MEJORA
-7. PLAN DE CONTINGENCIA
-
-PARA CADA PLAN DEBES INCLUIR EXACTAMENTE:
-
-=== [NOMBRE DEL PLAN] ===
-
-1. FUNDAMENTO ESTRATÉGICO
-[Explicación de por qué este plan es crítico para la empresa en su contexto actual, 3-4 párrafos profundos]
-
-2. OBJETIVO GENERAL DEL PLAN
-[Objetivo SMART específico]
-
-3. OBJETIVOS ESPECÍFICOS (mínimo 3)
-- Objetivo 1
-- Objetivo 2  
-- Objetivo 3
-
-4. ESTRATEGIAS DE IMPLEMENTACIÓN (mínimo 4 estrategias concretas)
-A. [Nombre estrategia 1]
-   - Descripción detallada
-   - Acciones clave
-B. [Nombre estrategia 2]
-   - Descripción detallada
-   - Acciones clave
-[C continuar...]
-
-5. KPls Y METAS (mínimo 5 KPIs por plan)
-- KPI 1: [Nombre] | Meta: [X] | Frecuencia: [mensual/trimestral]
-- KPI 2: [Nombre]
+                    # Construir prompt como lista de líneas para evitar problemas con triple comillas
+                    lineas_prompt = [
+                        "Actúa como un consultor senior de estrategia empresarial con 20 años de experiencia.",
+                        f"Elabora 7 PLANES FUNCIONALES ESTRATÉGICOS de alto nivel para {contexto_empresa['nombre']},",
+                        f"empresa del sector {contexto_empresa['giro']}.",
+                        "",
+                        "CONTEXTO ESTRATÉGICO:",
+                        f"- Estrategia principal FODA: {contexto_empresa['estrategia_principal']}",
+                        f"- Postura estratégica: {contexto_empresa['postura']}",
+                        f"- Entorno PEST score: {contexto_empresa['pest_total']:.2f}",
+                        f"- Estrategias generadas: {contexto_estrategias if contexto_estrategias else 'No hay estrategias previas'}",
+                        "",
+                        "ESTRUCTURA REQUERIDA PARA CADA PLAN (7 planes totales):",
+                        "",
+                        "1. PLAN ADMINISTRATIVO",
+                        "2. PLAN OPERATIVO",
+                        "3. PLAN TECNOLÓGICO",
+                        "4. PLAN FINANCIERO",
+                        "5. PLAN DE MONITOREO Y CONTROL",
+                        "6. PLAN DE MEJORA",
+                        "7. PLAN DE CONTINGENCIA",
+                        "",
+                        "PARA CADA PLAN DEBES INCLUIR EXACTAMENTE:",
+                        "",
+                        "=== [NOMBRE DEL PLAN] ===",
+                        "",
+                        "1. FUNDAMENTO ESTRATÉGICO",
+                        "[Explicación de por qué este plan es crítico para la empresa en su contexto actual, 3-4 párrafos profundos]",
+                        "",
+                        "2. OBJETIVO GENERAL DEL PLAN",
+                        "[Objetivo SMART específico]",
+                        "",
+                        "3. OBJETIVOS ESPECÍFICOS (mínimo 3)",
+                        "- Objetivo 1",
+                        "- Objetivo 2",
+                        "- Objetivo 3",
+                        "",
+                        "4. ESTRATEGIAS DE IMPLEMENTACIÓN (mínimo 4 estrategias concretas)",
+                        "A. [Nombre estrategia 1]",
+                        "   - Descripción detallada",
+                        "   - Acciones clave",
+                        "B. [Nombre estrategia 2]",
+                        "   - Descripción detallada",
+                        "   - Acciones clave",
+                        "[C continuar...]",
+                        "",
+                        "5. KPIs Y METAS (mínimo 5 KPIs por plan)",
+                        "- KPI 1: [Nombre] | Meta: [X] | Frecuencia: [mensual/trimestral]",
+                        "- KPI 2: [Nombre] | Meta: [X] | Frecuencia: [mensual/trimestral]",
+                        "[Continuar...]",
+                        "",
+                        "6. RECURSOS REQUERIDOS",
+                        "- Humanos: [Detalle]",
+                        "- Financieros: [Presupuesto estimado]",
+                        "- Tecnológicos: [Infraestructura]",
+                        "- Temporales: [Cronograma]",
+                        "",
+                        "7. RESPONSABLES Y GOBIERNO",
+                        "- Responsable principal: [Rol]",
+                        "- Comité de seguimiento: [Miembros]",
+                        "- Frecuencia de revisión: [Semanal/Mensual]",
+                        "",
+                        "8. RIESGOS Y MITIGACIÓN",
+                        "- Riesgo 1: [Descripción] | Mitigación: [Acción]",
+                        "- Riesgo 2: [Descripción] | Mitigación: [Acción]",
+                        "",
+                        "9. ALINEACIÓN CON ESTRATEGIA FODA",
+                        "[Cómo este plan contribuye específicamente a FO, FA, DO o DA]",
+                        "",
+                        "REQUISITOS DE CALIDAD:",
+                        "- Lenguaje ejecutivo y profesional",
+                        "- Contenido específico, no genérico",
+                        "- Cada plan debe tener 800-1200 palabras mínimo",
+                        "- Los KPIs deben ser cuantificables y realistas",
+                        "- Las estrategias deben ser accionables",
+                        "- Considerar el contexto PEST y FODA proporcionado",
+                        "- NO usar frases vacías como 'mejorar procesos' sin especificar cómo",
+                        "",
+                        "GENERA LOS 7 PLANES COMPLETOS AHORA:"
+                    ]
+                    
+                    prompt_planes_maestros = "\n".join(lineas_prompt)
+                    
+                    planes_generados = generar_analisis(prompt_planes_maestros)
+                    st.session_state['planes_maestros_generados'] = planes_generados
+                    st.success("✅ Planes funcionales generados con éxito")
+                    st.rerun()
+        
+        with col2:
+            st.caption("""
+            **Los 7 Planes Funcionales:**
+            1. 📊 Administrativo
+            2. ⚙️ Operativo
+            3. 💻 Tecnológico
+            4. 💰 Financiero
+            5. 📈 Monitoreo y Control
+            6. 🚀 Mejora
+            7. 🛡️ Contingencia
+            """)
+        
+        # Mostrar y editar planes
+        planes_actuales = st.session_state.get('planes_maestros_generados', empresa_data.get('analisis_operativo', ''))
+        
+        if planes_actuales:
+            st.divider()
+            st.subheader("📄 Planes Estratégicos Funcionales - Documento Maestro")
+            
+            # Mostrar en tabs los 7 planes si se detectan en el texto
+            planes_str = str(planes_actuales)
+            if "===" in planes_str:
+                # Intentar dividir por planes
+                try:
+                    # Patrón más flexible para detectar planes
+                    patron_planes = r'={2,}\s*(PLAN\s+[A-ZÁÉÍÓÚÑa-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑa-záéíóúñ]+)*)\s*={2,}'
+                    planes_secciones = re.split(patron_planes, planes_str, flags=re.IGNORECASE)
+                    
+                    if len(planes_secciones) > 1:
+                        # Crear tabs para cada plan detectado
+                        nombres_planes = []
+                        contenidos_planes = []
+                        
+                        for i in range(1, len(planes_secciones), 2):
+                            if i < len(planes_secciones):
+                                nombre = planes_secciones[i].strip()
+                                contenido = planes_secciones[i+1] if i+1 < len(planes_secciones) else ""
+                                # Limpiar nombre
+                                nombre_limpio = re.sub(r'[^\w\s-]', '', nombre).strip()
+                                if nombre_limpio and len(nombre_limpio) < 60:
+                                    nombres_planes.append(nombre_limpio)
+                                    contenidos_planes.append(contenido)
+                        
+                        if nombres_planes:
+                            tabs_planes = st.tabs(nombres_planes)
+                            for tab, nombre, contenido in zip(tabs_planes, nombres_planes, contenidos_planes):
+                                with tab:
+                                    st.markdown(f"### {nombre}")
+                                    st.markdown(contenido)
+                                    
+                                    # Botón para copiar contenido específico
+                                    key_segura = re.sub(r'[^\w]', '_', nombre)[:30]
+                                    if st.button(f"📋 Copiar contenido", key=f"copy_{key_segura}"):
+                                        st.code(contenido, language='markdown')
+                        else:
+                            st.info("Se generaron los planes pero no se pudieron separar automáticamente. Revisa el documento completo abajo.")
+                    else:
+                        st.info("No se detectaron separadores de planes. Mostrando documento completo.")
+                        
+                except Exception as e:
+                    st.warning(f"No se pudieron dividir los planes automáticamente: {e}")
+                    st.info("Mostrando documento completo para edición manual.")
+            
+            # Editor completo
+            with st.form("form_planes_maestros"):
+                st.write("**Editar Documento Completo de Planes:**")
+                planes_editados = st.text_area(
+                    "Planes Estratégicos Funcionales", 
+                    value=planes_str, 
+                    height=800, 
+                    disabled=not puede_editar,
+                    help="Edite los 7 planes funcionales. Use === NOMBRE DEL PLAN === para separar secciones."
+                )
+                
+                col_save, col_regen = st.columns(2)
+                with col_save:
+                    submitted_save = st.form_submit_button("💾 Guardar Planes Maestros", disabled=not puede_editar)
+                    if submitted_save:
+                        guardar_analisis_db(empresa_id, 'operativo', planes_editados)
+                        st.session_state['planes_maestros_generados'] = planes_editados
+                
+                with col_regen:
+                    submitted_regen = st.form_submit_button("🔄 Regenerar Todo", disabled=not puede_editar)
+                    if submitted_regen:
+                        if 'planes_maestros_generados' in st.session_state:
+                            del st.session_state['planes_maestros_generados']
+                        st.rerun()
+            
+            # Vista previa estructurada
+            with st.expander("📊 Ver Resumen Estructurado de Planes"):
+                try:
+                    # Extraer KPIs mencionados
+                    kpis_encontrados = re.findall(r'KPI\s*\d*[:.-]\s*([^\n|]+)', planes_str, re.IGNORECASE)
+                    if kpis_encontrados:
+                        st.write("**KPIs Detectados (primeros 20):**")
+                        for i, kpi in enumerate(kpis_encontrados[:20], 1):
+                            texto_kpi = kpi.strip()[:100]
+                            st.write(f"{i}. {texto_kpi}...")
+                    
+                    # Contar estrategias
+                    estrategias_count = len(re.findall(r'^[A-Z][.-]\s+', planes_str, re.MULTILINE))
+                    col_m1, col_m2, col_m3 = st.columns(3)
+                    with col_m1:
+                        st.metric("Estrategias Detectadas", estrategias_count)
+                    
+                    # Contar planes
+                    planes_count = len(re.findall(r'={2,}\s*PLAN', planes_str, re.IGNORECASE))
+                    with col_m2:
+                        st.metric("Planes Detectados", planes_count if planes_count > 0 else "No detectado")
+                    
+                    # Contar objetivos
+                    objetivos_count = len(re.findall(r'^\s*[-•]\s*Objetivo', planes_str, re.MULTILINE | re.IGNORECASE))
+                    with col_m3:
+                        st.metric("Objetivos Detectados", objetivos_count)
+                        
+                except Exception as e:
+                    st.error(f"Error al analizar el contenido: {e}")
+        
+        else:
+            st.info("""
+            👆 **Haz clic en "Generar 7 Planes Funcionales Profesionales"** para crear:
+            
+            **Plan Administrativo**: Estructura organizacional, gestión del talento, cultura corporativa
+            
+            **Plan Operativo**: Procesos productivos, cadena de suministro, calidad, logística
+            
+            **Plan Tecnológico**: Infraestructura digital, transformación digital, ciberseguridad, innovación
+            
+            **Plan Financiero**: Presupuesto, flujo de caja, inversión, rentabilidad, control financiero
+            
+            **Plan de Monitoreo y Control**: Dashboards, indicadores, auditorías, seguimiento estratégico
+            
+            **Plan de Mejora**: Metodologías (Kaizen, Six Sigma), optimización continua, capacitación
+            
+            **Plan de Contingencia**: Gestión de riesgos, continuidad del negocio, planes de respuesta
+            """)
+        
+        # Mostrar último guardado
+        mostrar_ultimo_analisis_guardado(empresa_data, 'operativo')        
         
     # --- PESTAÑA 5: CMI/INDICADORES ---
     with tab4:
@@ -3686,6 +3866,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
