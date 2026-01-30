@@ -4283,10 +4283,9 @@ Sé directo y accionable. Máximo 200 palabras."""
             
             st.info(
                 "**Estructura del documento generado:**\n\n"
-                "- **Resumen Ejecutivo** (máx. 5 hojas): Diagnóstico clave, estrategias prioritarias y recomendación\n"
-                "- **Plan Estratégico** (máx. 30 hojas): Introducción, estrategias, planes, CMI, operativización\n"
-                "- **Anexos** (ilimitado): Análisis detallados, matrices, dashboards y proyecciones\n\n"
-                "**Formato:** Tamaño carta (A4), Times New Roman 12pt, interlineado doble, márgenes de 1 pulgada"
+                "- **Resumen Ejecutivo** "
+                "- **Plan Estratégico** "
+                "- **Anexos** "
             )
             
             submitted_pdf = st.form_submit_button("🚀 Generar PDF Profesional")
@@ -4944,6 +4943,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
