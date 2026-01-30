@@ -3466,24 +3466,505 @@ Lenguaje ejecutivo y directo."""
             st.warning("Completa el Estado de Pérdidas y Ganancias y genera el Cuadro de Operativización para realizar la proyección.")
 
     
-    # --- PESTAÑA 7: DASHBOARD ---
+    # --- PESTAÑA DASHBOARD: BUSINESS INTELLIGENCE INTEGRADO ---
     with tab_dash:
-        st.header("📊 Dashboard de Análisis Estratégico")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Total Estrategias", len(get_datos_tabla('estrategias_generadas', empresa_id)))
-        with col2:
-            st.metric("Factores PEST", len(get_datos_tabla('matrices', empresa_id, tipo_matriz_filter='PEST')))
-        with col3:
-            st.metric("Factores FODA", len(get_datos_tabla('foda_cruzado', empresa_id)))
+        st.header("📊 Dashboard Ejecutivo - Business Intelligence")
+        st.markdown("*Análisis interactivo tipo Power BI con filtros dinámicos y visualizaciones en tiempo real*")
+        
+        import pandas as pd
+        import plotly.express as px
+        import plotly.graph_objects as go
+        from plotly.subplots import make_subplots
+        
+        # ============================================================
+        # 1. CARGA DE TODOS LOS DATOS DISPONIBLES
+        # ============================================================
+        
+        @st.cache_data(ttl=300)
+        def cargar_todos_los_datos(empresa_id):
+            datos = {}
+            datos['empresa'] = get_datos_empresa(empresa_id)
+            datos['estrategias'] = get_datos_tabla('estrategias_generadas', empresa_id)
+            datos['foda'] = get_datos_tabla('foda_cruzado', empresa_id)
+            datos['pest'] = get_datos_tabla('matrices', empresa_id, tipo_matriz_filter='PEST')
+            datos['operativizacion'] = get_datos_tabla('operativizacion', empresa_id)
+            datos['pg'] = get_datos_tabla('perdida_ganancia', empresa_id)
+            datos['proyeccion'] = get_datos_tabla('proyeccion_financiera', empresa_id)
+            datos['cmi'] = get_datos_tabla('estrategias_generadas', empresa_id)
+            return datos
+        
+        datos = cargar_todos_los_datos(empresa_id)
+        
+        # ============================================================
+        # 2. PANEL DE FILTROS GLOBALES (Tipo Power BI)
+        # ============================================================
+        
+        st.subheader("🎛️ Filtros Globales")
+        
+        col_f1, col_f2, col_f3, col_f4 = st.columns(4)
+        
+        with col_f1:
+            # Filtro por Cuadrante FODA
+            cuadrantes = ['Todos'] + datos['estrategias']['cuadrante'].unique().tolist() if not datos['estrategias'].empty else ['Todos']
+            filtro_cuadrante = st.selectbox("📍 Cuadrante FODA", cuadrantes)
+        
+        with col_f2:
+            # Filtro por Plan Funcional
+            planes = ['Todos'] + datos['estrategias']['plan_asignado'].unique().tolist() if not datos['estrategias'].empty else ['Todos']
+            filtro_plan = st.selectbox("📋 Plan Funcional", planes)
+        
+        with col_f3:
+            # Filtro por Importancia
+            importancias = ['Todas'] + datos['estrategias']['importancia'].unique().tolist() if not datos['estrategias'].empty else ['Todas']
+            filtro_importancia = st.selectbox("⚡ Importancia", importancias)
+        
+        with col_f4:
+            # Filtro por Categoría PEST
+            categorias_pest = ['Todas'] + datos['pest']['categoria'].unique().tolist() if not datos['pest'].empty else ['Todas']
+            filtro_pest = st.selectbox("🌍 Categoría PEST", categorias_pest)
+        
+        # Filtros adicionales expandibles
+        with st.expander("🔍 Filtros Avanzados"):
+            col_f5, col_f6 = st.columns(2)
+            with col_f5:
+                # Rango de impacto FODA
+                if not datos['foda'].empty:
+                    impacto_min, impacto_max = st.slider(
+                        "Rango de Impacto FODA", 
+                        min_value=0, 
+                        max_value=10, 
+                        value=(0, 10)
+                    )
+                else:
+                    impacto_min, impacto_max = 0, 10
+            
+            with col_f6:
+                # Filtro por texto
+                filtro_texto = st.text_input("🔎 Buscar en estrategias", placeholder="Escribe palabra clave...")
+        
+        # Botón para aplicar filtros (simula refresh de Power BI)
+        col_btn1, col_btn2, col_btn3 = st.columns([1, 1, 2])
+        with col_btn1:
+            aplicar_filtros = st.button("🔄 Aplicar Filtros", type="primary")
+        with col_btn2:
+            if st.button("❌ Limpiar Filtros"):
+                st.rerun()
         
         st.divider()
-        df_foda_dash = get_datos_tabla('foda_cruzado', empresa_id)
-        if not df_foda_dash.empty:
-            st.subheader("Distribución de Estrategias FODA")
-            fig = px.bar(df_foda_dash, x='cuadrante', y='impacto', color='cuadrante', title="Impacto por Cuadrante FODA")
-            st.plotly_chart(fig, use_container_width=True)
         
+        # ============================================================
+        # 3. APLICACIÓN DE FILTROS Y CÁLCULO DE MÉTRICAS
+        # ============================================================
+        
+        # Filtrar estrategias
+        df_estrategias_filtrado = datos['estrategias'].copy()
+        
+        if filtro_cuadrante != 'Todos' and not df_estrategias_filtrado.empty:
+            df_estrategias_filtrado = df_estrategias_filtrado[df_estrategias_filtrado['cuadrante'] == filtro_cuadrante]
+        
+        if filtro_plan != 'Todos' and not df_estrategias_filtrado.empty:
+            df_estrategias_filtrado = df_estrategias_filtrado[df_estrategias_filtrado['plan_asignado'] == filtro_plan]
+        
+        if filtro_importancia != 'Todas' and not df_estrategias_filtrado.empty:
+            df_estrategias_filtrado = df_estrategias_filtrado[df_estrategias_filtrado['importancia'] == filtro_importancia]
+        
+        if filtro_texto and not df_estrategias_filtrado.empty:
+            mask = df_estrategias_filtrado['estrategia'].str.contains(filtro_texto, case=False, na=False)
+            df_estrategias_filtrado = df_estrategias_filtrado[mask]
+        
+        # Filtrar PEST
+        df_pest_filtrado = datos['pest'].copy()
+        if filtro_pest != 'Todas' and not df_pest_filtrado.empty:
+            df_pest_filtrado = df_pest_filtrado[df_pest_filtrado['categoria'] == filtro_pest]
+        
+        # ============================================================
+        # 4. KPIs PRINCIPALES (Tarjetas tipo Power BI)
+        # ============================================================
+        
+        st.subheader("📈 Indicadores Clave de Desempeño (KPIs)")
+        
+        col_kpi1, col_kpi2, col_kpi3, col_kpi4, col_kpi5 = st.columns(5)
+        
+        # KPI 1: Total Estrategias Filtradas
+        with col_kpi1:
+            total_est = len(df_estrategias_filtrado) if not df_estrategias_filtrado.empty else 0
+            delta_est = len(datos['estrategias']) - total_est if not datos['estrategias'].empty else 0
+            st.metric(
+                label="🎯 Estrategias",
+                value=total_est,
+                delta=f"-{delta_est} filtradas" if delta_est > 0 else "Todas",
+                delta_color="off"
+            )
+        
+        # KPI 2: Inversión Total Operativizada
+        with col_kpi2:
+            if not datos['operativizacion'].empty:
+                # Aplicar mismos filtros a operativización
+                df_op = datos['operativizacion'].copy()
+                if filtro_plan != 'Todos':
+                    df_op = df_op[df_op['plan_asignado'] == filtro_plan]
+                inversion_total = df_op['costo'].sum() if 'costo' in df_op.columns else 0
+            else:
+                inversion_total = 0
+            st.metric(
+                label="💰 Inversión Total",
+                value=f"${inversion_total:,.0f}",
+                delta="Presupuesto" if inversion_total > 0 else "Sin datos"
+            )
+        
+        # KPI 3: Score PEST Promedio
+        with col_kpi3:
+            if not df_pest_filtrado.empty and 'valor_ponderado' in df_pest_filtrado.columns:
+                score_pest = df_pest_filtrado['valor_ponderado'].sum()
+            else:
+                score_pest = 0
+            st.metric(
+                label="🌍 Score PEST",
+                value=f"{score_pest:.2f}",
+                delta="Favorable" if score_pest > 2.5 else "Desafiante",
+                delta_color="normal" if score_pest > 2.5 else "inverse"
+            )
+        
+        # KPI 4: Estrategias de Alta Importancia
+        with col_kpi4:
+            if not df_estrategias_filtrado.empty:
+                altas = len(df_estrategias_filtrado[df_estrategias_filtrado['importancia'] == 'Alta'])
+            else:
+                altas = 0
+            st.metric(
+                label="⚡ Alta Prioridad",
+                value=altas,
+                delta="Requieren atención" if altas > 0 else "Sin alertas",
+                delta_color="inverse" if altas > 5 else "normal"
+            )
+        
+        # KPI 5: Rentabilidad Esperada
+        with col_kpi5:
+            if not datos['proyeccion'].empty and 'utilidad_neta_proyectada' in datos['proyeccion'].columns:
+                utilidad_total = datos['proyeccion']['utilidad_neta_proyectada'].sum()
+            else:
+                utilidad_total = 0
+            st.metric(
+                label="📈 Utilidad Proyectada",
+                value=f"${utilidad_total:,.0f}",
+                delta="5 años" if utilidad_total > 0 else "Sin proyección"
+            )
+        
+        st.divider()
+        
+        # ============================================================
+        # 5. GRÁFICOS PRINCIPALES (Layout tipo Power BI)
+        # ============================================================
+        
+        # Fila 1: Gráficos grandes
+        col_graf1, col_graf2 = st.columns([2, 1])
+        
+        with col_graf1:
+            st.subheader("🎯 Distribución de Estrategias por Cuadrante y Plan")
+            
+            if not df_estrategias_filtrado.empty:
+                # Gráfico de burbujas tipo Power BI
+                fig_burbuja = px.scatter(
+                    df_estrategias_filtrado,
+                    x='cuadrante',
+                    y='plan_asignado',
+                    size='importancia',
+                    color='cuadrante',
+                    hover_data=['estrategia'],
+                    size_max=60,
+                    title="Mapa de Estrategias (tamaño = importancia)"
+                )
+                fig_burbuja.update_layout(height=400)
+                st.plotly_chart(fig_burbuja, use_container_width=True)
+            else:
+                st.info("No hay datos de estrategias para mostrar")
+        
+        with col_graf2:
+            st.subheader("📊 Matriz de Importancia")
+            
+            if not df_estrategias_filtrado.empty:
+                # Conteo por importancia
+                imp_count = df_estrategias_filtrado['importancia'].value_counts()
+                fig_pastel = px.pie(
+                    values=imp_count.values,
+                    names=imp_count.index,
+                    title="Distribución por Prioridad",
+                    hole=0.4,
+                    color_discrete_sequence=['#e74c3c', '#f39c12', '#f1c40f', '#2ecc71']
+                )
+                fig_pastel.update_layout(height=400)
+                st.plotly_chart(fig_pastel, use_container_width=True)
+        
+        st.divider()
+        
+        # Fila 2: Análisis PEST y FODA
+        col_graf3, col_graf4 = st.columns(2)
+        
+        with col_graf3:
+            st.subheader("🌍 Análisis PEST Interactivo")
+            
+            if not df_pest_filtrado.empty:
+                # Gráfico de barras PEST
+                pest_agrupado = df_pest_filtrado.groupby('categoria')['valor_ponderado'].sum().reset_index()
+                fig_pest = px.bar(
+                    pest_agrupado,
+                    x='categoria',
+                    y='valor_ponderado',
+                    color='categoria',
+                    title="Impacto por Categoría PEST",
+                    labels={'valor_ponderado': 'Impacto Ponderado', 'categoria': 'Categoría'}
+                )
+                fig_pest.update_layout(height=350, showlegend=False)
+                st.plotly_chart(fig_pest, use_container_width=True)
+                
+                # Tabla detalle debajo
+                with st.expander("Ver detalle de factores PEST"):
+                    st.dataframe(
+                        df_pest_filtrado[['categoria', 'factor', 'valor_ponderado']].sort_values('valor_ponderado', ascending=False),
+                        use_container_width=True,
+                        hide_index=True
+                    )
+            else:
+                st.info("No hay datos PEST disponibles")
+        
+        with col_graf4:
+            st.subheader("⚔️ Análisis FODA Cruzado")
+            
+            if not datos['foda'].empty:
+                # Matriz de calor FODA
+                foda_pivot = datos['foda'].groupby(['cuadrante'])['impacto'].sum().reset_index()
+                
+                fig_foda = go.Figure(data=go.Bar(
+                    x=foda_pivot['cuadrante'],
+                    y=foda_pivot['impacto'],
+                    marker_color=['#2ecc71', '#e74c3c', '#3498db', '#f39c12'],
+                    text=foda_pivot['impacto'],
+                    textposition='auto'
+                ))
+                fig_foda.update_layout(
+                    title="Puntaje por Cuadrante FODA",
+                    xaxis_title="Cuadrante",
+                    yaxis_title="Impacto Total",
+                    height=350
+                )
+                st.plotly_chart(fig_foda, use_container_width=True)
+            else:
+                st.info("No hay datos FODA disponibles")
+        
+        st.divider()
+        
+        # ============================================================
+        # 6. TABLA DINÁMICA TIPO EXCEL/POWER BI
+        # ============================================================
+        
+        st.subheader("📋 Tabla Dinámica de Estrategias")
+        
+        if not df_estrategias_filtrado.empty:
+            # Configurar columnas para la tabla
+            columnas_tabla = ['cuadrante', 'estrategia', 'plan_asignado', 'importancia', 'actividades']
+            
+            # Agregar columna de costo si existe operativización
+            if not datos['operativizacion'].empty:
+                # Merge con costos
+                costos_por_estrategia = datos['operativizacion'].groupby('estrategia_id')['costo'].sum().reset_index()
+                # Nota: Esto requiere que haya un campo para relacionar, ajustar según tu BD
+            
+            # Tabla interactiva con formato
+            st.dataframe(
+                df_estrategias_filtrado[columnas_tabla],
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    'cuadrante': st.column_config.TextColumn("Cuadrante", width="small"),
+                    'estrategia': st.column_config.TextColumn("Estrategia", width="large"),
+                    'plan_asignado': st.column_config.TextColumn("Plan", width="medium"),
+                    'importancia': st.column_config.SelectboxColumn(
+                        "Importancia",
+                        options=['Alta', 'Media Alta', 'Media', 'Baja'],
+                        width="small"
+                    ),
+                    'actividades': st.column_config.TextColumn("Actividades", width="large")
+                }
+            )
+            
+            # Botones de exportación
+            col_exp1, col_exp2 = st.columns(2)
+            with col_exp1:
+                csv = df_estrategias_filtrado.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 Descargar CSV",
+                    data=csv,
+                    file_name=f"estrategias_filtradas_{datos['empresa'].get('nombre', 'empresa')}.csv",
+                    mime="text/csv"
+                )
+            with col_exp2:
+                # Excel usando openpyxl (instalar: pip install openpyxl)
+                try:
+                    import io
+                    buffer = io.BytesIO()
+                    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                        df_estrategias_filtrado.to_excel(writer, sheet_name='Estrategias', index=False)
+                        if not datos['foda'].empty:
+                            datos['foda'].to_excel(writer, sheet_name='FODA', index=False)
+                        if not datos['pest'].empty:
+                            datos['pest'].to_excel(writer, sheet_name='PEST', index=False)
+                    
+                    st.download_button(
+                        label="📊 Descargar Excel (múltiples hojas)",
+                        data=buffer.getvalue(),
+                        file_name=f"dashboard_{datos['empresa'].get('nombre', 'empresa')}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+                except ImportError:
+                    st.warning("Instala 'openpyxl' para exportar a Excel: pip install openpyxl")
+        else:
+            st.warning("No hay estrategias que coincidan con los filtros seleccionados")
+        
+        st.divider()
+        
+        # ============================================================
+        # 7. ANÁLISIS DE PRESUPUESTO Y COSTOS (Si hay datos)
+        # ============================================================
+        
+        if not datos['operativizacion'].empty:
+            st.subheader("💰 Análisis de Presupuesto y Costos")
+            
+            col_pres1, col_pres2 = st.columns(2)
+            
+            with col_pres1:
+                # Gráfico de barras por plan
+                presupuesto_plan = datos['operativizacion'].groupby('plan_asignado')['costo'].sum().reset_index()
+                fig_pres = px.bar(
+                    presupuesto_plan,
+                    x='plan_asignado',
+                    y='costo',
+                    color='plan_asignado',
+                    title="Inversión por Plan Funcional",
+                    labels={'costo': 'Costo Total ($)', 'plan_asignado': 'Plan'}
+                )
+                fig_pres.update_layout(height=350, showlegend=False)
+                st.plotly_chart(fig_pres, use_container_width=True)
+            
+            with col_pres2:
+                # Top 10 actividades más costosas
+                top_actividades = datos['operativizacion'].nlargest(10, 'costo')[['descripcion_actividad', 'costo', 'plan_asignado']]
+                fig_top = px.bar(
+                    top_actividades,
+                    y='descripcion_actividad',
+                    x='costo',
+                    orientation='h',
+                    color='plan_asignado',
+                    title="Top 10 Actividades más Costosas"
+                )
+                fig_top.update_layout(height=350, yaxis={'categoryorder': 'total ascending'})
+                st.plotly_chart(fig_top, use_container_width=True)
+        
+        st.divider()
+        
+        # ============================================================
+        # 8. PROYECCIÓN FINANCIERA (Si hay datos)
+        # ============================================================
+        
+        if not datos['proyeccion'].empty:
+            st.subheader("📈 Proyección Financiera a 5 Años")
+            
+            fig_proy = go.Figure()
+            
+            fig_proy.add_trace(go.Scatter(
+                x=datos['proyeccion']['anio'],
+                y=datos['proyeccion']['ingresos_proyectados'],
+                mode='lines+markers',
+                name='Ingresos',
+                line=dict(color='#2ecc71', width=3),
+                fill='tonexty'
+            ))
+            
+            fig_proy.add_trace(go.Scatter(
+                x=datos['proyeccion']['anio'],
+                y=datos['proyeccion']['costos_proyectados'],
+                mode='lines+markers',
+                name='Costos',
+                line=dict(color='#e74c3c', width=3)
+            ))
+            
+            fig_proy.add_trace(go.Scatter(
+                x=datos['proyeccion']['anio'],
+                y=datos['proyeccion']['utilidad_neta_proyectada'],
+                mode='lines+markers',
+                name='Utilidad Neta',
+                line=dict(color='#3498db', width=4)
+            ))
+            
+            fig_proy.update_layout(
+                title="Proyección Financiera Integral",
+                xaxis_title="Año",
+                yaxis_title="Monto ($)",
+                height=450,
+                hovermode='x unified'
+            )
+            
+            st.plotly_chart(fig_proy, use_container_width=True)
+            
+            # Tabla de proyección
+            with st.expander("Ver tabla de proyección detallada"):
+                st.dataframe(
+                    datos['proyeccion'],
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        'anio': st.column_config.NumberColumn("Año", format="%d"),
+                        'ingresos_proyectados': st.column_config.NumberColumn("Ingresos", format="$%.2f"),
+                        'costos_proyectados': st.column_config.NumberColumn("Costos", format="$%.2f"),
+                        'utilidad_neta_proyectada': st.column_config.NumberColumn("Utilidad Neta", format="$%.2f")
+                    }
+                )
+        
+        # ============================================================
+        # 9. PANEL DE ALERTAS Y RECOMENDACIONES CON IA
+        # ============================================================
+        
+        st.divider()
+        st.subheader("🤖 Insights y Recomendaciones Automáticas")
+        
+        if st.button("💡 Generar Análisis Ejecutivo con IA", type="secondary"):
+            with st.spinner("Analizando todos los datos del dashboard..."):
+                
+                # Preparar resumen de datos para la IA
+                resumen_datos = f"""
+DATOS DEL DASHBOARD:
+- Estrategias filtradas: {len(df_estrategias_filtrado)}
+- Distribución FODA: {df_estrategias_filtrado['cuadrante'].value_counts().to_dict() if not df_estrategias_filtrado.empty else 'N/A'}
+- Planes asignados: {df_estrategias_filtrado['plan_asignado'].value_counts().to_dict() if not df_estrategias_filtrado.empty else 'N/A'}
+- Score PEST: {df_pest_filtrado['valor_ponderado'].sum() if not df_pest_filtrado.empty else 0:.2f}
+- Inversión total: ${inversion_total:,.2f}
+- Estrategias de alta importancia: {altas}
+"""
+                
+                prompt_insights = f"""Como Director Ejecutivo, analiza estos datos del dashboard y genera:
+
+1. INSIGHT PRINCIPAL (1 hallazgo clave que no sea obvio)
+2. ALERTAS (máximo 2 cosas que requieren atención inmediata)
+3. OPORTUNIDADES (máximo 2 áreas de mejora o crecimiento)
+4. RECOMENDACIÓN EJECUTIVA (1 acción prioritaria para esta semana)
+
+Datos:
+{resumen_datos}
+
+Sé directo, específico y accionable. Máximo 200 palabras."""
+                
+                insights = generar_analisis(prompt_insights)
+                st.markdown("### 📋 Análisis Generado:")
+                st.info(insights)
+                
+                # Guardar opcionalmente
+                if st.button("💾 Guardar este análisis en la empresa"):
+                    try:
+                        supabase.table('empresas').update({
+                            'analisis_dashboard_ia': insights
+                        }).eq('id', empresa_id).execute()
+                        st.success("Análisis guardado")
+                    except Exception as e:
+                        st.error(f"Error al guardar: {e}")        
     # --- PESTAÑA 8: RESUMEN Y CONCLUSIONES ---
     with tab7:
         st.header("Resumen, Conclusiones y Exportación")
@@ -4164,6 +4645,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
