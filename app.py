@@ -4615,8 +4615,9 @@ def pantalla_acceso():
                     else:
                         st.warning("Por favor, llena todos los campos.")
     with col2:
-        st.image("https://i.imgur.com/gYv2k3C.png", width=200)
-
+    st.markdown("<h1 style='font-size: 120px; text-align: center; margin-top: 50px;'>🎯</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: gray;'>Estratega Pro</p>", unsafe_allow_html=True)
+    
 def main():
     if "logged_in" not in st.session_state:
         st.session_state.logged_in = False
@@ -4631,6 +4632,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
