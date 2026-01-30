@@ -3536,7 +3536,7 @@ def generar_pdf_formato_uea(empresa_id, version, elaborado, revisado, aprobado):
         story.append(PageBreak())
 
         # 6. OBJETIVOS ESTRATÉGICOS
-        story.append(Paragraph("OBJETIVOS ESTRATÉGICOS", styles['TituloPrincipal']))
+        story.append(Paragraph("OBJETIVOS ESTRATEGICOS", styles['TituloPrincipal']))
 
         objetivos = empresa.get('objetivos_estrategicos', [])
         if objetivos:
@@ -3866,6 +3866,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
