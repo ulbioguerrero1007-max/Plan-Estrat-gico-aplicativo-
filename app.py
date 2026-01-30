@@ -775,9 +775,9 @@ def create_table_pdf(data, col_widths=None, style=None):
 def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, aprobado):
     """
     Genera el documento PDF completo con formato APA y estructura de 3 partes:
-    1. Plan Estratégico (máx 30 hojas)
-    2. Anexos (ilimitado)
-    3. Resumen Ejecutivo (máx 5 hojas) - va al inicio pero se genera al final
+    1. Resumen Ejecutivo (máx 5 hojas) - PRIMERO
+    2. Plan Estratégico (máx 30 hojas) - Estructura solicitada
+    3. Anexos (ilimitado) - Dashboards y matrices detalladas
     """
     from datetime import datetime
     
@@ -794,6 +794,8 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     df_pg = get_datos_tabla('perdida_ganancia', empresa_id)
     df_proy = get_datos_tabla('proyeccion_financiera', empresa_id)
     df_cb = get_datos_tabla('analisis_costo_beneficio', empresa_id)
+    df_made = get_datos_tabla('matriz_marketing', empresa_id, tipo_matriz_filter='MADE')
+    df_madi = get_datos_tabla('matriz_marketing', empresa_id, tipo_matriz_filter='MADI')
     
     # Calcular análisis FODA
     analisis_foda_df, resumen_foda, estrategia_principal, puntajes_foda = analizar_foda(df_foda)
@@ -807,25 +809,24 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     pdf_buffer = BytesIO()
     
     # Configuración de márgenes APA (1 pulgada = 2.54 cm en todos los lados)
-    # Crear documento con márgenes grandes
     doc = SimpleDocTemplate(
         pdf_buffer, 
         pagesize=A4,
         leftMargin=1*inch,
         rightMargin=1*inch,
-        topMargin=1.5*inch,  # Reducido a 1.5 pulgadas (menos espacio vacío)
-        bottomMargin=1.2*inch,  # Reducido a 1.2 pulgadas (menos espacio vacío)
+        topMargin=1.5*inch,
+        bottomMargin=1.2*inch,
     )
 
-    # Crear Frame para limitar el área de contenido (evita solapamiento con header/footer)
+    # Crear Frame para limitar el área de contenido
     from reportlab.platypus import Frame
     content_frame = Frame(
-        doc.leftMargin,  # x
-        doc.bottomMargin,  # y
-        doc.width,  # width
-        letter[1] - doc.topMargin - doc.bottomMargin,  # height (página - márgenes)
+        doc.leftMargin,
+        doc.bottomMargin,
+        doc.width,
+        letter[1] - doc.topMargin - doc.bottomMargin,
         id='content_frame',
-        showBoundary=0  # 0 = no mostrar borde, 1 = debug
+        showBoundary=0
     )
     
     styles = get_apa_styles()
@@ -836,27 +837,34 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     logo_bytes = None
     if logo_bytes_data:
         try:
-            # Intentar convertir desde hexadecimal
             if isinstance(logo_bytes_data, str):
-                # Limpiar el string hex de prefijos y caracteres problemáticos
                 hex_clean = logo_bytes_data.replace('\\x', '').replace('0x', '').replace("'", "")
                 logo_bytes = BytesIO(bytes.fromhex(hex_clean))
             elif isinstance(logo_bytes_data, bytes):
-                # Si ya es bytes, usar directamente
                 logo_bytes = BytesIO(logo_bytes_data)
             else:
                 logo_bytes = BytesIO(logo_bytes_data)
 
-            # Verificar que sea una imagen válida
             from PIL import Image as PILImage
             logo_bytes.seek(0)
             PILImage.open(logo_bytes)
             logo_bytes.seek(0)
         except Exception as e:
-            # Si hay cualquier error, no usar logo
             logo_bytes = None
-            print(f"Advertencia: No se pudo cargar el logo: {e}")
     
+    # Preparar organigrama
+    organigrama_bytes = None
+    org_bytes_data = empresa.get('organigrama')
+    if org_bytes_data:
+        try:
+            if isinstance(org_bytes_data, str):
+                hex_clean = org_bytes_data.replace('\\x', '').replace('0x', '').replace("'", "")
+                organigrama_bytes = BytesIO(bytes.fromhex(hex_clean))
+            elif isinstance(org_bytes_data, bytes):
+                organigrama_bytes = BytesIO(org_bytes_data)
+        except:
+            organigrama_bytes = None
+
     # Función para encabezado/pie en cada página
     def header_footer(canvas, doc):
         encabezado_pie_pagina(
@@ -866,7 +874,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         )
     
     # ============================================
-    # PARTE 3: RESUMEN EJECUTIVO (máx 5 hojas)
+    # PARTE 1: RESUMEN EJECUTIVO (máx 5 hojas)
     # ============================================
     
     story.append(Paragraph("RESUMEN EJECUTIVO", styles['APA_H1']))
@@ -1009,10 +1017,10 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     story.append(PageBreak())
     
     # ============================================
-    # PARTE 1: PLAN ESTRÁTEGICO (máx 30 hojas)
+    # PARTE 2: PLAN ESTRATÉGICO (máx 30 hojas)
     # ============================================
     
-    # PORTADA
+    # PORTADA INTERNA DEL PLAN
     story.append(Spacer(1, 2*inch))
     story.append(Paragraph("PLAN ESTRATÉGICO", styles['APA_Title']))
     story.append(Spacer(1, 0.3*inch))
@@ -1032,10 +1040,10 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     
     story.append(PageBreak())
     
-    # 1. INTRODUCCIÓN
-    story.append(Paragraph("1. INTRODUCCIÓN Y CULTURA ORGANIZACIONAL", styles['APA_H1']))
+    # 1. INTRODUCCIÓN Y FUNDAMENTOS (Datos Generales + Cultura Organizacional)
+    story.append(Paragraph("1. INTRODUCCIÓN Y FUNDAMENTOS", styles['APA_H1']))
     
-    # Datos generales
+    # 1.1 Datos Generales
     story.append(Paragraph("1.1 Datos Generales de la Empresa", styles['APA_H2']))
     
     datos_gen = [
@@ -1050,16 +1058,24 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     story.append(tabla_datos_gen)
     story.append(Spacer(1, 0.2*inch))
     
-    # Cultura organizacional
-    story.append(Paragraph("1.2 Cultura Organizacional", styles['APA_H2']))
+    # Logo de la empresa
+    if logo_bytes:
+        story.append(Paragraph("Logo de la Empresa", styles['APA_H3']))
+        story.append(Image(logo_bytes, width=2*inch, height=2*inch))
+        story.append(Spacer(1, 0.2*inch))
+    
+    # 1.2 Cultura Organizacional (Misión, Visión, Valores)
+    story.append(Paragraph("1.2 Elementos Orientadores de la Cultura Organizacional", styles['APA_H2']))
     
     if empresa.get('mision'):
         story.append(Paragraph("Misión", styles['APA_H3']))
         story.append(Paragraph(empresa['mision'], styles['APA_Body']))
+        story.append(Spacer(1, 0.1*inch))
     
     if empresa.get('vision'):
         story.append(Paragraph("Visión", styles['APA_H3']))
         story.append(Paragraph(empresa['vision'], styles['APA_Body']))
+        story.append(Spacer(1, 0.1*inch))
     
     if empresa.get('valores'):
         story.append(Paragraph("Valores y Principios", styles['APA_H3']))
@@ -1075,10 +1091,189 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         story.append(Paragraph("Objetivo del Plan Estratégico", styles['APA_H3']))
         story.append(Paragraph(empresa['objetivo_plan'], styles['APA_Body']))
     
+    # Organigrama
+    if organigrama_bytes:
+        story.append(Paragraph("1.3 Organigrama de la Empresa", styles['APA_H2']))
+        story.append(Image(organigrama_bytes, width=6*inch, height=4*inch))
+        story.append(Paragraph(
+            "<i>Figura 1.1. Estructura organizacional de la empresa.</i>",
+            ParagraphStyle(name='Caption', parent=styles['APA_Body'], alignment=TA_CENTER, fontSize=10, firstLineIndent=0)
+        ))
+    
     story.append(PageBreak())
     
-    # 2. ESTRATEGIAS
-    story.append(Paragraph("2. ESTRATEGIAS FORMULADAS", styles['APA_H1']))
+    # 2. ANÁLISIS SITUACIONAL (Diagnóstico Interno y Externo)
+    story.append(Paragraph("2. ANÁLISIS SITUACIONAL", styles['APA_H1']))
+    story.append(Paragraph(
+        "El análisis situacional examina tanto los factores internos como externos que afectan "
+        "a la organización, permitiendo identificar fortalezas, debilidades, oportunidades y amenazas.",
+        styles['APA_Body']
+    ))
+    story.append(Spacer(1, 0.2*inch))
+    
+    # 2.1 Diagnóstico Interno
+    story.append(Paragraph("2.1 Diagnóstico Interno", styles['APA_H2']))
+    
+    # Análisis MADE (Marketing Interno)
+    if not df_made.empty:
+        story.append(Paragraph("2.1.1 Análisis de Marketing Interno (MADE)", styles['APA_H3']))
+        story.append(Paragraph(
+            "La matriz MADE evalúa las variables internas de marketing: Producto, Precio, Plaza y Promoción.",
+            styles['APA_Body']
+        ))
+        
+        datos_made_resumen = [['Variable', 'Factor', 'Rating', 'Ponderación']]
+        for _, row in df_made.head(10).iterrows():
+            datos_made_resumen.append([
+                row.get('variable', '')[:20],
+                row.get('factor', '')[:30],
+                str(row.get('rating', '')),
+                f"{row.get('weight_percent', '')}%"
+            ])
+        
+        tabla_made = create_table_pdf(datos_made_resumen, col_widths=[1.2*inch, 2.5*inch, 0.8*inch, 1*inch])
+        story.append(tabla_made)
+        story.append(Spacer(1, 0.1*inch))
+        
+        # Análisis guardado de MADE
+        analisis_made = empresa.get('analisis_made', '')
+        if analisis_made:
+            story.append(Paragraph("Análisis de Marketing Interno", styles['APA_H3']))
+            story.append(Paragraph(analisis_made, styles['APA_Body']))
+    
+    story.append(Spacer(1, 0.2*inch))
+    
+    # 2.2 Diagnóstico Externo
+    story.append(Paragraph("2.2 Diagnóstico Externo", styles['APA_H2']))
+    
+    # Análisis MADI (Marketing Externo)
+    if not df_madi.empty:
+        story.append(Paragraph("2.2.1 Análisis de Marketing Externo (MADI)", styles['APA_H3']))
+        story.append(Paragraph(
+            "La matriz MADI evalúa las variables externas de marketing que impactan en la posición competitiva.",
+            styles['APA_Body']
+        ))
+        
+        datos_madi_resumen = [['Variable', 'Factor', 'Rating', 'Ponderación']]
+        for _, row in df_madi.head(10).iterrows():
+            datos_madi_resumen.append([
+                row.get('variable', '')[:20],
+                row.get('factor', '')[:30],
+                str(row.get('rating', '')),
+                f"{row.get('weight_percent', '')}%"
+            ])
+        
+        tabla_madi = create_table_pdf(datos_madi_resumen, col_widths=[1.2*inch, 2.5*inch, 0.8*inch, 1*inch])
+        story.append(tabla_madi)
+        
+        analisis_madi = empresa.get('analisis_madi', '')
+        if analisis_madi:
+            story.append(Paragraph("Análisis de Marketing Externo", styles['APA_H3']))
+            story.append(Paragraph(analisis_madi, styles['APA_Body']))
+    
+    story.append(Spacer(1, 0.2*inch))
+    
+    # Análisis PEST
+    if not df_pest.empty:
+        story.append(Paragraph("2.2.2 Análisis del Entorno PEST", styles['APA_H3']))
+        story.append(Paragraph(
+            "El análisis PEST examina los factores Políticos, Económicos, Sociales y Tecnológicos.",
+            styles['APA_Body']
+        ))
+        
+        datos_pest_resumen = [['Categoría', 'Factor', 'Tipo FODA', 'Puntaje', 'Ponderado']]
+        for _, row in df_pest.head(15).iterrows():
+            datos_pest_resumen.append([
+                row['categoria'],
+                row['factor'][:35] + '...' if len(row['factor']) > 35 else row['factor'],
+                row['tipo_foda'],
+                str(row['puntaje']),
+                f"{row['valor_ponderado']:.2f}"
+            ])
+        
+        tabla_pest = create_table_pdf(datos_pest_resumen, col_widths=[1*inch, 2.5*inch, 1*inch, 0.8*inch, 1*inch])
+        story.append(tabla_pest)
+        story.append(Spacer(1, 0.1*inch))
+        
+        # Gráfico PEST
+        grafico_pest = generar_grafico_barras_pest(df_pest)
+        if grafico_pest:
+            story.append(Image(grafico_pest, width=5*inch, height=3*inch))
+            story.append(Paragraph(
+                "<i>Figura 2.1. Análisis PEST - Distribución por categoría.</i>",
+                ParagraphStyle(name='Caption', parent=styles['APA_Body'], alignment=TA_CENTER, fontSize=10, firstLineIndent=0)
+            ))
+        
+        analisis_pest = empresa.get('analisis_pest', '')
+        if analisis_pest:
+            story.append(Paragraph("Interpretación del Análisis PEST", styles['APA_H3']))
+            story.append(Paragraph(analisis_pest, styles['APA_Body']))
+    
+    story.append(Spacer(1, 0.2*inch))
+    
+    # Matriz FODA Cruzado
+    if not df_foda.empty:
+        story.append(Paragraph("2.3 Matriz FODA Cruzado", styles['APA_H2']))
+        story.append(Paragraph(
+            "El análisis FODA cruzado identifica estrategias a partir de la combinación de "
+            "fortalezas, debilidades, oportunidades y amenazas.",
+            styles['APA_Body']
+        ))
+        
+        datos_foda_resumen = [['Cuadrante', 'Factor Fila', 'Factor Columna', 'Impacto']]
+        for _, row in df_foda.head(20).iterrows():
+            datos_foda_resumen.append([
+                row['cuadrante'],
+                str(row['factor_fila'])[:30] + '...' if len(str(row['factor_fila'])) > 30 else str(row['factor_fila']),
+                str(row['factor_columna'])[:30] + '...' if len(str(row['factor_columna'])) > 30 else str(row['factor_columna']),
+                str(row['impacto'])
+            ])
+        
+        tabla_foda = create_table_pdf(datos_foda_resumen, col_widths=[1*inch, 2.5*inch, 2.5*inch, 0.8*inch])
+        story.append(tabla_foda)
+        story.append(Spacer(1, 0.1*inch))
+        
+        # Gráfico FODA
+        if puntajes_foda is not None and not puntajes_foda.empty:
+            grafico_foda = generar_grafico_foda_radar_pdf(puntajes_foda)
+            if grafico_foda:
+                story.append(Image(grafico_foda, width=4*inch, height=4*inch))
+                story.append(Paragraph(
+                    "<i>Figura 2.2. Posicionamiento estratégico según FODA cruzado.</i>",
+                    ParagraphStyle(name='Caption', parent=styles['APA_Body'], alignment=TA_CENTER, fontSize=10, firstLineIndent=0)
+                ))
+        
+        # Postura estratégica
+        if analisis_foda_df is not None:
+            story.append(Paragraph("Postura Estratégica Recomendada", styles['APA_H3']))
+            story.append(Paragraph(
+                f"Basado en el análisis cruzado, la estrategia principal recomendada es "
+                f"<b>{estrategia_principal}</b>. La distribución de puntajes por estrategia es:",
+                styles['APA_Body']
+            ))
+            
+            datos_postura = [['Estrategia', 'Puntaje Total']]
+            for _, row in analisis_foda_df.iterrows():
+                datos_postura.append([row['Estrategia'], str(row['Puntaje Total'])])
+            
+            tabla_postura = create_table_pdf(datos_postura, col_widths=[3*inch, 2*inch])
+            story.append(tabla_postura)
+        
+        analisis_foda_texto = empresa.get('analisis_foda', '')
+        if analisis_foda_texto:
+            story.append(Paragraph("Interpretación del Análisis FODA", styles['APA_H3']))
+            story.append(Paragraph(analisis_foda_texto, styles['APA_Body']))
+    
+    story.append(PageBreak())
+    
+    # 3. ESTRATEGIAS
+    story.append(Paragraph("3. ESTRATEGIAS", styles['APA_H1']))
+    story.append(Paragraph(
+        "Las estrategias representan las acciones específicas diseñadas para alcanzar los objetivos "
+        "organizacionales, derivadas del análisis situacional.",
+        styles['APA_Body']
+    ))
+    story.append(Spacer(1, 0.2*inch))
     
     if not df_estrategias.empty:
         story.append(Paragraph(
@@ -1088,7 +1283,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         ))
         story.append(Spacer(1, 0.2*inch))
         
-        story.append(Paragraph("2.1 Resumen de Estrategias por Cuadrante", styles['APA_H2']))
+        story.append(Paragraph("3.1 Resumen de Estrategias por Cuadrante", styles['APA_H2']))
         
         resumen_est = df_estrategias.groupby('cuadrante').agg({
             'estrategia': 'count',
@@ -1104,69 +1299,49 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         story.append(tabla_est)
         story.append(Spacer(1, 0.2*inch))
         
-        story.append(Paragraph("2.2 Estrategias Prioritarias (Alta Importancia)", styles['APA_H2']))
+        story.append(Paragraph("3.2 Estrategias Detalladas", styles['APA_H2']))
         
-        estrategias_prioritarias = df_estrategias[df_estrategias['importancia'] == 'Alta']
-        
-        for idx, row in estrategias_prioritarias.iterrows():
-            story.append(Paragraph(f"{row['cuadrante']}: {row['estrategia']}", styles['APA_H3']))
-            story.append(Paragraph(f"Plan asignado: {row['plan_asignado']}", styles['APA_Body_No_Indent']))
-            story.append(Paragraph(f"Actividades clave: {row['actividades'][:200]}...", styles['APA_Body']))
-            story.append(Spacer(1, 0.1*inch))
+        for idx, row in df_estrategias.iterrows():
+            story.append(Paragraph(f"Estrategia {idx + 1}: [{row['cuadrante']}] {row['estrategia']}", styles['APA_H3']))
+            story.append(Paragraph(f"<b>Plan asignado:</b> {row['plan_asignado']}", styles['APA_Body_No_Indent']))
+            story.append(Paragraph(f"<b>Importancia:</b> {row['importancia']}", styles['APA_Body_No_Indent']))
+            story.append(Paragraph(f"<b>Actividades clave:</b> {row['actividades']}", styles['APA_Body']))
+            story.append(Spacer(1, 0.15*inch))
     else:
         story.append(Paragraph("No se han generado estrategias en el sistema.", styles['APA_Body']))
     
     story.append(PageBreak())
     
-    # 3. PLANES ESTRATÉGICOS
-    story.append(Paragraph("3. PLANES ESTRATÉGICOS", styles['APA_H1']))
+    # 4. PLAN DE ACCIÓN (Planes Funcionales + Operativización)
+    story.append(Paragraph("4. PLAN DE ACCIÓN", styles['APA_H1']))
+    story.append(Paragraph(
+        "El plan de acción detalla las actividades específicas, responsables, tiempos y recursos "
+        "necesarios para implementar las estrategias formuladas.",
+        styles['APA_Body']
+    ))
+    story.append(Spacer(1, 0.2*inch))
+    
+    # 4.1 Planes Funcionales
+    story.append(Paragraph("4.1 Planes Funcionales Estratégicos", styles['APA_H2']))
     
     planes = generar_planes_por_plantilla(estrategia_principal, pest_total)
     
     for nombre_plan, datos_plan in planes.items():
-        story.append(Paragraph(f"3.{list(planes.keys()).index(nombre_plan) + 1} {nombre_plan}", styles['APA_H2']))
+        story.append(Paragraph(f"4.1.{list(planes.keys()).index(nombre_plan) + 1} {nombre_plan}", styles['APA_H3']))
         story.append(Paragraph(datos_plan['introduccion'], styles['APA_Body']))
-        story.append(Paragraph(f"Objetivo: {datos_plan['objetivo']}", styles['APA_Body']))
+        story.append(Paragraph(f"<b>Objetivo:</b> {datos_plan['objetivo']}", styles['APA_Body']))
         story.append(Spacer(1, 0.1*inch))
     
-    story.append(PageBreak())
-    
-    # 4. CMI
-    story.append(Paragraph("4. CUADRO DE MANDO INTEGRAL (CMI)", styles['APA_H1']))
-    
-    if not df_estrategias.empty:
-        story.append(Paragraph(
-            "El Cuadro de Mando Integral traduce las estrategias en indicadores medibles "
-            "desde cuatro perspectivas: Financiera, Cliente, Procesos Internos, y Aprendizaje y Crecimiento.",
-            styles['APA_Body']
-        ))
-        story.append(Spacer(1, 0.2*inch))
-        
-        try:
-            df_cmi = generar_cuadro_de_mando_ia(df_estrategias)
-            if not df_cmi.empty:
-                story.append(Paragraph("4.1 Indicadores Clave por Perspectiva", styles['APA_H2']))
-                
-                datos_cmi = [['Estrategia', 'Perspectiva', 'KPI', 'Frecuencia']]
-                for _, row in df_cmi.head(15).iterrows():
-                    datos_cmi.append([
-                        row['Estrategia'][:40] + '...' if len(row['Estrategia']) > 40 else row['Estrategia'],
-                        row['Perspectiva'],
-                        row['KPIs'][:35] + '...' if len(row['KPIs']) > 35 else row['KPIs'],
-                        row['Frecuencia']
-                    ])
-                
-                tabla_cmi = create_table_pdf(datos_cmi, col_widths=[2*inch, 1.2*inch, 2*inch, 0.8*inch])
-                story.append(tabla_cmi)
-        except Exception as e:
-            story.append(Paragraph(f"No se pudo generar el CMI automáticamente: {str(e)}", styles['APA_Body']))
-    else:
-        story.append(Paragraph("No hay estrategias disponibles para construir el CMI.", styles['APA_Body']))
+    # Análisis de planes maestros si existe
+    planes_maestros = empresa.get('analisis_operativo', '')
+    if planes_maestros:
+        story.append(Paragraph("4.2 Planes Funcionales Detallados", styles['APA_H2']))
+        story.append(Paragraph(planes_maestros, styles['APA_Body']))
     
     story.append(PageBreak())
     
-    # 5. OPERATIVIZACIÓN Y PRESUPUESTO
-    story.append(Paragraph("5. OPERATIVIZACIÓN Y PRESUPUESTO", styles['APA_H1']))
+    # 4.3 Operativización (Cuadro de Operativización)
+    story.append(Paragraph("4.3 Operativización y Presupuesto", styles['APA_H2']))
     
     if not df_oper.empty:
         story.append(Paragraph(
@@ -1176,7 +1351,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         ))
         story.append(Spacer(1, 0.2*inch))
         
-        story.append(Paragraph("5.1 Resumen de Inversión por Plan", styles['APA_H2']))
+        story.append(Paragraph("4.3.1 Resumen de Inversión por Plan", styles['APA_H3']))
         
         presupuesto_plan = df_oper.groupby('plan_asignado').agg({
             'costo': 'sum',
@@ -1196,7 +1371,30 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         story.append(tabla_pres)
         story.append(Spacer(1, 0.2*inch))
         
-        story.append(Paragraph("5.2 Actividades de Mayor Inversión", styles['APA_H2']))
+        story.append(Paragraph("4.3.2 Cuadro de Operativización Detallado", styles['APA_H3']))
+        
+        datos_oper = [['Estrategia', 'Actividad', 'Plazo', 'Responsable', 'Costo']]
+        for _, row in df_oper.head(30).iterrows():  # Mostrar primeras 30 para no sobrecargar
+            datos_oper.append([
+                row['estrategia_nombre'][:25] + '...' if len(row['estrategia_nombre']) > 25 else row['estrategia_nombre'],
+                row['descripcion_actividad'][:35] + '...' if len(row['descripcion_actividad']) > 35 else row['descripcion_actividad'],
+                row['plazo'] or 'Pendiente',
+                row['responsable'] or 'Sin asignar',
+                f"${row['costo']:,.2f}"
+            ])
+        
+        tabla_oper = create_table_pdf(datos_oper, col_widths=[1.8*inch, 2.2*inch, 1*inch, 1.2*inch, 1*inch])
+        story.append(tabla_oper)
+        story.append(Spacer(1, 0.1*inch))
+        
+        if len(df_oper) > 30:
+            story.append(Paragraph(
+                f"<i>Nota: Se muestran 30 de {len(df_oper)} actividades. El detalle completo está en los anexos.</i>",
+                styles['APA_Body']
+            ))
+        
+        # Actividades de mayor inversión
+        story.append(Paragraph("4.3.3 Actividades de Mayor Inversión", styles['APA_H3']))
         
         actividades_criticas = df_oper.nlargest(5, 'costo')
         for idx, row in actividades_criticas.iterrows():
@@ -1205,80 +1403,194 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
                 f"({row['responsable'] or 'Sin asignar'})",
                 styles['APA_List']
             ))
-        
-        if not df_pg.empty:
-            story.append(Spacer(1, 0.2*inch))
-            story.append(Paragraph("5.3 Situación Financiera Base (Último Año)", styles['APA_H2']))
-            
-            datos_pg = df_pg.iloc[0]
-            datos_fin_base = [
-                ['Concepto', 'Monto'],
-                ['Ingresos por Ventas', f"${datos_pg['ingresos_ventas']:,.2f}"],
-                ['Utilidad Bruta', f"${datos_pg['utilidad_bruta']:,.2f}"],
-                ['Utilidad Operativa', f"${datos_pg['utilidad_operativa']:,.2f}"],
-                ['Utilidad Neta', f"${datos_pg['utilidad_neta']:,.2f}"],
-            ]
-            
-            tabla_fin_base = create_table_pdf(datos_fin_base, col_widths=[3*inch, 3*inch])
-            story.append(tabla_fin_base)
     else:
         story.append(Paragraph("No se ha completado la operativización de estrategias.", styles['APA_Body']))
     
     story.append(PageBreak())
     
+    # 5. EVALUACIÓN Y CONTROL (CMI + Semaforización)
+    story.append(Paragraph("5. EVALUACIÓN Y CONTROL", styles['APA_H1']))
+    story.append(Paragraph(
+        "La evaluación y control permiten monitorear el desempeño de las estrategias mediante "
+        "indicadores clave de desempeño (KPIs) y sistemas de alerta temprana.",
+        styles['APA_Body']
+    ))
+    story.append(Spacer(1, 0.2*inch))
+    
+    # 5.1 Cuadro de Mando Integral (CMI)
+    story.append(Paragraph("5.1 Cuadro de Mando Integral (CMI)", styles['APA_H2']))
+    
+    if not df_estrategias.empty:
+        story.append(Paragraph(
+            "El Cuadro de Mando Integral traduce las estrategias en indicadores medibles "
+            "desde cuatro perspectivas: Financiera, Cliente, Procesos Internos, y Aprendizaje y Crecimiento.",
+            styles['APA_Body']
+        ))
+        story.append(Spacer(1, 0.2*inch))
+        
+        # Intentar obtener CMI guardado
+        cmi_guardado = empresa.get('analisis_cmi', '')
+        df_cmi = pd.DataFrame()
+        
+        if cmi_guardado and '|' in str(cmi_guardado):
+            try:
+                df_cmi = pd.read_csv(io.StringIO(cmi_guardado), sep="|")
+            except:
+                pass
+        
+        if df_cmi.empty:
+            try:
+                df_cmi = generar_cuadro_de_mando_ia(df_estrategias)
+            except:
+                pass
+        
+        if not df_cmi.empty:
+            story.append(Paragraph("5.1.1 Indicadores Clave por Perspectiva", styles['APA_H3']))
+            
+            datos_cmi = [['Estrategia', 'Perspectiva', 'KPI', 'Frecuencia', 'Límites']]
+            for _, row in df_cmi.head(15).iterrows():
+                limites = f"LI:{row.get('LI','')} LC:{row.get('LC','')} LS:{row.get('LS','')}"
+                datos_cmi.append([
+                    row['Estrategia'][:35] + '...' if len(row['Estrategia']) > 35 else row['Estrategia'],
+                    row['Perspectiva'],
+                    row['KPIs'][:30] + '...' if len(row['KPIs']) > 30 else row['KPIs'],
+                    row['Frecuencia'],
+                    limites
+                ])
+            
+            tabla_cmi = create_table_pdf(datos_cmi, col_widths=[2*inch, 1.2*inch, 1.8*inch, 0.8*inch, 1.5*inch])
+            story.append(tabla_cmi)
+            
+            if len(df_cmi) > 15:
+                story.append(Paragraph(
+                    f"<i>Nota: Se muestran 15 de {len(df_cmi)} indicadores. El detalle completo está en los anexos.</i>",
+                    styles['APA_Body']
+                ))
+        else:
+            story.append(Paragraph("No se pudo generar el CMI automáticamente.", styles['APA_Body']))
+    else:
+        story.append(Paragraph("No hay estrategias disponibles para construir el CMI.", styles['APA_Body']))
+    
+    story.append(Spacer(1, 0.2*inch))
+    
+    # 5.2 Semaforización Estratégica
+    story.append(Paragraph("5.2 Semaforización Estratégica", styles['APA_H2']))
+    
+    analisis_semaforo = empresa.get('analisis_semaforo_resumen', '')
+    if analisis_semaforo:
+        story.append(Paragraph(analisis_semaforo, styles['APA_Body']))
+    else:
+        story.append(Paragraph(
+            "El sistema de semaforización evalúa el estado de cada estrategia considerando alineación "
+            "con objetivos, recursos asignados y contexto externo. Las estrategias se clasifican en: "
+            "<b>🟢 Óptimas</b> (implementar según plan), <b>🟡 Atención</b> (requieren ajustes), "
+            "y <b>🔴 Críticas</b> (necesitan revisión inmediata).",
+            styles['APA_Body']
+        ))
+    
+    story.append(PageBreak())
+    
     # ============================================
-    # PARTE 2: ANEXOS
+    # PARTE 3: ANEXOS (ilimitado)
     # ============================================
     
     story.append(Paragraph("ANEXOS", styles['APA_H1']))
     story.append(Spacer(1, 0.2*inch))
     
-    # Anexo A
-    story.append(Paragraph("Anexo A. Análisis de Matrices y Diagnóstico Detallado", styles['APA_H2']))
+    # Anexo A: Análisis Detallados de Matrices
+    story.append(Paragraph("Anexo A. Análisis Detallados de Matrices", styles['APA_H2']))
     
-    if not df_pest.empty:
-        story.append(Paragraph("A.1 Análisis PEST Completo", styles['APA_H3']))
+    # A.1 MADE Completo
+    if not df_made.empty:
+        story.append(Paragraph("A.1 Matriz MADE (Marketing Interno) - Datos Completos", styles['APA_H3']))
         
-        datos_pest = [['Categoría', 'Factor', 'Tipo FODA', 'Puntaje', 'Ponderado']]
+        datos_made_full = [['Variable', 'Factor', 'Producto', 'Precio', 'Plaza', 'Promoción', 'Rating', 'Peso %', 'Valor']]
+        for _, row in df_made.iterrows():
+            datos_made_full.append([
+                str(row.get('variable', ''))[:15],
+                str(row.get('factor', ''))[:25],
+                str(row.get('producto', ''))[:10],
+                str(row.get('precio', ''))[:10],
+                str(row.get('plaza', ''))[:10],
+                str(row.get('promocion', ''))[:10],
+                str(row.get('rating', '')),
+                f"{row.get('weight_percent', '')}%",
+                str(row.get('valor', ''))
+            ])
+        
+        tabla_made_full = create_table_pdf(datos_made_full, col_widths=[0.9*inch, 1.5*inch, 0.7*inch, 0.7*inch, 0.7*inch, 0.7*inch, 0.6*inch, 0.7*inch, 0.6*inch])
+        story.append(tabla_made_full)
+        story.append(PageBreak())
+    
+    # A.2 MADI Completo
+    if not df_madi.empty:
+        story.append(Paragraph("A.2 Matriz MADI (Marketing Externo) - Datos Completos", styles['APA_H3']))
+        
+        datos_madi_full = [['Variable', 'Factor', 'Producto', 'Precio', 'Plaza', 'Promoción', 'Rating', 'Peso %', 'Valor']]
+        for _, row in df_madi.iterrows():
+            datos_madi_full.append([
+                str(row.get('variable', ''))[:15],
+                str(row.get('factor', ''))[:25],
+                str(row.get('producto', ''))[:10],
+                str(row.get('precio', ''))[:10],
+                str(row.get('plaza', ''))[:10],
+                str(row.get('promocion', ''))[:10],
+                str(row.get('rating', '')),
+                f"{row.get('weight_percent', '')}%",
+                str(row.get('valor', ''))
+            ])
+        
+        tabla_madi_full = create_table_pdf(datos_madi_full, col_widths=[0.9*inch, 1.5*inch, 0.7*inch, 0.7*inch, 0.7*inch, 0.7*inch, 0.6*inch, 0.7*inch, 0.6*inch])
+        story.append(tabla_madi_full)
+        story.append(PageBreak())
+    
+    # A.3 PEST Completo
+    if not df_pest.empty:
+        story.append(Paragraph("A.3 Análisis PEST Completo", styles['APA_H3']))
+        
+        datos_pest_full = [['Categoría', 'Factor', 'Tipo FODA', 'Puntaje', 'Importancia', 'Ponderado']]
         for _, row in df_pest.iterrows():
-            datos_pest.append([
+            datos_pest_full.append([
                 row['categoria'],
                 row['factor'][:40] + '...' if len(row['factor']) > 40 else row['factor'],
                 row['tipo_foda'],
                 str(row['puntaje']),
+                f"{row['importancia']}%",
                 f"{row['valor_ponderado']:.2f}"
             ])
         
-        tabla_pest = create_table_pdf(datos_pest, col_widths=[1*inch, 2.5*inch, 1*inch, 0.8*inch, 1*inch])
-        story.append(tabla_pest)
+        tabla_pest_full = create_table_pdf(datos_pest_full, col_widths=[1*inch, 3*inch, 1*inch, 0.8*inch, 1*inch, 1*inch])
+        story.append(tabla_pest_full)
         story.append(Spacer(1, 0.1*inch))
         
+        # Gráfico PEST detallado
         grafico_pest = generar_grafico_barras_pest(df_pest)
         if grafico_pest:
-            story.append(Image(grafico_pest, width=5.5*inch, height=3.5*inch))
+            story.append(Image(grafico_pest, width=6*inch, height=4*inch))
             story.append(Paragraph(
                 "Figura A.1. Análisis PEST - Distribución de factores por categoría.",
                 ParagraphStyle(name='Caption', parent=styles['APA_Body'], alignment=TA_CENTER, fontSize=10, firstLineIndent=0)
             ))
+        story.append(PageBreak())
     
-    story.append(PageBreak())
-    
+    # A.4 FODA Cruzado Completo
     if not df_foda.empty:
-        story.append(Paragraph("A.2 Matriz FODA Cruzada", styles['APA_H3']))
+        story.append(Paragraph("A.4 Matriz FODA Cruzado Completa", styles['APA_H3']))
         
-        datos_foda = [['Cuadrante', 'Factor Fila', 'Factor Columna', 'Impacto']]
+        datos_foda_full = [['Cuadrante', 'Factor Fila', 'Factor Columna', 'Impacto']]
         for _, row in df_foda.iterrows():
-            datos_foda.append([
+            datos_foda_full.append([
                 row['cuadrante'],
-                str(row['factor_fila'])[:30] + '...' if len(str(row['factor_fila'])) > 30 else str(row['factor_fila']),
-                str(row['factor_columna'])[:30] + '...' if len(str(row['factor_columna'])) > 30 else str(row['factor_columna']),
+                str(row['factor_fila']),
+                str(row['factor_columna']),
                 str(row['impacto'])
             ])
         
-        tabla_foda = create_table_pdf(datos_foda, col_widths=[1*inch, 2.5*inch, 2.5*inch, 0.8*inch])
-        story.append(tabla_foda)
+        tabla_foda_full = create_table_pdf(datos_foda_full, col_widths=[1*inch, 2.5*inch, 2.5*inch, 0.8*inch])
+        story.append(tabla_foda_full)
         story.append(Spacer(1, 0.1*inch))
         
+        # Gráfico FODA
         if puntajes_foda is not None and not puntajes_foda.empty:
             grafico_foda = generar_grafico_foda_radar_pdf(puntajes_foda)
             if grafico_foda:
@@ -1287,10 +1599,9 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
                     "Figura A.2. Posicionamiento estratégico - Matriz FODA cruzada.",
                     ParagraphStyle(name='Caption', parent=styles['APA_Body'], alignment=TA_CENTER, fontSize=10, firstLineIndent=0)
                 ))
+        story.append(PageBreak())
     
-    story.append(PageBreak())
-    
-    # Anexo B
+    # Anexo B: Dashboards y Visualizaciones
     story.append(Paragraph("Anexo B. Dashboards de Análisis Estratégico", styles['APA_H2']))
     
     story.append(Paragraph(
@@ -1299,8 +1610,9 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     ))
     story.append(Spacer(1, 0.2*inch))
     
+    # B.1 Distribución de Estrategias
     if not df_estrategias.empty:
-        story.append(Paragraph("B.1 Distribución de Estrategias", styles['APA_H3']))
+        story.append(Paragraph("B.1 Distribución de Estrategias por Cuadrante", styles['APA_H3']))
         
         fig, ax = plt.subplots(figsize=(7, 4))
         est_counts = df_estrategias['cuadrante'].value_counts()
@@ -1325,6 +1637,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         story.append(Image(buf_est, width=5*inch, height=3*inch))
         story.append(Spacer(1, 0.2*inch))
     
+    # B.2 Proyección Financiera Detallada
     if not df_proy.empty:
         story.append(Paragraph("B.2 Proyección Financiera Detallada", styles['APA_H3']))
         
@@ -1333,7 +1646,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
             story.append(Image(grafico_proy, width=6*inch, height=4*inch))
             story.append(Spacer(1, 0.1*inch))
         
-        datos_proy = [['Año', 'Ingresos', 'Costos', 'Utilidad Neta']]
+        datos_proy = [['Año', 'Ingresos Proyectados', 'Costos Proyectados', 'Utilidad Neta Proyectada']]
         for _, row in df_proy.iterrows():
             datos_proy.append([
                 str(int(row['anio'])),
@@ -1342,11 +1655,12 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
                 f"${row['utilidad_neta_proyectada']:,.0f}"
             ])
         
-        tabla_proy = create_table_pdf(datos_proy, col_widths=[1*inch, 1.6*inch, 1.6*inch, 1.6*inch])
+        tabla_proy = create_table_pdf(datos_proy, col_widths=[1*inch, 1.8*inch, 1.8*inch, 1.8*inch])
         story.append(tabla_proy)
-    
-    if not df_cb.empty:
         story.append(PageBreak())
+    
+    # B.3 Análisis Costo-Beneficio Detallado
+    if not df_cb.empty:
         story.append(Paragraph("B.3 Análisis Costo-Beneficio Detallado", styles['APA_H3']))
         
         datos_cb = df_cb.iloc[0]
@@ -1361,12 +1675,64 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
              'Aceptable' if datos_cb['payback_periodo_anios'] and datos_cb['payback_periodo_anios'] <= 5 else 'Revisar'],
             ['VPN Total', f"${float(datos_cb['vpn_total']):,.2f}", '> 0', 
              'Positivo' if datos_cb['vpn_total'] > 0 else 'Negativo'],
+            ['Inversión Total', f"${float(datos_cb['inversion_total']):,.2f}", '-', 'Requerimiento'],
             ['Beneficio/Unidad', f"${float(datos_cb['beneficio_por_unidad']):,.2f}", '≥ Costo/Unidad', 
              'Rentable' if datos_cb['relacion_cb_unidades'] >= 1 else 'No rentable'],
         ]
         
-        tabla_cb = create_table_pdf(indicadores_cb, col_widths=[1.5*inch, 1.5*inch, 1.5*inch, 1.5*inch])
+        tabla_cb = create_table_pdf(indicadores_cb, col_widths=[1.8*inch, 1.5*inch, 1.5*inch, 1.5*inch])
         story.append(tabla_cb)
+        story.append(PageBreak())
+    
+    # Anexo C: Operativización Completa
+    if not df_oper.empty:
+        story.append(Paragraph("Anexo C. Cuadro de Operativización Completo", styles['APA_H2']))
+        
+        # Tabla completa de operativización (todas las actividades)
+        datos_oper_full = [['N°', 'Estrategia', 'Actividad', 'Plazo', 'Responsable', 'Costo']]
+        for idx, row in df_oper.iterrows():
+            datos_oper_full.append([
+                str(idx + 1),
+                row['estrategia_nombre'][:30] + '...' if len(row['estrategia_nombre']) > 30 else row['estrategia_nombre'],
+                row['descripcion_actividad'][:40] + '...' if len(row['descripcion_actividad']) > 40 else row['descripcion_actividad'],
+                row['plazo'] or 'Pendiente',
+                row['responsable'] or 'Sin asignar',
+                f"${row['costo']:,.2f}"
+            ])
+        
+        # Dividir en múltiples tablas si es muy largo
+        chunk_size = 40
+        for i in range(0, len(datos_oper_full), chunk_size):
+            chunk = datos_oper_full[i:i+chunk_size]
+            if i == 0:
+                tabla_oper_full = create_table_pdf(chunk, col_widths=[0.5*inch, 2*inch, 2.5*inch, 0.8*inch, 1.2*inch, 1*inch])
+            else:
+                # Sin encabezado para continuación
+                tabla_oper_full = create_table_pdf(chunk, col_widths=[0.5*inch, 2*inch, 2.5*inch, 0.8*inch, 1.2*inch, 1*inch])
+            story.append(tabla_oper_full)
+            if i + chunk_size < len(datos_oper_full):
+                story.append(PageBreak())
+    
+    # Anexo D: CMI Completo
+    if not df_cmi.empty:
+        story.append(PageBreak())
+        story.append(Paragraph("Anexo D. Cuadro de Mando Integral Completo", styles['APA_H2']))
+        
+        datos_cmi_full = [['Estrategia', 'Perspectiva', 'KPIs', 'Fórmulas', 'Frecuencia', 'LI', 'LC', 'LS']]
+        for _, row in df_cmi.iterrows():
+            datos_cmi_full.append([
+                row['Estrategia'][:40] + '...' if len(row['Estrategia']) > 40 else row['Estrategia'],
+                row['Perspectiva'],
+                row['KPIs'][:35] + '...' if len(row['KPIs']) > 35 else row['KPIs'],
+                row['Formulas'][:25] + '...' if len(row['Formulas']) > 25 else row['Formulas'],
+                row['Frecuencia'],
+                str(row['LI']),
+                str(row['LC']),
+                str(row['LS'])
+            ])
+        
+        tabla_cmi_full = create_table_pdf(datos_cmi_full, col_widths=[1.8*inch, 1*inch, 1.8*inch, 1.2*inch, 0.8*inch, 0.6*inch, 0.6*inch, 0.6*inch])
+        story.append(tabla_cmi_full)
     
     # Construir el PDF
     try:
@@ -1380,200 +1746,13 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         )
         doc.addPageTemplates([page_template])
 
-        # Construir documento - el Frame limita el contenido al área útil
+        # Construir documento
         doc.build(story)
         pdf_buffer.seek(0)
         return pdf_buffer
     except Exception as e:
         st.error(f"Error al generar PDF: {e}")
         return None
-
-def encabezado_pie_pagina(canvas, doc, logo_bytes, nombre_empresa, version, elaborado, revisado, aprobado, fecha):
-    """
-    Dibuja encabezado y pie de página en cada página según formato formal.
-    """
-    canvas.saveState()
-    
-    # ENCABEZADO
-    # Línea superior
-    canvas.line(doc.leftMargin, letter[1] - 0.6*inch, 
-                doc.width + doc.leftMargin, letter[1] - 0.6*inch)
-    
-    # Logo (izquierda)
-    if logo_bytes:
-        try:
-            logo = Image(logo_bytes, width=0.6*inch, height=0.6*inch)
-            logo.drawOn(canvas, doc.leftMargin, doc.height + doc.topMargin - 0.2*inch)
-        except:
-            pass
-    
-    # Nombre de empresa (centro)
-    canvas.setFont('Times-Bold', 11)
-    canvas.drawCentredString(doc.width/2 + doc.leftMargin, 
-                            letter[1] - 0.6*inch, 
-                            nombre_empresa[:50])
-    
-    # Versión y fecha (derecha)
-    canvas.setFont('Times-Roman', 9)
-    canvas.drawRightString(doc.width + doc.leftMargin, 
-                          letter[1] - 0.6*inch, 
-                          f"Versión: {version}")
-    canvas.drawRightString(doc.width + doc.leftMargin, 
-                          doc.height + doc.topMargin - 0.7*inch, 
-                          f"Fecha: {fecha}")
-    
-    # Línea inferior del encabezado
-    canvas.line(doc.leftMargin, doc.height + doc.topMargin - 1.0*inch, 
-                doc.width + doc.leftMargin, doc.height + doc.topMargin - 1.0*inch)
-    
-    # PIE DE PÁGINA
-    # Línea superior del pie
-    canvas.line(doc.leftMargin, 0.8*inch, 
-                doc.width + doc.leftMargin, 0.8*inch)
-    
-    # Texto del pie (tres columnas)
-    canvas.setFont('Times-Roman', 9)
-    
-    # Elaborado por (izquierda)
-    canvas.drawString(doc.leftMargin, doc.bottomMargin + 0.3*inch, 
-                     f"Elaborado por: {elaborado}")
-    
-    # Revisado por (centro)
-    canvas.drawCentredString(doc.width/2 + doc.leftMargin, 
-                            doc.bottomMargin + 0.3*inch, 
-                            f"Revisado por: {revisado}")
-    
-    # Aprobado por (derecha)
-    canvas.drawRightString(doc.width + doc.leftMargin, 
-                          doc.bottomMargin + 0.3*inch, 
-                          f"Aprobado por: {aprobado}")
-    
-    # Número de página (centro, abajo)
-    canvas.setFont('Times-Roman', 10)
-    canvas.drawCentredString(doc.width/2 + doc.leftMargin, 
-                            doc.bottomMargin + 0.1*inch, 
-                            f"Página {doc.page}")
-    
-    canvas.restoreState()
-
-
-def generar_grafico_foda_radar_pdf(puntajes):
-    """Genera gráfico de radar FODA para el PDF."""
-    if puntajes is None or puntajes.empty: 
-        return None
-    
-    labels = np.array(['Ofensiva\n(FO)', 'Defensiva\n(FA)', 'Adaptativa\n(DO)', 'Supervivencia\n(DA)'])
-    stats = puntajes.reindex(['FO', 'FA', 'DO', 'DA']).fillna(0).values
-    angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False).tolist()
-    stats = np.concatenate((stats, [stats[0]]))
-    angles += angles[:1]
-    
-    fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
-    ax.fill(angles, stats, color='#1f77b4', alpha=0.25)
-    ax.plot(angles, stats, color='#1f77b4', linewidth=2, marker='o')
-    ax.set_yticklabels([])
-    ax.set_xticks(angles[:-1])
-    ax.set_xticklabels(labels, fontsize=10)
-    ax.set_title("Posicionamiento Estratégico FODA", size=12, color='black', y=1.1, fontweight='bold')
-    ax.grid(True, linestyle='--', alpha=0.7)
-    
-    buf = BytesIO()
-    plt.tight_layout()
-    plt.savefig(buf, format='PNG', dpi=150, bbox_inches='tight', facecolor='white')
-    plt.close(fig)
-    buf.seek(0)
-    return buf
-
-
-def generar_grafico_barras_pest(df_pest):
-    """Genera gráfico de barras PEST para el PDF."""
-    if df_pest.empty: 
-        return None
-    
-    pest_scores = df_pest.groupby('categoria')['valor_ponderado'].sum().sort_values(ascending=True)
-    
-    fig, ax = plt.subplots(figsize=(7, 4))
-    colors = {'Político': '#d62728', 'Económico': '#ff7f0e', 'Social': '#2ca02c', 'Tecnológico': '#1f77b4'}
-    bar_colors = [colors.get(cat, '#1f77b4') for cat in pest_scores.index]
-    
-    bars = ax.barh(pest_scores.index, pest_scores.values, color=bar_colors, edgecolor='black', linewidth=0.5)
-    ax.set_title('Análisis PEST - Puntuación por Categoría', fontsize=12, fontweight='bold', pad=15)
-    ax.set_xlabel('Suma de Valores Ponderados', fontsize=10)
-    ax.set_ylabel('')
-    
-    # Agregar valores en las barras
-    for i, (bar, val) in enumerate(zip(bars, pest_scores.values)):
-        ax.text(val + 0.5, i, f'{val:.1f}', va='center', fontsize=9)
-    
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.grid(axis='x', alpha=0.3, linestyle='--')
-    
-    plt.tight_layout()
-    buf = BytesIO()
-    plt.savefig(buf, format='PNG', dpi=150, bbox_inches='tight', facecolor='white')
-    plt.close(fig)
-    buf.seek(0)
-    return buf
-
-
-def generar_grafico_proyeccion(df_proy):
-    """Genera gráfico de proyección financiera para el PDF."""
-    if df_proy.empty:
-        return None
-    
-    fig, ax = plt.subplots(figsize=(8, 5))
-    
-    ax.plot(df_proy['anio'], df_proy['ingresos_proyectados'], 
-            marker='o', linewidth=2.5, label='Ingresos Proyectados', color='#2ca02c')
-    ax.plot(df_proy['anio'], df_proy['costos_proyectados'], 
-            marker='s', linewidth=2.5, label='Costos Proyectados', color='#d62728')
-    ax.plot(df_proy['anio'], df_proy['utilidad_neta_proyectada'], 
-            marker='^', linewidth=2.5, label='Utilidad Neta', color='#1f77b4')
-    
-    ax.set_title('Proyección Financiera a 5 Años', fontsize=12, fontweight='bold', pad=15)
-    ax.set_xlabel('Año', fontsize=10)
-    ax.set_ylabel('Monto ($)', fontsize=10)
-    ax.legend(loc='best', framealpha=0.9)
-    ax.grid(True, alpha=0.3, linestyle='--')
-    ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'${x/1e6:.1f}M' if x >= 1e6 else f'${x/1e3:.0f}K'))
-    
-    plt.tight_layout()
-    buf = BytesIO()
-    plt.savefig(buf, format='PNG', dpi=150, bbox_inches='tight', facecolor='white')
-    plt.close(fig)
-    buf.seek(0)
-    return buf
-
-
-def create_table_pdf(data, col_widths=None, style=None):
-    """Crea una tabla formateada para PDF."""
-    from reportlab.lib.colors import HexColor
-    
-    if col_widths is None:
-        col_widths = [1.5*inch] * len(data[0])
-    
-    table = Table(data, colWidths=col_widths, repeatRows=1)
-    
-    if style is None:
-        style = TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), HexColor('#4472C4')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), HexColor('#FFFFFF')),
-            ('FONTNAME', (0, 0), (-1, 0), 'Times-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-            ('BACKGROUND', (0, 1), (-1, -1), HexColor('#F2F2F2')),
-            ('GRID', (0, 0), (-1, -1), 0.5, HexColor('#000000')),
-            ('FONTNAME', (0, 1), (-1, -1), 'Times-Roman'),
-            ('FONTSIZE', (0, 1), (-1, -1), 9),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 6),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-        ])
-    
-    table.setStyle(style)
-    return table
     
 # AQUÍ VA LA FUNCIÓN mostrar_ultimo_analisis_guardado (ya existe en tu código)
 
@@ -4765,6 +4944,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
