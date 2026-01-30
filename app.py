@@ -2215,179 +2215,179 @@ def aplicacion_principal():
         
         mostrar_ultimo_analisis_guardado(empresa_data, 'operativo')
     
-# --- PESTAÑA 5: CMI/INDICADORES ---
-with tab4:
-    st.header("CMI / Indicadores")
-    df_estrategias_cmi = get_datos_tabla('estrategias_generadas', empresa_id)
-    
-    if not df_estrategias_cmi.empty:
-        # Verificar si ya existe un CMI guardado
-        cmi_guardado = empresa_data.get('analisis_cmi', '')
-        df_cmi_actual = pd.DataFrame()
+    # --- PESTAÑA 5: CMI/INDICADORES ---
+    with tab4:
+        st.header("CMI / Indicadores")
+        df_estrategias_cmi = get_datos_tabla('estrategias_generadas', empresa_id)
         
-        # Si hay CMI guardado, convertirlo a DataFrame
-        if cmi_guardado and '|' in str(cmi_guardado):
-            try:
-                df_cmi_actual = pd.read_csv(io.StringIO(cmi_guardado), sep="|")
-                st.success("📋 CMI cargado desde datos guardados")
-            except Exception as e:
-                st.warning(f"Error al cargar CMI guardado: {e}")
-                df_cmi_actual = pd.DataFrame()
-        
-        # Botón para regenerar con IA
-        col1, col2 = st.columns([1, 2])
-        with col1:
-            if st.button("🤖 Regenerar CMI con IA", disabled=not puede_editar, type="primary"):
-                with st.spinner("Generando Cuadro de Mando Integral..."):
-                    df_cmi_generado = generar_cuadro_de_mando_ia(df_estrategias_cmi)
-                    if not df_cmi_generado.empty:
-                        st.session_state['cmi_df_temp'] = df_cmi_generado
-                        st.success("CMI generado por IA. Edita la tabla y guarda los cambios.")
-                        st.rerun()
-                    else:
-                        st.error("No se pudo generar el CMI. Verifica las estrategias.")
-        
-        with col2:
-            if 'cmi_df_temp' in st.session_state:
-                st.info("💡 Estás viendo el CMI generado por IA. Edita los valores y guarda.")
-            elif not df_cmi_actual.empty:
-                st.info("💡 Puedes editar directamente la tabla y guardar los cambios.")
-            else:
-                st.info("👆 Genera el CMI con IA para comenzar")
-        
-        # Determinar qué DataFrame mostrar (temporal de IA o guardado)
-        if 'cmi_df_temp' in st.session_state:
-            df_cmi_editar = st.session_state['cmi_df_temp'].copy()
-        elif not df_cmi_actual.empty:
-            df_cmi_editar = df_cmi_actual.copy()
-        else:
-            df_cmi_editar = pd.DataFrame()
-        
-        # Mostrar editor de tabla si hay datos
-        if not df_cmi_editar.empty:
-            st.divider()
-            st.subheader("📊 Cuadro de Mando Integral - Editable")
+        if not df_estrategias_cmi.empty:
+            # Verificar si ya existe un CMI guardado
+            cmi_guardado = empresa_data.get('analisis_cmi', '')
+            df_cmi_actual = pd.DataFrame()
             
-            # Definir columnas esperadas
-            columnas_cmi = ['Estrategia', 'Perspectiva', 'KPIs', 'Formulas', 'Frecuencia', 'LI', 'LC', 'LS']
+            # Si hay CMI guardado, convertirlo a DataFrame
+            if cmi_guardado and '|' in str(cmi_guardado):
+                try:
+                    df_cmi_actual = pd.read_csv(io.StringIO(cmi_guardado), sep="|")
+                    st.success("📋 CMI cargado desde datos guardados")
+                except Exception as e:
+                    st.warning(f"Error al cargar CMI guardado: {e}")
+                    df_cmi_actual = pd.DataFrame()
             
-            # Asegurar que todas las columnas existan
-            for col in columnas_cmi:
-                if col not in df_cmi_editar.columns:
-                    df_cmi_editar[col] = ''
-            
-            # Reordenar columnas
-            df_cmi_editar = df_cmi_editar[columnas_cmi]
-            
-            # Editor de datos
-            edited_cmi = st.data_editor(
-                df_cmi_editar,
-                num_rows="dynamic",
-                key="editor_cmi",
-                use_container_width=True,
-                disabled=not puede_editar,
-                column_config={
-                    'Estrategia': st.column_config.TextColumn("Estrategia", width="large"),
-                    'Perspectiva': st.column_config.SelectboxColumn(
-                        "Perspectiva", 
-                        options=['Financiera', 'Cliente', 'Procesos', 'Aprendizaje y Control'],
-                        width="medium"
-                    ),
-                    'KPIs': st.column_config.TextColumn("KPIs", width="large"),
-                    'Formulas': st.column_config.TextColumn("Fórmulas", width="medium"),
-                    'Frecuencia': st.column_config.SelectboxColumn(
-                        "Frecuencia",
-                        options=['Diaria', 'Semanal', 'Mensual', 'Trimestral', 'Semestral', 'Anual'],
-                        width="small"
-                    ),
-                    'LI': st.column_config.TextColumn("Límite Inferior", width="small"),
-                    'LC': st.column_config.TextColumn("Límite Control", width="small"),
-                    'LS': st.column_config.TextColumn("Límite Superior", width="small")
-                },
-                hide_index=True
-            )
-            
-            # Botones de acción
-            col_guardar, col_cancelar, col_nuevo = st.columns(3)
-            
-            with col_guardar:
-                if st.button("💾 Guardar CMI", type="primary", disabled=not puede_editar):
-                    try:
-                        # Validar que no esté vacío
-                        if edited_cmi.empty:
-                            st.error("No se puede guardar un CMI vacío")
-                        else:
-                            # Convertir a formato pipe-separated para guardar
-                            cmi_texto = edited_cmi.to_csv(sep="|", index=False)
-                            
-                            # Guardar en base de datos
-                            guardar_analisis_db(empresa_id, 'cmi', cmi_texto)
-                            
-                            # Limpiar temporal
-                            if 'cmi_df_temp' in st.session_state:
-                                del st.session_state['cmi_df_temp']
-                            
-                            st.success("✅ CMI guardado correctamente.")
+            # Botón para regenerar con IA
+            col1, col2 = st.columns([1, 2])
+            with col1:
+                if st.button("🤖 Regenerar CMI con IA", disabled=not puede_editar, type="primary"):
+                    with st.spinner("Generando Cuadro de Mando Integral..."):
+                        df_cmi_generado = generar_cuadro_de_mando_ia(df_estrategias_cmi)
+                        if not df_cmi_generado.empty:
+                            st.session_state['cmi_df_temp'] = df_cmi_generado
+                            st.success("CMI generado por IA. Edita la tabla y guarda los cambios.")
                             st.rerun()
-                    except Exception as e:
-                        st.error(f"Error al guardar CMI: {e}")
+                        else:
+                            st.error("No se pudo generar el CMI. Verifica las estrategias.")
             
-            with col_cancelar:
-                if st.button("❌ Cancelar", disabled=not puede_editar):
-                    if 'cmi_df_temp' in st.session_state:
-                        del st.session_state['cmi_df_temp']
-                    st.rerun()
+            with col2:
+                if 'cmi_df_temp' in st.session_state:
+                    st.info("💡 Estás viendo el CMI generado por IA. Edita los valores y guarda.")
+                elif not df_cmi_actual.empty:
+                    st.info("💡 Puedes editar directamente la tabla y guardar los cambios.")
+                else:
+                    st.info("👆 Genera el CMI con IA para comenzar")
             
-            with col_nuevo:
-                if st.button("➕ Agregar Fila", disabled=not puede_editar):
-                    nueva_fila = pd.DataFrame([{
-                        'Estrategia': '',
-                        'Perspectiva': 'Procesos',
-                        'KPIs': '',
-                        'Formulas': '',
-                        'Frecuencia': 'Mensual',
-                        'LI': '',
-                        'LC': '',
-                        'LS': ''
-                    }])
-                    # Actualizar el temporal con la nueva fila
-                    if 'cmi_df_temp' in st.session_state:
-                        st.session_state['cmi_df_temp'] = pd.concat([st.session_state['cmi_df_temp'], nueva_fila], ignore_index=True)
-                    else:
-                        st.session_state['cmi_df_temp'] = pd.concat([edited_cmi, nueva_fila], ignore_index=True)
-                    st.rerun()
+            # Determinar qué DataFrame mostrar (temporal de IA o guardado)
+            if 'cmi_df_temp' in st.session_state:
+                df_cmi_editar = st.session_state['cmi_df_temp'].copy()
+            elif not df_cmi_actual.empty:
+                df_cmi_editar = df_cmi_actual.copy()
+            else:
+                df_cmi_editar = pd.DataFrame()
             
-            # Vista previa de gráfico o resumen
-            st.divider()
-            with st.expander("📈 Ver Resumen del CMI"):
-                # Contar KPIs por perspectiva
-                if 'Perspectiva' in edited_cmi.columns and not edited_cmi.empty:
-                    resumen_perspectiva = edited_cmi.groupby('Perspectiva').agg({
-                        'KPIs': 'count',
-                        'Estrategia': 'nunique'
-                    }).reset_index()
-                    resumen_perspectiva.columns = ['Perspectiva', 'N° KPIs', 'N° Estrategias']
-                    
-                    col_res1, col_res2 = st.columns(2)
-                    with col_res1:
-                        st.dataframe(resumen_perspectiva, use_container_width=True, hide_index=True)
-                    with col_res2:
-                        # Gráfico simple de distribución
-                        if not resumen_perspectiva.empty:
-                            fig = px.pie(
-                                resumen_perspectiva, 
-                                names='Perspectiva', 
-                                values='N° KPIs',
-                                title='Distribución de KPIs por Perspectiva',
-                                hole=0.4
-                            )
-                            st.plotly_chart(fig, use_container_width=True)
+            # Mostrar editor de tabla si hay datos
+            if not df_cmi_editar.empty:
+                st.divider()
+                st.subheader("📊 Cuadro de Mando Integral - Editable")
+                
+                # Definir columnas esperadas
+                columnas_cmi = ['Estrategia', 'Perspectiva', 'KPIs', 'Formulas', 'Frecuencia', 'LI', 'LC', 'LS']
+                
+                # Asegurar que todas las columnas existan
+                for col in columnas_cmi:
+                    if col not in df_cmi_editar.columns:
+                        df_cmi_editar[col] = ''
+                
+                # Reordenar columnas
+                df_cmi_editar = df_cmi_editar[columnas_cmi]
+                
+                # Editor de datos
+                edited_cmi = st.data_editor(
+                    df_cmi_editar,
+                    num_rows="dynamic",
+                    key="editor_cmi",
+                    use_container_width=True,
+                    disabled=not puede_editar,
+                    column_config={
+                        'Estrategia': st.column_config.TextColumn("Estrategia", width="large"),
+                        'Perspectiva': st.column_config.SelectboxColumn(
+                            "Perspectiva", 
+                            options=['Financiera', 'Cliente', 'Procesos', 'Aprendizaje y Control'],
+                            width="medium"
+                        ),
+                        'KPIs': st.column_config.TextColumn("KPIs", width="large"),
+                        'Formulas': st.column_config.TextColumn("Fórmulas", width="medium"),
+                        'Frecuencia': st.column_config.SelectboxColumn(
+                            "Frecuencia",
+                            options=['Diaria', 'Semanal', 'Mensual', 'Trimestral', 'Semestral', 'Anual'],
+                            width="small"
+                        ),
+                        'LI': st.column_config.TextColumn("Límite Inferior", width="small"),
+                        'LC': st.column_config.TextColumn("Límite Control", width="small"),
+                        'LS': st.column_config.TextColumn("Límite Superior", width="small")
+                    },
+                    hide_index=True
+                )
+                
+                # Botones de acción
+                col_guardar, col_cancelar, col_nuevo = st.columns(3)
+                
+                with col_guardar:
+                    if st.button("💾 Guardar CMI", type="primary", disabled=not puede_editar):
+                        try:
+                            # Validar que no esté vacío
+                            if edited_cmi.empty:
+                                st.error("No se puede guardar un CMI vacío")
+                            else:
+                                # Convertir a formato pipe-separated para guardar
+                                cmi_texto = edited_cmi.to_csv(sep="|", index=False)
+                                
+                                # Guardar en base de datos
+                                guardar_analisis_db(empresa_id, 'cmi', cmi_texto)
+                                
+                                # Limpiar temporal
+                                if 'cmi_df_temp' in st.session_state:
+                                    del st.session_state['cmi_df_temp']
+                                
+                                st.success("✅ CMI guardado correctamente.")
+                                st.rerun()
+                        except Exception as e:
+                            st.error(f"Error al guardar CMI: {e}")
+                
+                with col_cancelar:
+                    if st.button("❌ Cancelar", disabled=not puede_editar):
+                        if 'cmi_df_temp' in st.session_state:
+                            del st.session_state['cmi_df_temp']
+                        st.rerun()
+                
+                with col_nuevo:
+                    if st.button("➕ Agregar Fila", disabled=not puede_editar):
+                        nueva_fila = pd.DataFrame([{
+                            'Estrategia': '',
+                            'Perspectiva': 'Procesos',
+                            'KPIs': '',
+                            'Formulas': '',
+                            'Frecuencia': 'Mensual',
+                            'LI': '',
+                            'LC': '',
+                            'LS': ''
+                        }])
+                        # Actualizar el temporal con la nueva fila
+                        if 'cmi_df_temp' in st.session_state:
+                            st.session_state['cmi_df_temp'] = pd.concat([st.session_state['cmi_df_temp'], nueva_fila], ignore_index=True)
+                        else:
+                            st.session_state['cmi_df_temp'] = pd.concat([edited_cmi, nueva_fila], ignore_index=True)
+                        st.rerun()
+                
+                # Vista previa de gráfico o resumen
+                st.divider()
+                with st.expander("📈 Ver Resumen del CMI"):
+                    # Contar KPIs por perspectiva
+                    if 'Perspectiva' in edited_cmi.columns and not edited_cmi.empty:
+                        resumen_perspectiva = edited_cmi.groupby('Perspectiva').agg({
+                            'KPIs': 'count',
+                            'Estrategia': 'nunique'
+                        }).reset_index()
+                        resumen_perspectiva.columns = ['Perspectiva', 'N° KPIs', 'N° Estrategias']
+                        
+                        col_res1, col_res2 = st.columns(2)
+                        with col_res1:
+                            st.dataframe(resumen_perspectiva, use_container_width=True, hide_index=True)
+                        with col_res2:
+                            # Gráfico simple de distribución
+                            if not resumen_perspectiva.empty:
+                                fig = px.pie(
+                                    resumen_perspectiva, 
+                                    names='Perspectiva', 
+                                    values='N° KPIs',
+                                    title='Distribución de KPIs por Perspectiva',
+                                    hole=0.4
+                                )
+                                st.plotly_chart(fig, use_container_width=True)
+            
+            else:
+                st.info("👆 Haz clic en 'Regenerar CMI con IA' para generar el cuadro automáticamente basado en tus estrategias.")
         
         else:
-            st.info("👆 Haz clic en 'Regenerar CMI con IA' para generar el cuadro automáticamente basado en tus estrategias.")
-    
-    else:
-        st.warning("No hay estrategias disponibles para generar el CMI. Genera estrategias primero en la pestaña anterior.")    
+            st.warning("No hay estrategias disponibles para generar el CMI. Genera estrategias primero en la pestaña anterior.")    
 
     # --- PESTAÑA 6: OPERATIVIZACIÓN/PRESUPUESTO ---
     with tab5:
@@ -3595,4 +3595,3 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
-
