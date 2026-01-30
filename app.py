@@ -4469,9 +4469,9 @@ Sé directo y accionable. Máximo 200 palabras."""
                 except Exception as e:
                     st.error(f"Error al generar análisis: {e}")    
 
-# --- PESTAÑA 8: RESUMEN Y CONCLUSIONES ---
-with tab7:
-    st.header("Resumen, Conclusiones y Exportación")
+# --- PESTAÑA 9: RESUMEN Y CONCLUSIONES (tu código va AQUÍ) ---
+    with tab7:
+        st.header("Resumen, Conclusiones y Exportación")
     
     st.subheader("📄 Generar Documento Final (Formato APA)")
     
@@ -4591,6 +4591,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
