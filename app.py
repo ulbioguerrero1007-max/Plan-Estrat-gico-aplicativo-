@@ -2213,6 +2213,9 @@ def aplicacion_principal():
     with tab3:
         st.header("📋 Planes Estratégicos Funcionales")
         
+        # Importar re al inicio de la pestaña para evitar UnboundLocalError
+        import re
+        
         # Obtener datos necesarios para contextualizar
         df_foda_temp = get_datos_tabla('foda_cruzado', empresa_id)
         analisis_df_temp, _, estrategia_principal, puntajes_foda = analizar_foda(df_foda_temp)
@@ -2255,8 +2258,7 @@ def aplicacion_principal():
                         for idx, row in df_estrategias_planes.iterrows():
                             contexto_estrategias += f"\n{idx+1}. [{row['cuadrante']}] {row['estrategia']} -> {row['plan_asignado']}"
                     
-                    prompt_planes_maestros = f"""
-Actúa como un consultor senior de estrategia empresarial con 20 años de experiencia. 
+                    prompt_planes_maestros = f"""Actúa como un consultor senior de estrategia empresarial con 20 años de experiencia. 
 Elabora 7 PLANES FUNCIONALES ESTRATÉGICOS de alto nivel para {contexto_empresa['nombre']}, 
 empresa del sector {contexto_empresa['giro']}.
 
@@ -2302,149 +2304,7 @@ B. [Nombre estrategia 2]
 
 5. KPls Y METAS (mínimo 5 KPIs por plan)
 - KPI 1: [Nombre] | Meta: [X] | Frecuencia: [mensual/trimestral]
-- KPI 2: [Nombre] | Meta: [X] | Frecuencia: [mensual/trimestral]
-[Continuar...]
-
-6. RECURSOS REQUERIDOS
-- Humanos: [Detalle]
-- Financieros: [Presupuesto estimado]
-- Tecnológicos: [Infraestructura]
-- Temporales: [Cronograma]
-
-7. RESPONSABLES Y GOBIERNO
-- Responsable principal: [Rol]
-- Comité de seguimiento: [Miembros]
-- Frecuencia de revisión: [Semanal/Mensual]
-
-8. RIESGOS Y MITIGACIÓN
-- Riesgo 1: [Descripción] | Mitigación: [Acción]
-- Riesgo 2: [Descripción] | Mitigación: [Acción]
-
-9. ALINEACIÓN CON ESTRATEGIA FODA
-[Cómo este plan contribuye específicamente a FO, FA, DO o DA]
-
-REQUISITOS DE CALIDAD:
-- Lenguaje ejecutivo y profesional
-- Contenido específico, no genérico
-- Cada plan debe tener 800-1200 palabras mínimo
-- Los KPIs deben ser cuantificables y realistas
-- Las estrategias deben ser accionables
-- Considerar el contexto PEST y FODA proporcionado
-- NO usar frases vacías como "mejorar procesos" sin especificar cómo
-
-GENERA LOS 7 PLANES COMPLETOS AHORA:
-"""
-                    
-                    planes_generados = generar_analisis(prompt_planes_maestros)
-                    st.session_state['planes_maestros_generados'] = planes_generados
-                    st.success("✅ Planes funcionales generados con éxito")
-                    st.rerun()
-        
-        with col2:
-            st.caption("""
-            **Los 7 Planes Funcionales:**
-            1. 📊 Administrativo
-            2. ⚙️ Operativo
-            3. 💻 Tecnológico
-            4. 💰 Financiero
-            5. 📈 Monitoreo y Control
-            6. 🚀 Mejora
-            7. 🛡️ Contingencia
-            """)
-        
-        # Mostrar y editar planes
-        planes_actuales = st.session_state.get('planes_maestros_generados', empresa_data.get('analisis_operativo', ''))
-        
-        if planes_actuales:
-            st.divider()
-            st.subheader("📄 Planes Estratégicos Funcionales - Documento Maestro")
-            
-            # Mostrar en tabs los 7 planes si se detectan en el texto
-            if "===" in planes_actuales:
-                # Intentar dividir por planes
-                import re
-                planes_secciones = re.split(r'===\s*(PLAN\s+\w+|Plan\s+\w+)\s*===', planes_actuales)
-                
-                if len(planes_secciones) > 1:
-                    # Crear tabs para cada plan detectado
-                    nombres_planes = []
-                    contenidos_planes = []
-                    
-                    for i in range(1, len(planes_secciones), 2):
-                        if i < len(planes_secciones):
-                            nombre = planes_secciones[i].strip()
-                            contenido = planes_secciones[i+1] if i+1 < len(planes_secciones) else ""
-                            nombres_planes.append(nombre)
-                            contenidos_planes.append(contenido)
-                    
-                    if nombres_planes:
-                        tabs_planes = st.tabs(nombres_planes)
-                        for tab, nombre, contenido in zip(tabs_planes, nombres_planes, contenidos_planes):
-                            with tab:
-                                st.markdown(f"### {nombre}")
-                                st.markdown(contenido)
-                                
-                                # Botón para copiar contenido específico
-                                if st.button(f"📋 Copiar {nombre}", key=f"copy_{nombre}"):
-                                    st.code(contenido, language='markdown')
-            
-            # Editor completo
-            with st.form("form_planes_maestros"):
-                st.write("**Editar Documento Completo de Planes:**")
-                planes_editados = st.text_area(
-                    "Planes Estratégicos Funcionales", 
-                    value=planes_actuales, 
-                    height=800, 
-                    disabled=not puede_editar,
-                    help="Edite los 7 planes funcionales. Mantenga la estructura con === NOMBRE DEL PLAN === para separar secciones."
-                )
-                
-                col_save, col_regen = st.columns(2)
-                with col_save:
-                    if st.form_submit_button("💾 Guardar Planes Maestros", disabled=not puede_editar):
-                        guardar_analisis_db(empresa_id, 'operativo', planes_editados)
-                        st.session_state['planes_maestros_generados'] = planes_editados
-                
-                with col_regen:
-                    if st.form_submit_button("🔄 Regenerar Todo", disabled=not puede_editar):
-                        if 'planes_maestros_generados' in st.session_state:
-                            del st.session_state['planes_maestros_generados']
-                        st.rerun()
-            
-            # Vista previa estructurada
-            with st.expander("📊 Ver Resumen Estructurado de Planes"):
-                # Extraer KPIs mencionados
-                kpis_encontrados = re.findall(r'KPI\s*\d*[:.-]\s*([^\n|]+)', planes_actuales, re.IGNORECASE)
-                if kpis_encontrados:
-                    st.write("**KPIs Detectados:**")
-                    for i, kpi in enumerate(kpis_encontrados[:15], 1):
-                        st.write(f"{i}. {kpi.strip()}")
-                
-                # Contar estrategias
-                estrategias_count = len(re.findall(r'^[A-Z]\.\s+', planes_actuales, re.MULTILINE))
-                st.metric("Estrategias Detectadas", estrategias_count)
-        
-        else:
-            st.info("""
-            👆 **Haz clic en "Generar 7 Planes Funcionales Profesionales"** para crear:
-            
-            **Plan Administrativo**: Estructura organizacional, gestión del talento, cultura corporativa
-            
-            **Plan Operativo**: Procesos productivos, cadena de suministro, calidad, logística
-            
-            **Plan Tecnológico**: Infraestructura digital, transformación digital, ciberseguridad, innovación
-            
-            **Plan Financiero**: Presupuesto, flujo de caja, inversión, rentabilidad, control financiero
-            
-            **Plan de Monitoreo y Control**: Dashboards, indicadores, auditorías, seguimiento estratégico
-            
-            **Plan de Mejora**: Metodologías (Kaizen, Six Sigma), optimización continua, capacitación
-            
-            **Plan de Contingencia**: Gestión de riesgos, continuidad del negocio, planes de respuesta
-            """)
-        
-        # Mostrar último guardado
-        mostrar_ultimo_analisis_guardado(empresa_data, 'operativo')
+- KPI 2: [Nombre]
         
     # --- PESTAÑA 5: CMI/INDICADORES ---
     with tab4:
@@ -3826,5 +3686,6 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
