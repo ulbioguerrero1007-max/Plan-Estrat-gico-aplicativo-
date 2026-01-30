@@ -1702,6 +1702,28 @@ def aplicacion_principal():
         "4. Planes", "5. CMI/Indicadores", "6. Semaforización", 
         "7. Operativización/Presupuesto", "8. Dashboard de Análisis", "9. Resumen y Conclusiones"
     ])
+        # SECCIÓN DE CIERRE DE SESIÓN
+        st.divider()
+        st.subheader("Sesión")
+        
+        # Mostrar usuario actual si existe
+        if st.session_state.get("user"):
+            st.caption(f"👤 {st.session_state.user.email}")
+        
+        with st.expander("🚪 Cerrar Sesión"):
+            st.warning("¿Estás seguro de que deseas salir?")
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("Sí, salir", type="primary", use_container_width=True):
+                    # Limpiar toda la sesión
+                    keys_to_delete = [k for k in st.session_state.keys()]
+                    for key in keys_to_delete:
+                        del st.session_state[key]
+                    st.success("Sesión cerrada correctamente")
+                    st.rerun()
+            with col2:
+                if st.button("Cancelar", use_container_width=True):
+                    st.rerun()
     
     # --- PESTAÑA 1: INTRODUCCIÓN ---
     with tab1:
@@ -4629,6 +4651,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
