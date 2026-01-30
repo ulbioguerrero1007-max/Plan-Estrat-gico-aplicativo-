@@ -813,45 +813,74 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     styles = get_apa_styles()
     story = []
     
-    # Preparar logo
-    logo_bytes_data = empresa.get('logo')
-    logo_bytes = None
-    if logo_bytes_data:
-        try:
-            # Intentar convertir desde hexadecimal
-            if isinstance(logo_bytes_data, str):
-                # Limpiar el string hex de prefijos y caracteres problemáticos
-                hex_clean = logo_bytes_data.replace('\\x', '').replace('0x', '').replace("'", "")
-                logo_bytes = BytesIO(bytes.fromhex(hex_clean))
-            elif isinstance(logo_bytes_data, bytes):
-                # Si ya es bytes, usar directamente
-                logo_bytes = BytesIO(logo_bytes_data)
-            else:
-                logo_bytes = BytesIO(logo_bytes_data)
-
-            # Verificar que sea una imagen válida
+# Preparar logo
+logo_bytes_data = empresa.get('logo')
+logo_bytes = None
+if logo_bytes_data:
+    try:
+        image_bytes = None
+        
+        if isinstance(logo_bytes_data, bytes):
+            image_bytes = logo_bytes_data
+        elif isinstance(logo_bytes_data, str):
+            hex_clean = logo_bytes_data.replace('\\x', '').replace('0x', '').replace("'", "").strip()
+            try:
+                image_bytes = bytes.fromhex(hex_clean)
+            except ValueError:
+                try:
+                    import base64
+                    image_bytes = base64.b64decode(logo_bytes_data)
+                except:
+                    pass
+        
+        if image_bytes:
             from PIL import Image as PILImage
-            logo_bytes.seek(0)
-            PILImage.open(logo_bytes)
-            logo_bytes.seek(0)
-        except Exception as e:
-            # Si hay cualquier error, no usar logo
-            logo_bytes = None
-            print(f"Advertencia: No se pudo cargar el logo: {e}")
-    
-    # Preparar organigrama
-    organigrama_bytes = None
-    org_bytes_data = empresa.get('organigrama')
-    if org_bytes_data:
-        try:
-            if isinstance(org_bytes_data, str):
-                hex_clean = org_bytes_data.replace('\\x', '').replace('0x', '').replace("'", "")
-                organigrama_bytes = BytesIO(bytes.fromhex(hex_clean))
-            elif isinstance(org_bytes_data, bytes):
-                organigrama_bytes = BytesIO(org_bytes_data)
-        except:
-            organigrama_bytes = None
+            from io import BytesIO
+            
+            try:
+                test_img = PILImage.open(BytesIO(image_bytes))
+                test_img.verify()
+                logo_bytes = BytesIO(image_bytes)
+            except:
+                logo_bytes = None
+                
+    except Exception as e:
+        logo_bytes = None
 
+# Preparar organigrama
+organigrama_bytes = None
+org_bytes_data = empresa.get('organigrama')
+if org_bytes_data:
+    try:
+        image_bytes = None
+        
+        if isinstance(org_bytes_data, bytes):
+            image_bytes = org_bytes_data
+        elif isinstance(org_bytes_data, str):
+            hex_clean = org_bytes_data.replace('\\x', '').replace('0x', "").replace("'", "").strip()
+            try:
+                image_bytes = bytes.fromhex(hex_clean)
+            except ValueError:
+                try:
+                    import base64
+                    image_bytes = base64.b64decode(org_bytes_data)
+                except:
+                    pass
+        
+        if image_bytes:
+            from PIL import Image as PILImage
+            from io import BytesIO
+            
+            try:
+                test_img = PILImage.open(BytesIO(image_bytes))
+                test_img.verify()
+                organigrama_bytes = BytesIO(image_bytes)
+            except:
+                organigrama_bytes = None
+                
+    except Exception as e:
+        organigrama_bytes = None
+        
     # Función para encabezado/pie en cada página
     def header_footer(canvas, doc):
         encabezado_pie_pagina(
@@ -1078,13 +1107,21 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         story.append(Paragraph("Objetivo del Plan Estratégico", styles['APA_H3']))
         story.append(Paragraph(empresa['objetivo_plan'], styles['APA_Body']))
     
-    # Organigrama
-    if organigrama_bytes:
+   # Organigrama
+if organigrama_bytes:
+    try:
         story.append(Paragraph("1.3 Organigrama de la Empresa", styles['APA_H2']))
         story.append(Image(organigrama_bytes, width=6*inch, height=4*inch))
         story.append(Paragraph(
             "<i>Figura 1.1. Estructura organizacional de la empresa.</i>",
             ParagraphStyle(name='Caption', parent=styles['APA_Body'], alignment=TA_CENTER, fontSize=10, firstLineIndent=0)
+        ))
+    except Exception as e:
+        # Si falla al insertar la imagen, agregar mensaje de error silencioso
+        story.append(Paragraph("1.3 Organigrama de la Empresa", styles['APA_H2']))
+        story.append(Paragraph(
+            "[El organigrama no pudo ser cargado - formato de imagen no válido]",
+            ParagraphStyle(name='Error', parent=styles['APA_Body'], textColor='red', alignment=TA_CENTER)
         ))
     
     story.append(PageBreak())
@@ -4380,6 +4417,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
