@@ -4578,7 +4578,7 @@ def generar_word_formato_uea(empresa_id, version, elaborado, revisado, aprobado)
 
 
 def pantalla_acceso():
-    st.sidebar.title("Estratega Pro")
+    st.sidebar.title("Estratega Pro UG-UCE")
     opcion = st.sidebar.radio("Acceso al Sistema", ["Entrar", "Crear Cuenta"])
     col1, col2 = st.columns([2,1])
     with col1:
@@ -4615,9 +4615,10 @@ def pantalla_acceso():
                     else:
                         st.warning("Por favor, llena todos los campos.")
     with col2:
-    st.markdown("<h1 style='font-size: 120px; text-align: center; margin-top: 50px;'>🎯</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: gray;'>Estratega Pro</p>", unsafe_allow_html=True)
-    
+        # Emoji de estrategia como imagen de bienvenida
+        st.markdown("<h1 style='font-size: 120px; text-align: center; margin-top: 50px;'>🎯</h1>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; color: gray;'>Estratega Pro</p>", unsafe_allow_html=True)    
+
 def main():
     if "logged_in" not in st.session_state:
         st.session_state.logged_in = False
@@ -4632,6 +4633,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
