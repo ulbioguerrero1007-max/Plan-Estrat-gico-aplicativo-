@@ -3472,13 +3472,6 @@ Lenguaje ejecutivo y directo."""
         st.header("📊 Dashboard Ejecutivo - Business Intelligence")
         st.markdown("*Análisis interactivo tipo Power BI con filtros dinámicos y visualizaciones en tiempo real*")
         
-        # IMPORTS NECESARIOS AL INICIO DE LA PESTAÑA
-        import pandas as pd
-        import plotly.express as px
-        import plotly.graph_objects as go
-        from plotly.subplots import make_subplots
-        import io
-        
         # ============================================================
         # 1. CARGA DE TODOS LOS DATOS DISPONIBLES
         # ============================================================
@@ -4638,6 +4631,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
