@@ -4,7 +4,7 @@ import google.generativeai as genai
 import pandas as pd
 import sqlite3
 import io
-from io import StringIO, BytesIO
+from io import StringIO, BytesIO  # <-- Asegúrate de tener esta línea
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4, letter
 from reportlab.lib.units import inch
@@ -760,6 +760,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     2. Plan Estratégico (máx 30 hojas) con estructura específica
     3. Anexos (ilimitado)
     """
+    from io import BytesIO
     from datetime import datetime
     
     empresa = get_datos_empresa(empresa_id)
@@ -4425,6 +4426,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
