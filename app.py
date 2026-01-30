@@ -4614,10 +4614,6 @@ def pantalla_acceso():
                             st.error(f"Error en el registro: {e}")
                     else:
                         st.warning("Por favor, llena todos los campos.")
-    with col2:
-        # Emoji de estrategia como imagen de bienvenida
-        st.markdown("<h1 style='font-size: 120px; text-align: center; margin-top: 50px;'>🎯</h1>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align: center; color: gray;'>Estratega Pro</p>", unsafe_allow_html=True)    
 
 def main():
     if "logged_in" not in st.session_state:
@@ -4633,6 +4629,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
