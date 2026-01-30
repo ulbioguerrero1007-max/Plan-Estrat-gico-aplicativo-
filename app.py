@@ -4469,76 +4469,75 @@ Sé directo y accionable. Máximo 200 palabras."""
                 except Exception as e:
                     st.error(f"Error al generar análisis: {e}")    
 
-# --- PESTAÑA 9: RESUMEN Y CONCLUSIONES (tu código va AQUÍ) ---
+# --- PESTAÑA 9: RESUMEN Y CONCLUSIONES ---
     with tab7:
         st.header("Resumen, Conclusiones y Exportación")
     
-    st.subheader("📄 Generar Documento Final (Formato APA)")
-    
-    with st.form("pdf_form"):
-        col1, col2 = st.columns(2)
-        with col1:
-            pdf_version = st.text_input("Versión del Plan", value="1.0")
-            pdf_elaborado = st.text_input("Elaborado por", value="Consultor Estratégico")
-        with col2:
-            pdf_revisado = st.text_input("Revisado por", value="Director de Planeación")
-            pdf_aprobado = st.text_input("Aprobado por", value="Director General")
+        st.subheader("📄 Generar Documento Final (Formato APA)")
         
-        st.info(
-            "**Estructura del documento generado:**\n\n"
-            "- **Resumen Ejecutivo** "
-            "- **Plan Estratégico** "
-            "- **Anexos** "
-        )
-        
-        submitted_pdf = st.form_submit_button("🚀 Generar PDF Profesional")
-    
-    # El procesamiento va FUERA del with st.form()
-    if submitted_pdf:
-        with st.spinner("Generando documento con formato APA. Esto puede tomar un momento..."):
-            # Generar PDF con formato profesional
-            pdf_buffer = generar_pdf_completo_mejorado(
-                empresa_id, 
-                pdf_version, 
-                pdf_elaborado, 
-                pdf_revisado, 
-                pdf_aprobado
-            )
-
-            if pdf_buffer:
-                # Guardar PDF
-                st.session_state['pdf_bytes'] = pdf_buffer.getvalue()
-                st.session_state['pdf_nombre'] = f"Plan_Estrategico_{empresa_data.get('nombre', 'Empresa')}_V{pdf_version}.pdf"
-
-                st.session_state['pdf_generado'] = True
-                st.success("✅ Documento PDF generado correctamente.")
-    
-    # Mostrar botones de descarga si el documento fue generado
-    if st.session_state.get('pdf_generado', False) and 'pdf_bytes' in st.session_state:
-        col1, col2 = st.columns([1, 3])
-        with col1:
-            # Botón descargar PDF
-            download_buffer = BytesIO(st.session_state['pdf_bytes'])
-            st.download_button(
-                label="⬇️ Descargar PDF", 
-                data=download_buffer, 
-                file_name=st.session_state.get('pdf_nombre', 'plan_estrategico.pdf'), 
-                mime="application/pdf",
-                type="primary"
-            )
-        with col2:
-            st.success(f"Documento listo: {st.session_state.get('pdf_nombre', 'plan_estrategico.pdf')}")
-            st.caption("Formato profesional APA con encabezado, pie de página y todas las secciones.")
-
-        # Botón para generar nuevo documento
-        if st.button("🔄 Generar Nuevo", type="secondary"):
-            if 'pdf_bytes' in st.session_state:
-                del st.session_state['pdf_bytes']
-            if 'pdf_nombre' in st.session_state:
-                del st.session_state['pdf_nombre']
-            st.session_state['pdf_generado'] = False
-            st.rerun()
+        with st.form("pdf_form"):
+            col1, col2 = st.columns(2)
+            with col1:
+                pdf_version = st.text_input("Versión del Plan", value="1.0")
+                pdf_elaborado = st.text_input("Elaborado por", value="Consultor Estratégico")
+            with col2:
+                pdf_revisado = st.text_input("Revisado por", value="Director de Planeación")
+                pdf_aprobado = st.text_input("Aprobado por", value="Director General")
             
+            st.info(
+                "**Estructura del documento generado:**\n\n"
+                "- **Resumen Ejecutivo** "
+                "- **Plan Estratégico** "
+                "- **Anexos** "
+            )
+            
+            submitted_pdf = st.form_submit_button("🚀 Generar PDF Profesional")
+        
+        # El procesamiento va FUERA del with st.form()
+        if submitted_pdf:
+            with st.spinner("Generando documento con formato APA. Esto puede tomar un momento..."):
+                # Generar PDF con formato profesional
+                pdf_buffer = generar_pdf_completo_mejorado(
+                    empresa_id, 
+                    pdf_version, 
+                    pdf_elaborado, 
+                    pdf_revisado, 
+                    pdf_aprobado
+                )
+
+                if pdf_buffer:
+                    # Guardar PDF
+                    st.session_state['pdf_bytes'] = pdf_buffer.getvalue()
+                    st.session_state['pdf_nombre'] = f"Plan_Estrategico_{empresa_data.get('nombre', 'Empresa')}_V{pdf_version}.pdf"
+
+                    st.session_state['pdf_generado'] = True
+                    st.success("✅ Documento PDF generado correctamente.")
+        
+        # Mostrar botones de descarga si el documento fue generado
+        if st.session_state.get('pdf_generado', False) and 'pdf_bytes' in st.session_state:
+            col1, col2 = st.columns([1, 3])
+            with col1:
+                # Botón descargar PDF
+                download_buffer = BytesIO(st.session_state['pdf_bytes'])
+                st.download_button(
+                    label="⬇️ Descargar PDF", 
+                    data=download_buffer, 
+                    file_name=st.session_state.get('pdf_nombre', 'plan_estrategico.pdf'), 
+                    mime="application/pdf",
+                    type="primary"
+                )
+            with col2:
+                st.success(f"Documento listo: {st.session_state.get('pdf_nombre', 'plan_estrategico.pdf')}")
+                st.caption("Formato profesional APA con encabezado, pie de página y todas las secciones.")
+
+            # Botón para generar nuevo documento
+            if st.button("🔄 Generar Nuevo", type="secondary"):
+                if 'pdf_bytes' in st.session_state:
+                    del st.session_state['pdf_bytes']
+                if 'pdf_nombre' in st.session_state:
+                    del st.session_state['pdf_nombre']
+                st.session_state['pdf_generado'] = False
+                st.rerun()            
 def pantalla_acceso():
     st.sidebar.title("Estratega Pro UG-UCE")
     opcion = st.sidebar.radio("Acceso al Sistema", ["Entrar", "Crear Cuenta"])
@@ -4591,6 +4590,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
