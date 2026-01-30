@@ -12,6 +12,9 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Tabl
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.colors import navy, grey, red, green, black
 from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT, TA_RIGHT
+from docx import Document
+from docx.shared import Inches, Pt, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 import matplotlib.pyplot as plt
 import plotly.express as px
 import plotly.graph_objects as go
@@ -1789,6 +1792,173 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         st.error(traceback.format_exc())
         return None
         
+
+def generar_word_completo(empresa_id, version, elaborado, revisado, aprobado):
+    """
+    Genera el documento Word completo con formato profesional
+    """
+    from datetime import datetime
+    
+    empresa = get_datos_empresa(empresa_id)
+    if not empresa:
+        return None
+    
+    # Crear documento
+    doc = Document()
+    
+    # Configurar márgenes
+    sections = doc.sections
+    for section in sections:
+        section.top_margin = Inches(1)
+        section.bottom_margin = Inches(1)
+        section.left_margin = Inches(1)
+        section.right_margin = Inches(1)
+    
+    # PORTADA
+    doc.add_heading('PLAN ESTRATÉGICO', 0)
+    doc.add_heading(empresa.get('nombre', 'EMPRESA').upper(), level=1)
+    
+    # Información del documento
+    doc.add_paragraph(f'Versión: {version}')
+    doc.add_paragraph(f'Fecha: {datetime.now().strftime("%d/%m/%Y")}')
+    doc.add_paragraph()
+    doc.add_paragraph(f'Elaborado por: {elaborado}')
+    doc.add_paragraph(f'Revisado por: {revisado}')
+    doc.add_paragraph(f'Aprobado por: {aprobado}')
+    
+    doc.add_page_break()
+    
+    # 1. INTRODUCCIÓN
+    doc.add_heading('1. INTRODUCCIÓN Y FUNDAMENTOS', level=1)
+    
+    doc.add_heading('1.1 Datos Generales de la Empresa', level=2)
+    table = doc.add_table(rows=5, cols=2)
+    table.style = 'Light Grid Accent 1'
+    datos = [
+        ('Nombre', empresa.get('nombre', 'N/A')),
+        ('Giro', empresa.get('giro', 'N/A')),
+        ('Fecha', datetime.now().strftime('%d/%m/%Y')),
+        ('Versión', version),
+        ('Elaborado por', elaborado)
+    ]
+    for i, (campo, valor) in enumerate(datos):
+        table.rows[i].cells[0].text = campo
+        table.rows[i].cells[1].text = str(valor)
+    
+    # Cultura organizacional
+    if empresa.get('mision'):
+        doc.add_heading('Misión', level=3)
+        doc.add_paragraph(empresa['mision'])
+    
+    if empresa.get('vision'):
+        doc.add_heading('Visión', level=3)
+        doc.add_paragraph(empresa['vision'])
+    
+    if empresa.get('valores'):
+        doc.add_heading('Valores', level=3)
+        doc.add_paragraph(empresa['valores'])
+    
+    doc.add_page_break()
+    
+    # Obtener datos de matrices
+    df_pest = get_datos_tabla('matrices', empresa_id, tipo_matriz_filter='PEST')
+    df_foda = get_datos_tabla('foda_cruzado', empresa_id)
+    df_estrategias = get_datos_tabla('estrategias_generadas', empresa_id)
+    df_oper = get_datos_tabla('operativizacion', empresa_id)
+    
+    # 2. ANÁLISIS SITUACIONAL
+    doc.add_heading('2. ANÁLISIS SITUACIONAL', level=1)
+    
+    if not df_pest.empty:
+        doc.add_heading('2.1 Análisis PEST', level=2)
+        table = doc.add_table(rows=1, cols=5)
+        table.style = 'Light List Accent 1'
+        hdr_cells = table.rows[0].cells
+        hdr_cells[0].text = 'Categoría'
+        hdr_cells[1].text = 'Factor'
+        hdr_cells[2].text = 'Tipo FODA'
+        hdr_cells[3].text = 'Puntaje'
+        hdr_cells[4].text = 'Ponderado'
+        
+        for _, row in df_pest.head(20).iterrows():
+            row_cells = table.add_row().cells
+            row_cells[0].text = str(row['categoria'])
+            row_cells[1].text = str(row['factor'])[:50]
+            row_cells[2].text = str(row['tipo_foda'])
+            row_cells[3].text = str(row['puntaje'])
+            row_cells[4].text = f"{row['valor_ponderado']:.2f}"
+    
+    if not df_foda.empty:
+        doc.add_heading('2.2 Matriz FODA Cruzado', level=2)
+        table = doc.add_table(rows=1, cols=4)
+        table.style = 'Light List Accent 1'
+        hdr_cells = table.rows[0].cells
+        hdr_cells[0].text = 'Cuadrante'
+        hdr_cells[1].text = 'Factor Fila'
+        hdr_cells[2].text = 'Factor Columna'
+        hdr_cells[3].text = 'Impacto'
+        
+        for _, row in df_foda.head(20).iterrows():
+            row_cells = table.add_row().cells
+            row_cells[0].text = str(row['cuadrante'])
+            row_cells[1].text = str(row['factor_fila'])[:40]
+            row_cells[2].text = str(row['factor_columna'])[:40]
+            row_cells[3].text = str(row['impacto'])
+    
+    doc.add_page_break()
+    
+    # 3. ESTRATEGIAS
+    doc.add_heading('3. ESTRATEGIAS', level=1)
+    
+    if not df_estrategias.empty:
+        for idx, row in df_estrategias.iterrows():
+            doc.add_heading(f"Estrategia {idx + 1}: [{row['cuadrante']}]", level=2)
+            doc.add_paragraph(f"Descripción: {row['estrategia']}")
+            doc.add_paragraph(f"Plan asignado: {row['plan_asignado']}")
+            doc.add_paragraph(f"Importancia: {row['importancia']}")
+            doc.add_paragraph(f"Actividades: {row['actividades']}")
+            doc.add_paragraph()
+    else:
+        doc.add_paragraph("No se han generado estrategias.")
+    
+    doc.add_page_break()
+    
+    # 4. PLAN DE ACCIÓN
+    doc.add_heading('4. PLAN DE ACCIÓN', level=1)
+    
+    if not df_oper.empty:
+        doc.add_heading('4.1 Operativización', level=2)
+        table = doc.add_table(rows=1, cols=5)
+        table.style = 'Light List Accent 1'
+        hdr_cells = table.rows[0].cells
+        hdr_cells[0].text = 'Estrategia'
+        hdr_cells[1].text = 'Actividad'
+        hdr_cells[2].text = 'Plazo'
+        hdr_cells[3].text = 'Responsable'
+        hdr_cells[4].text = 'Costo'
+        
+        total_costo = 0
+        for _, row in df_oper.head(30).iterrows():
+            row_cells = table.add_row().cells
+            row_cells[0].text = str(row['estrategia_nombre'])[:30]
+            row_cells[1].text = str(row['descripcion_actividad'])[:40]
+            row_cells[2].text = str(row['plazo'] or 'Pendiente')
+            row_cells[3].text = str(row['responsable'] or 'Sin asignar')
+            costo = float(row['costo'] or 0)
+            row_cells[4].text = f"${costo:,.2f}"
+            total_costo += costo
+        
+        doc.add_paragraph()
+        doc.add_paragraph(f"**Inversión Total: ${total_costo:,.2f}**").bold = True
+    else:
+        doc.add_paragraph("No hay datos de operativización.")
+    
+    # Guardar en buffer
+    word_buffer = io.BytesIO()
+    doc.save(word_buffer)
+    word_buffer.seek(0)
+    return word_buffer
+
 def mostrar_ultimo_analisis_guardado(empresa_data, tipo_analisis):
     """
     Muestra el último análisis guardado desde el diccionario de datos de la empresa.
@@ -4325,29 +4495,37 @@ Sé directo y accionable. Máximo 200 palabras."""
         
         # El procesamiento va FUERA del with st.form()
         if submitted_pdf:
-            with st.spinner("Generando documento con formato APA. Esto puede tomar un momento..."):
-                # Generar PDF con formato profesional
-                pdf_buffer = generar_pdf_completo_mejorado(
-                    empresa_id, 
-                    pdf_version, 
-                    pdf_elaborado, 
-                    pdf_revisado, 
-                    pdf_aprobado
-                )
+    with st.spinner("Generando documentos. Esto puede tomar un momento..."):
+        # Generar PDF
+        pdf_buffer = generar_pdf_completo_mejorado(
+            empresa_id, 
+            pdf_version, 
+            pdf_elaborado, 
+            pdf_revisado, 
+            pdf_aprobado
+        )
 
-                if pdf_buffer:
+        # Generar Word
+        word_buffer = generar_word_completo(
+            empresa_id,
+            pdf_version,
+            pdf_elaborado,
+            pdf_revisado,
+            pdf_aprobado
+        )
 
-                    # Guardar PDF
-                    st.session_state['pdf_bytes'] = pdf_buffer.getvalue()
-                    st.session_state['pdf_nombre'] = f"Plan_Estrategico_{empresa_data.get('nombre', 'Empresa')}_V{pdf_version}.pdf"
+        if pdf_buffer:
+            # Guardar PDF
+            st.session_state['pdf_bytes'] = pdf_buffer.getvalue()
+            st.session_state['pdf_nombre'] = f"Plan_Estrategico_{empresa_data.get('nombre', 'Empresa')}_V{pdf_version}.pdf"
 
-                    # Guardar Word
-                    st.session_state['word_bytes'] = word_buffer.getvalue()
-                    st.session_state['word_nombre'] = f"Plan_Estrategico_{empresa_data.get('nombre', 'Empresa')}_V{pdf_version}.docx"
+            # Guardar Word (solo si se generó correctamente)
+            if word_buffer:
+                st.session_state['word_bytes'] = word_buffer.getvalue()
+                st.session_state['word_nombre'] = f"Plan_Estrategico_{empresa_data.get('nombre', 'Empresa')}_V{pdf_version}.docx"
 
-                    st.session_state['pdf_generado'] = True
-                    st.success("✅ Documentos generados correctamente (PDF y Word).")
-        
+            st.session_state['pdf_generado'] = True
+            st.success("✅ Documentos generados correctamente (PDF y Word).")        
         # Mostrar botones de descarga si el documento fue generado
         if st.session_state.get('pdf_generado', False) and 'pdf_bytes' in st.session_state:
             col1, col2 = st.columns([1, 3])
@@ -4426,6 +4604,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
