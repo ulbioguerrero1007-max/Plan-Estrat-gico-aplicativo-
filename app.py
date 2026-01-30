@@ -2150,19 +2150,41 @@ def aplicacion_principal():
                     st.info("ℹ️ Esta empresa no está compartida con ningún usuario todavía.")
                     
             
-            # Eliminar empresa (solo propietario)
-            if st.button("❌ Eliminar Empresa", type="primary"):
-                if supabase:
-                    try:
-                        # Primero eliminar registros compartidos
-                        supabase.table('empresas_compartidas').delete().eq('empresa_id', empresa_id).execute()
-                        # Luego eliminar empresa
-                        supabase.table('empresas').delete().eq('id', empresa_id).execute()
-                        st.success(f"Empresa '{empresa_seleccionada}' eliminada.")
+            # Eliminar empresa (solo propietario) - CON CONFIRMACIÓN
+            if "confirmar_eliminacion" not in st.session_state:
+                st.session_state.confirmar_eliminacion = False
+            
+            if not st.session_state.confirmar_eliminacion:
+                if st.button("❌ Eliminar Empresa", type="primary"):
+                    st.session_state.confirmar_eliminacion = True
+                    st.rerun()
+            else:
+                # Mostrar diálogo de confirmación
+                st.error(f"⚠️ ¿ESTÁS SEGURO de eliminar '{empresa_seleccionada}'?")
+                st.warning("🚨 Esta acción NO se puede deshacer. Se perderán todos los datos permanentemente.")
+                
+                col_confirm1, col_confirm2 = st.columns(2)
+                with col_confirm1:
+                    if st.button("✅ SÍ, Eliminar Definitivamente", type="primary", use_container_width=True):
+                        if supabase:
+                            try:
+                                # Primero eliminar registros compartidos
+                                supabase.table('empresas_compartidas').delete().eq('empresa_id', empresa_id).execute()
+                                # Luego eliminar empresa
+                                supabase.table('empresas').delete().eq('id', empresa_id).execute()
+                                st.success(f"Empresa '{empresa_seleccionada}' eliminada.")
+                                # Limpiar estado
+                                st.session_state.confirmar_eliminacion = False
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Error al eliminar la empresa: {e}")
+                
+                with col_confirm2:
+                    if st.button("❌ NO, Cancelar", type="secondary", use_container_width=True):
+                        st.session_state.confirmar_eliminacion = False
+                        st.info("Eliminación cancelada.")
                         st.rerun()
-                    except Exception as e:
-                        st.error(f"Error al eliminar la empresa: {e}")
-
+                        
         # Mensaje para no propietarios
         elif empresa_id and not es_propietario:
             st.divider()
@@ -4590,6 +4612,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
