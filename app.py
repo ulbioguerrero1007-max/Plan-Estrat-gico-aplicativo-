@@ -217,6 +217,7 @@ def eliminar_compartir(empresa_id, usuario_compartido_id):
 
 
 def get_usuarios_compartidos(empresa_id):
+    """Obtiene la lista de usuarios con quienes se compartió la empresa."""
     if supabase and empresa_id:
         try:
             resp = supabase.table('empresas_compartidas').select('*').eq('empresa_id', empresa_id).execute()
@@ -224,12 +225,22 @@ def get_usuarios_compartidos(empresa_id):
             if resp.data:
                 usuarios = []
                 for comp in resp.data:
-                    usuarios.append({
-                        'usuario_id': comp['usuario_compartido_id'],
-                        'email': comp.get('email_compartido', comp['usuario_compartido_id'][:8] + '...'),
-                        'nombre': 'Usuario',
-                        'permiso': comp['permiso']
-                    })
+                    try:
+                        # Extraer datos de forma segura
+                        usuario_id = comp.get('usuario_compartido_id', 'unknown')
+                        permiso = comp.get('permiso', 'lector')
+                        
+                        # Intentar obtener email de diferentes campos posibles
+                        email = comp.get('email_compartido') or comp.get('email') or f"Usuario {str(usuario_id)[:8]}..."
+                        
+                        usuarios.append({
+                            'usuario_id': usuario_id,
+                            'email': email,
+                            'permiso': permiso
+                        })
+                    except Exception as e:
+                        print(f"Error procesando registro: {e}")
+                        continue
                 return usuarios
         except Exception as e:
             st.error(f"Error al cargar usuarios compartidos: {e}")
@@ -1616,7 +1627,7 @@ def aplicacion_principal():
                         else:
                             st.warning("Ingresa un email")
 
-                # Mostrar usuarios con quienes se compartió - DISEÑO MEJORADO
+                # Mostrar usuarios con quienes se compartió - VERSIÓN CORREGIDA Y LIMPIA
                 usuarios_comp = get_usuarios_compartidos(empresa_id)
                 
                 if usuarios_comp:
@@ -1624,81 +1635,74 @@ def aplicacion_principal():
                     st.markdown("**👥 Usuarios con acceso compartido**")
                     
                     for uc in usuarios_comp:
-                        # Tarjeta visual para cada usuario
+                        # Crear un contenedor limpio para cada usuario
                         with st.container():
-                            # Fondo según permiso
-                            bg_color = "#e3f2fd" if uc['permiso'] == 'editor' else "#f5f5f5"
-                            border_color = "#2196f3" if uc['permiso'] == 'editor' else "#9e9e9e"
-                            
-                            st.markdown(f"""
-                            <div style='
-                                background-color: {bg_color};
-                                border-left: 4px solid {border_color};
-                                border-radius: 8px;
-                                padding: 15px;
-                                margin-bottom: 10px;
-                            '>
-                            """, unsafe_allow_html=True)
-                            
-                            # Fila 1: Icono + Email + Badge de rol
-                            col1, col2, col3 = st.columns([4, 2, 1])
+                            # Fila principal: Email, Rol actual, Eliminar
+                            col1, col2, col3 = st.columns([3, 2, 1])
                             
                             with col1:
                                 icono = "✏️" if uc['permiso'] == 'editor' else "👁️"
                                 st.markdown(f"**{icono} {uc['email']}**")
                             
                             with col2:
-                                # Badge visual del rol actual
-                                color_badge = "blue" if uc['permiso'] == 'editor' else "gray"
-                                st.markdown(f"<span style='background-color: {color_badge}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px;'>{uc['permiso'].upper()}</span>", unsafe_allow_html=True)
+                                # Mostrar rol actual como badge
+                                color_badge = "#2196f3" if uc['permiso'] == 'editor' else "#757575"
+                                st.markdown(
+                                    f"<span style='background-color: {color_badge}; color: white; "
+                                    f"padding: 4px 12px; border-radius: 12px; font-size: 11px; "
+                                    f"text-transform: uppercase;'>{uc['permiso']}</span>",
+                                    unsafe_allow_html=True
+                                )
                             
                             with col3:
-                                # Botón eliminar más discreto
-                                if st.button("🗑️", key=f"del_{uc['usuario_id']}", help="Eliminar acceso"):
+                                # Botón eliminar
+                                user_id = uc['usuario_id']  # Guardar en variable local
+                                if st.button("🗑️", key=f"del_{user_id}", help="Eliminar acceso"):
                                     try:
                                         supabase.table('empresas_compartidas').delete().eq(
                                             'empresa_id', empresa_id
-                                        ).eq('usuario_compartido_id', uc['usuario_id']).execute()
-                                        st.success(f"Acceso eliminado")
+                                        ).eq('usuario_compartido_id', user_id).execute()
+                                        st.success("✓ Eliminado")
                                         st.rerun()
                                     except Exception as e:
-                                        st.error(f"Error: {e}")
+                                        st.error(f"Error: {str(e)[:50]}")
                             
-                            # Fila 2: Cambiar rol (más compacto)
-                            col_cambio1, col_cambio2 = st.columns([3, 2])
+                            # Fila secundaria: Cambiar rol
+                            col_cambio1, col_cambio2 = st.columns([2, 1])
                             
                             with col_cambio1:
+                                user_id = uc['usuario_id']  # Guardar en variable local
+                                rol_actual = uc['permiso']
+                                
                                 nuevo_rol = st.selectbox(
-                                    "Cambiar a:",
+                                    "Cambiar rol a:",
                                     ["lector", "editor"],
-                                    index=0 if uc['permiso'] == 'lector' else 1,
-                                    key=f"rol_{uc['usuario_id']}",
-                                    label_visibility="collapsed"
+                                    index=0 if rol_actual == 'lector' else 1,
+                                    key=f"select_rol_{user_id}"
                                 )
                             
                             with col_cambio2:
-                                if nuevo_rol != uc['permiso']:
-                                    if st.button("💾 Guardar", key=f"save_{uc['usuario_id']}", type="primary"):
+                                user_id = uc['usuario_id']  # Guardar en variable local
+                                rol_actual = uc['permiso']
+                                
+                                if nuevo_rol != rol_actual:
+                                    if st.button("💾 Guardar", key=f"btn_save_{user_id}", type="primary"):
                                         try:
-                                            supabase.table('empresas_compartidas').insert({
-    'empresa_id': empresa_id,
-    'usuario_compartido_id': usuario_compartir_id,
-    'email_compartido': email_usuario,  # <-- Agregar este campo
-    'permiso': permiso
-}).execute()
-                                            st.success(f"Actualizado a {nuevo_rol}")
+                                            supabase.table('empresas_compartidas').update(
+                                                {'permiso': nuevo_rol}
+                                            ).eq('empresa_id', empresa_id).eq('usuario_compartido_id', user_id).execute()
+                                            st.success(f"✓ Cambiado a {nuevo_rol}")
                                             st.rerun()
                                         except Exception as e:
-                                            st.error(f"Error: {e}")
+                                            st.error(f"Error: {str(e)[:50]}")
                                 else:
                                     st.caption("✓ Actual")
-                            
-                            st.markdown("</div>", unsafe_allow_html=True)
                         
                         st.divider()
                 else:
                     st.info("ℹ️ Esta empresa no está compartida con ningún usuario todavía.")
-                    
+
+            
             # Eliminar empresa (solo propietario)
             if st.button("❌ Eliminar Empresa", type="primary"):
                 if supabase:
@@ -4695,6 +4699,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
