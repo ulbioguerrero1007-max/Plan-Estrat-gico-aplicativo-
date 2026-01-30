@@ -1539,7 +1539,7 @@ def mostrar_ultimo_analisis_guardado(empresa_data, tipo_analisis):
 
 def aplicacion_principal():
     with st.sidebar:
-        st.header("Gestión de Empresas")
+        st.header("Estratega Pro UG-UCE")
         empresas_df = get_empresas()
 
         # Mostrar empresas con indicador de permiso
@@ -1698,7 +1698,7 @@ def aplicacion_principal():
 
     tab1, tab2, tab_est, tab3, tab4, tab5, tab_dash, tab6 = st.tabs([
         "1. Introducción", "2. Diagnóstico Situacional", "3. Estrategia", 
-        "4. égicos", "5. CMI/Indicadores", "6. Operativización/Presupuesto", 
+        "4. Planes", "5. CMI/Indicadores", "6. Operativización/Presupuesto", 
         "7. Dashboard de Análisis", "8. Resumen y Conclusiones"
     ])
 
@@ -3866,6 +3866,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
