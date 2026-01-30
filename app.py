@@ -170,26 +170,27 @@ def get_empresas():
 def compartir_empresa(empresa_id, email_usuario, permiso='lector'):
     """
     Comparte una empresa con otro usuario.
-    permiso: 'lector' o 'editor'
     """
     if supabase and empresa_id and email_usuario:
         try:
-            # Buscar el usuario por email usando auth.admin.list_users()
-            # O alternativamente, crear una función RPC en Supabase
-            # Por ahora, usaremos un método alternativo: buscar en empresas_compartidas
-            # o crear una tabla de usuarios públicos
-
-            # Método alternativo: usar una consulta directa con service role
-            # o pedir al usuario que ingrese el UUID directamente
-
-            # Por ahora, buscaremos en la tabla auth.users mediante RPC o función
+            # Buscar el usuario por email
+            # Nota: Esto requiere una función RPC o tabla de usuarios públicos
+            # Por ahora, usaremos un método alternativo
+            
+            # Método: Crear entrada con email y esperar que el usuario se registre
+            # o buscar en una tabla de usuarios si existe
+            
+            # Opción alternativa: Guardar el email directamente y buscar usuario después
             resp_usuario = supabase.rpc('get_user_id_by_email', {'email_input': email_usuario}).execute()
-
+            
             if not resp_usuario.data:
-                return False, "Usuario no encontrado. Asegúrate de que el email esté registrado."
-
+                # Si no existe la función RPC, guardamos con email para referencia
+                # y creamos un registro temporal
+                st.warning(f"Usuario {email_usuario} no encontrado en el sistema. Asegúrate de que esté registrado.")
+                return False, "Usuario no encontrado. El email debe estar registrado en el sistema."
+            
             usuario_compartir_id = resp_usuario.data
-
+            
             # Verificar que no sea el propietario
             resp_empresa = supabase.table('empresas').select('propietario_id').eq('id', empresa_id).single().execute()
             if resp_empresa.data and resp_empresa.data['propietario_id'] == usuario_compartir_id:
@@ -211,6 +212,9 @@ def compartir_empresa(empresa_id, email_usuario, permiso='lector'):
 
             return True, f"Empresa compartida con {email_usuario} como {permiso}"
 
+        except Exception as e:
+            return False, f"Error al compartir: {e}"
+    return False, "Datos incompletos"
         except Exception as e:
             return False, f"Error al compartir: {e}"
     return False, "Datos incompletos"
@@ -4684,6 +4688,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
