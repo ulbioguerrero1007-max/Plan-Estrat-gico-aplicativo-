@@ -1698,7 +1698,7 @@ def aplicacion_principal():
 
     tab1, tab2, tab_est, tab3, tab4, tab5, tab_dash, tab6 = st.tabs([
         "1. Introducción", "2. Diagnóstico Situacional", "3. Estrategia", 
-        "4. Planes Estratégicos", "5. CMI/Indicadores", "6. Operativización/Presupuesto", 
+        "4. égicos", "5. CMI/Indicadores", "6. Operativización/Presupuesto", 
         "7. Dashboard de Análisis", "8. Resumen y Conclusiones"
     ])
 
@@ -2211,27 +2211,241 @@ def aplicacion_principal():
                         
     # --- PESTAÑA 4: PLANES ESTRATÉGICOS ---
     with tab3:
-        st.header("Planes Estratégicos")
+        st.header("📋 Planes Estratégicos Funcionales")
         
-        # Obtener estrategia principal del FODA para generar planes contextuales
+        # Obtener datos necesarios para contextualizar
         df_foda_temp = get_datos_tabla('foda_cruzado', empresa_id)
-        analisis_df_temp, _, estrategia_principal, _ = analizar_foda(df_foda_temp)
+        analisis_df_temp, _, estrategia_principal, puntajes_foda = analizar_foda(df_foda_temp)
+        df_estrategias_planes = get_datos_tabla('estrategias_generadas', empresa_id)
+        empresa_datos = get_datos_empresa(empresa_id)
         
-        if st.button("🤖 Generar Planes Estratégicos con IA", disabled=not puede_editar):
-            with st.spinner("Generando planes estratégicos personalizados..."):
-                prompt_planes = f"Genera planes estratégicos detallados basados en la estrategia: {estrategia_principal}. Incluye objetivos específicos para cada área."
-                planes_generados = generar_analisis(prompt_planes)
-                st.session_state['operativo_analisis_temp'] = planes_generados
-                st.rerun()
+        # Calcular puntaje PEST para contexto
+        df_pest_temp = get_datos_tabla('matrices', empresa_id, tipo_matriz_filter='PEST')
+        pest_total = df_pest_temp['valor_ponderado'].sum() if not df_pest_temp.empty else 0
         
-        with st.form("form_planes"):
-            current_analisis_operativo = st.session_state.get("operativo_analisis_temp", empresa_data.get('analisis_operativo', ''))
-            analisis_propio_operativo = st.text_area("Plan Estratégico Maestro", value=current_analisis_operativo, height=400, disabled=not puede_editar)
-            if st.form_submit_button("💾 Guardar Plan Maestro", disabled=not puede_editar):
-                guardar_analisis_db(empresa_id, 'operativo', analisis_propio_operativo)
+        # Determinar contexto estratégico
+        es_ofensiva = "Ofensiva" in str(estrategia_principal)
+        es_adaptativa = "Adaptativa" in str(estrategia_principal)
+        es_defensiva = "Defensiva" in str(estrategia_principal)
+        es_supervivencia = "Supervivencia" in str(estrategia_principal)
         
+        contexto_empresa = {
+            'nombre': empresa_datos.get('nombre', 'La empresa'),
+            'giro': empresa_datos.get('giro', 'su sector'),
+            'estrategia_principal': estrategia_principal or 'No definida',
+            'pest_total': pest_total,
+            'postura': 'crecimiento' if (es_ofensiva or es_adaptativa) else 'consolidación/defensa'
+        }
+        
+        st.info(f"""
+        **Contexto Estratégico Detectado:**
+        - Estrategia Principal: **{contexto_empresa['estrategia_principal']}**
+        - Postura: **{contexto_empresa['postura'].upper()}**
+        - Entorno PEST: **{'Favorable' if pest_total > 2.5 else 'Desafiante'}** ({pest_total:.2f})
+        """)
+        
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            if st.button("🤖 Generar 7 Planes Funcionales Profesionales", disabled=not puede_editar, type="primary"):
+                with st.spinner("Elaborando planes estratégicos detallados con IA. Esto puede tomar 1-2 minutos..."):
+                    
+                    # Preparar contexto de estrategias generadas
+                    contexto_estrategias = ""
+                    if not df_estrategias_planes.empty:
+                        for idx, row in df_estrategias_planes.iterrows():
+                            contexto_estrategias += f"\n{idx+1}. [{row['cuadrante']}] {row['estrategia']} -> {row['plan_asignado']}"
+                    
+                    prompt_planes_maestros = f"""
+Actúa como un consultor senior de estrategia empresarial con 20 años de experiencia. 
+Elabora 7 PLANES FUNCIONALES ESTRATÉGICOS de alto nivel para {contexto_empresa['nombre']}, 
+empresa del sector {contexto_empresa['giro']}.
+
+CONTEXTO ESTRATÉGICO:
+- Estrategia principal FODA: {contexto_empresa['estrategia_principal']}
+- Postura estratégica: {contexto_empresa['postura']}
+- Entorno PEST score: {contexto_empresa['pest_total']:.2f}
+- Estrategias generadas: {contexto_estrategias if contexto_estrategias else 'No hay estrategias previas'}
+
+ESTRUCTURA REQUERIDA PARA CADA PLAN (7 planes totales):
+
+1. PLAN ADMINISTRATIVO
+2. PLAN OPERATIVO  
+3. PLAN TECNOLÓGICO
+4. PLAN FINANCIERO
+5. PLAN DE MONITOREO Y CONTROL
+6. PLAN DE MEJORA
+7. PLAN DE CONTINGENCIA
+
+PARA CADA PLAN DEBES INCLUIR EXACTAMENTE:
+
+=== [NOMBRE DEL PLAN] ===
+
+1. FUNDAMENTO ESTRATÉGICO
+[Explicación de por qué este plan es crítico para la empresa en su contexto actual, 3-4 párrafos profundos]
+
+2. OBJETIVO GENERAL DEL PLAN
+[Objetivo SMART específico]
+
+3. OBJETIVOS ESPECÍFICOS (mínimo 3)
+- Objetivo 1
+- Objetivo 2  
+- Objetivo 3
+
+4. ESTRATEGIAS DE IMPLEMENTACIÓN (mínimo 4 estrategias concretas)
+A. [Nombre estrategia 1]
+   - Descripción detallada
+   - Acciones clave
+B. [Nombre estrategia 2]
+   - Descripción detallada
+   - Acciones clave
+[C continuar...]
+
+5. KPls Y METAS (mínimo 5 KPIs por plan)
+- KPI 1: [Nombre] | Meta: [X] | Frecuencia: [mensual/trimestral]
+- KPI 2: [Nombre] | Meta: [X] | Frecuencia: [mensual/trimestral]
+[Continuar...]
+
+6. RECURSOS REQUERIDOS
+- Humanos: [Detalle]
+- Financieros: [Presupuesto estimado]
+- Tecnológicos: [Infraestructura]
+- Temporales: [Cronograma]
+
+7. RESPONSABLES Y GOBIERNO
+- Responsable principal: [Rol]
+- Comité de seguimiento: [Miembros]
+- Frecuencia de revisión: [Semanal/Mensual]
+
+8. RIESGOS Y MITIGACIÓN
+- Riesgo 1: [Descripción] | Mitigación: [Acción]
+- Riesgo 2: [Descripción] | Mitigación: [Acción]
+
+9. ALINEACIÓN CON ESTRATEGIA FODA
+[Cómo este plan contribuye específicamente a FO, FA, DO o DA]
+
+REQUISITOS DE CALIDAD:
+- Lenguaje ejecutivo y profesional
+- Contenido específico, no genérico
+- Cada plan debe tener 800-1200 palabras mínimo
+- Los KPIs deben ser cuantificables y realistas
+- Las estrategias deben ser accionables
+- Considerar el contexto PEST y FODA proporcionado
+- NO usar frases vacías como "mejorar procesos" sin especificar cómo
+
+GENERA LOS 7 PLANES COMPLETOS AHORA:
+"""
+                    
+                    planes_generados = generar_analisis(prompt_planes_maestros)
+                    st.session_state['planes_maestros_generados'] = planes_generados
+                    st.success("✅ Planes funcionales generados con éxito")
+                    st.rerun()
+        
+        with col2:
+            st.caption("""
+            **Los 7 Planes Funcionales:**
+            1. 📊 Administrativo
+            2. ⚙️ Operativo
+            3. 💻 Tecnológico
+            4. 💰 Financiero
+            5. 📈 Monitoreo y Control
+            6. 🚀 Mejora
+            7. 🛡️ Contingencia
+            """)
+        
+        # Mostrar y editar planes
+        planes_actuales = st.session_state.get('planes_maestros_generados', empresa_data.get('analisis_operativo', ''))
+        
+        if planes_actuales:
+            st.divider()
+            st.subheader("📄 Planes Estratégicos Funcionales - Documento Maestro")
+            
+            # Mostrar en tabs los 7 planes si se detectan en el texto
+            if "===" in planes_actuales:
+                # Intentar dividir por planes
+                import re
+                planes_secciones = re.split(r'===\s*(PLAN\s+\w+|Plan\s+\w+)\s*===', planes_actuales)
+                
+                if len(planes_secciones) > 1:
+                    # Crear tabs para cada plan detectado
+                    nombres_planes = []
+                    contenidos_planes = []
+                    
+                    for i in range(1, len(planes_secciones), 2):
+                        if i < len(planes_secciones):
+                            nombre = planes_secciones[i].strip()
+                            contenido = planes_secciones[i+1] if i+1 < len(planes_secciones) else ""
+                            nombres_planes.append(nombre)
+                            contenidos_planes.append(contenido)
+                    
+                    if nombres_planes:
+                        tabs_planes = st.tabs(nombres_planes)
+                        for tab, nombre, contenido in zip(tabs_planes, nombres_planes, contenidos_planes):
+                            with tab:
+                                st.markdown(f"### {nombre}")
+                                st.markdown(contenido)
+                                
+                                # Botón para copiar contenido específico
+                                if st.button(f"📋 Copiar {nombre}", key=f"copy_{nombre}"):
+                                    st.code(contenido, language='markdown')
+            
+            # Editor completo
+            with st.form("form_planes_maestros"):
+                st.write("**Editar Documento Completo de Planes:**")
+                planes_editados = st.text_area(
+                    "Planes Estratégicos Funcionales", 
+                    value=planes_actuales, 
+                    height=800, 
+                    disabled=not puede_editar,
+                    help="Edite los 7 planes funcionales. Mantenga la estructura con === NOMBRE DEL PLAN === para separar secciones."
+                )
+                
+                col_save, col_regen = st.columns(2)
+                with col_save:
+                    if st.form_submit_button("💾 Guardar Planes Maestros", disabled=not puede_editar):
+                        guardar_analisis_db(empresa_id, 'operativo', planes_editados)
+                        st.session_state['planes_maestros_generados'] = planes_editados
+                
+                with col_regen:
+                    if st.form_submit_button("🔄 Regenerar Todo", disabled=not puede_editar):
+                        if 'planes_maestros_generados' in st.session_state:
+                            del st.session_state['planes_maestros_generados']
+                        st.rerun()
+            
+            # Vista previa estructurada
+            with st.expander("📊 Ver Resumen Estructurado de Planes"):
+                # Extraer KPIs mencionados
+                kpis_encontrados = re.findall(r'KPI\s*\d*[:.-]\s*([^\n|]+)', planes_actuales, re.IGNORECASE)
+                if kpis_encontrados:
+                    st.write("**KPIs Detectados:**")
+                    for i, kpi in enumerate(kpis_encontrados[:15], 1):
+                        st.write(f"{i}. {kpi.strip()}")
+                
+                # Contar estrategias
+                estrategias_count = len(re.findall(r'^[A-Z]\.\s+', planes_actuales, re.MULTILINE))
+                st.metric("Estrategias Detectadas", estrategias_count)
+        
+        else:
+            st.info("""
+            👆 **Haz clic en "Generar 7 Planes Funcionales Profesionales"** para crear:
+            
+            **Plan Administrativo**: Estructura organizacional, gestión del talento, cultura corporativa
+            
+            **Plan Operativo**: Procesos productivos, cadena de suministro, calidad, logística
+            
+            **Plan Tecnológico**: Infraestructura digital, transformación digital, ciberseguridad, innovación
+            
+            **Plan Financiero**: Presupuesto, flujo de caja, inversión, rentabilidad, control financiero
+            
+            **Plan de Monitoreo y Control**: Dashboards, indicadores, auditorías, seguimiento estratégico
+            
+            **Plan de Mejora**: Metodologías (Kaizen, Six Sigma), optimización continua, capacitación
+            
+            **Plan de Contingencia**: Gestión de riesgos, continuidad del negocio, planes de respuesta
+            """)
+        
+        # Mostrar último guardado
         mostrar_ultimo_analisis_guardado(empresa_data, 'operativo')
-    
+        
     # --- PESTAÑA 5: CMI/INDICADORES ---
     with tab4:
         st.header("CMI / Indicadores")
@@ -3612,4 +3826,5 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
