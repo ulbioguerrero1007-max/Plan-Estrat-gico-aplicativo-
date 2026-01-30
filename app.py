@@ -1628,28 +1628,65 @@ def aplicacion_principal():
                             exito, mensaje = compartir_empresa(empresa_id, email_compartir, permiso_compartir)
                             if exito:
                                 st.success(mensaje)
+                                st.rerun()
                             else:
                                 st.error(mensaje)
                         else:
                             st.warning("Ingresa un email")
 
-                # Mostrar usuarios con quienes se compartió
+                # Mostrar usuarios con quienes se compartió - CON OPCIONES DE GESTIÓN
                 usuarios_comp = get_usuarios_compartidos(empresa_id)
                 if usuarios_comp:
-                    st.write("**Usuarios con acceso:**")
+                    st.write("---")
+                    st.write("**👥 Usuarios con acceso compartido:**")
+                    
                     for uc in usuarios_comp:
-                        col_uc1, col_uc2 = st.columns([3, 1])
-                        with col_uc1:
-                            permiso_icon = "✏️" if uc['permiso'] == 'editor' else "👁️"
-                            st.write(f"{permiso_icon} {uc['email']} ({uc['permiso']})")
-                        with col_uc2:
-                            if st.button("❌", key=f"del_{uc['usuario_id']}"):
-                                exito_del, msg_del = eliminar_compartir(empresa_id, uc['usuario_id'])
-                                if exito_del:
-                                    st.success(msg_del)
-                                    st.rerun()
-                                else:
-                                    st.error(msg_del)
+                        with st.container():
+                            col_info, col_rol, col_accion = st.columns([3, 2, 1])
+                            
+                            with col_info:
+                                permiso_icon = "✏️" if uc['permiso'] == 'editor' else "👁️"
+                                st.write(f"{permiso_icon} **{uc['email']}**")
+                                if uc.get('nombre'):
+                                    st.caption(f"Nombre: {uc['nombre']}")
+                            
+                            with col_rol:
+                                # Selectbox para cambiar rol
+                                nuevo_rol = st.selectbox(
+                                    "Rol",
+                                    ["lector", "editor"],
+                                    index=0 if uc['permiso'] == 'lector' else 1,
+                                    format_func=lambda x: "👁️ Lector" if x == "lector" else "✏️ Editor",
+                                    key=f"rol_{uc['usuario_id']}"
+                                )
+                                
+                                # Si cambió el rol, actualizar
+                                if nuevo_rol != uc['permiso']:
+                                    if st.button("💾 Guardar cambio", key=f"save_rol_{uc['usuario_id']}"):
+                                        try:
+                                            supabase.table('empresas_compartidas').update(
+                                                {'permiso': nuevo_rol}
+                                            ).eq('empresa_id', empresa_id).eq('usuario_compartido_id', uc['usuario_id']).execute()
+                                            st.success(f"Rol actualizado a {nuevo_rol}")
+                                            st.rerun()
+                                        except Exception as e:
+                                            st.error(f"Error al actualizar: {e}")
+                            
+                            with col_accion:
+                                # Botón para eliminar acceso
+                                if st.button("🗑️ Eliminar", key=f"del_{uc['usuario_id']}", type="secondary"):
+                                    try:
+                                        supabase.table('empresas_compartidas').delete().eq(
+                                            'empresa_id', empresa_id
+                                        ).eq('usuario_compartido_id', uc['usuario_id']).execute()
+                                        st.success(f"Acceso eliminado para {uc['email']}")
+                                        st.rerun()
+                                    except Exception as e:
+                                        st.error(f"Error al eliminar: {e}")
+                        
+                        st.divider()
+                else:
+                    st.info("ℹ️ Esta empresa no está compartida con ningún usuario todavía.")
 
             # Eliminar empresa (solo propietario)
             if st.button("❌ Eliminar Empresa", type="primary"):
@@ -1663,7 +1700,12 @@ def aplicacion_principal():
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error al eliminar la empresa: {e}")
-                               # BOTÓN DE CERRAR SESIÓN (AGREGADO AL FINAL)
+
+        elif empresa_id and not es_propietario:
+            st.divider()
+            st.info("ℹ️ Solo el propietario puede compartir o eliminar esta empresa")
+            
+# BOTÓN DE CERRAR SESIÓN (AGREGADO AL FINAL)
         st.divider()
         st.subheader("Sesión")
         
@@ -1683,7 +1725,7 @@ def aplicacion_principal():
                 if st.button("Cancelar", use_container_width=True):
                     st.rerun()
   
-        elif empresa_id and not es_propietario:
+        el and not es_propietario:
             st.divider()
             st.info("ℹ️ Solo el propietario puede compartir o eliminar esta empresa")
                 
@@ -4648,6 +4690,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
