@@ -4292,16 +4292,6 @@ Sé directo y accionable. Máximo 200 palabras."""
 
                 if pdf_buffer:
 
-                # Generar Word con formato profesional
-                word_buffer = generar_word_formato_uea(
-                    empresa_id, 
-                    pdf_version, 
-                    pdf_elaborado, 
-                    pdf_revisado, 
-                    pdf_aprobado
-                )
-
-                if pdf_buffer and word_buffer:
                     # Guardar PDF
                     st.session_state['pdf_bytes'] = pdf_buffer.getvalue()
                     st.session_state['pdf_nombre'] = f"Plan_Estrategico_{empresa_data.get('nombre', 'Empresa')}_V{pdf_version}.pdf"
@@ -4391,34 +4381,5 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
