@@ -774,10 +774,10 @@ def create_table_pdf(data, col_widths=None, style=None):
 
 def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, aprobado):
     """
-    Genera el documento PDF completo con formato APA y estructura de 3 partes:
-    1. Resumen Ejecutivo (máx 5 hojas) - PRIMERO
-    2. Plan Estratégico (máx 30 hojas) - Estructura solicitada
-    3. Anexos (ilimitado) - Dashboards y matrices detalladas
+    Genera el documento PDF completo con formato APA y estructura solicitada:
+    1. Resumen Ejecutivo (máx 5 hojas)
+    2. Plan Estratégico (máx 30 hojas) con estructura específica
+    3. Anexos (ilimitado)
     """
     from datetime import datetime
     
@@ -814,19 +814,19 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         pagesize=A4,
         leftMargin=1*inch,
         rightMargin=1*inch,
-        topMargin=1.5*inch,
-        bottomMargin=1.2*inch,
+        topMargin=1.5*inch,  # Espacio para encabezado
+        bottomMargin=1.2*inch,  # Espacio para pie de página
     )
 
-    # Crear Frame para limitar el área de contenido
+    # Crear Frame para limitar el área de contenido (evita solapamiento con header/footer)
     from reportlab.platypus import Frame
     content_frame = Frame(
-        doc.leftMargin,
-        doc.bottomMargin,
-        doc.width,
-        letter[1] - doc.topMargin - doc.bottomMargin,
+        doc.leftMargin,  # x
+        doc.bottomMargin,  # y
+        doc.width,  # width
+        letter[1] - doc.topMargin - doc.bottomMargin,  # height (página - márgenes)
         id='content_frame',
-        showBoundary=0
+        showBoundary=0  # 0 = no mostrar borde, 1 = debug
     )
     
     styles = get_apa_styles()
@@ -837,20 +837,26 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     logo_bytes = None
     if logo_bytes_data:
         try:
+            # Intentar convertir desde hexadecimal
             if isinstance(logo_bytes_data, str):
+                # Limpiar el string hex de prefijos y caracteres problemáticos
                 hex_clean = logo_bytes_data.replace('\\x', '').replace('0x', '').replace("'", "")
                 logo_bytes = BytesIO(bytes.fromhex(hex_clean))
             elif isinstance(logo_bytes_data, bytes):
+                # Si ya es bytes, usar directamente
                 logo_bytes = BytesIO(logo_bytes_data)
             else:
                 logo_bytes = BytesIO(logo_bytes_data)
 
+            # Verificar que sea una imagen válida
             from PIL import Image as PILImage
             logo_bytes.seek(0)
             PILImage.open(logo_bytes)
             logo_bytes.seek(0)
         except Exception as e:
+            # Si hay cualquier error, no usar logo
             logo_bytes = None
+            print(f"Advertencia: No se pudo cargar el logo: {e}")
     
     # Preparar organigrama
     organigrama_bytes = None
@@ -1752,8 +1758,9 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         return pdf_buffer
     except Exception as e:
         st.error(f"Error al generar PDF: {e}")
-        return None
-    
+        import traceback
+        st.error(traceback.format_exc())
+        return None    
 # AQUÍ VA LA FUNCIÓN mostrar_ultimo_analisis_guardado (ya existe en tu código)
 
 
@@ -4943,6 +4950,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
