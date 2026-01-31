@@ -280,13 +280,8 @@ def mostrar_imagen_bd(imagen_data, caption="Imagen", width=None):
             img_bytes = base64.b64decode(imagen_data)
             st.image(img_bytes, caption=caption, width=width)
             return True
-    except:
-        pass
-    return False
-            
     except Exception as e:
-        st.warning(f"No se pudo mostrar imagen: {e}")
-    
+        pass
     return False
     
 def analizar_foda(df_foda):
@@ -2213,9 +2208,9 @@ def aplicacion_principal():
         "7. Operativización/Presupuesto", "8. Dashboard de Análisis", "9. Resumen y Conclusiones"
     ])
     
-    # --- PESTAÑA 1: INTRODUCCIÓN ---
+    # --- PESTAÑA 1: INTRODUCCION ---
     with tab1:
-        st.header("Introducción y Cultura Organizacional")
+        st.header("Introduccion y Cultura Organizacional")
         
         with st.form("form_intro"):
             st.subheader("Datos Generales")
@@ -2232,7 +2227,7 @@ def aplicacion_principal():
                     import base64
                     logo_bytes = base64.b64decode(logo_actual)
                     st.image(logo_bytes, width=150, caption="Logo guardado")
-                except:
+                except Exception as e:
                     st.info("No hay logo guardado")
             else:
                 st.info("No hay logo guardado. Sube uno nuevo.")
@@ -2260,15 +2255,17 @@ def aplicacion_principal():
                     import base64
                     org_bytes = base64.b64decode(org_actual)
                     st.image(org_bytes, width=600, caption="Organigrama guardado")
-                except:
+                except Exception as e:
                     st.info("No hay organigrama guardado")
             else:
                 st.info("No hay organigrama. Sube uno.")
             
             org_file = st.file_uploader("Subir Organigrama", type=['png', 'jpg', 'jpeg'], disabled=not puede_editar)
             
-            # BOTÓN GUARDAR
-            if st.form_submit_button("Guardar Todo", disabled=not puede_editar):
+            # BOTON GUARDAR
+            submitted = st.form_submit_button("Guardar Todo", disabled=not puede_editar)
+            
+            if submitted:
                 update_data = {
                     "nombre": nombre, 
                     "giro": giro, 
@@ -2282,19 +2279,28 @@ def aplicacion_principal():
                 }
                 
                 # Logo nuevo
-                if logo_file:
-                    import base64
-                    update_data['logo'] = base64.b64encode(logo_file.getvalue()).decode('utf-8')
+                if logo_file is not None:
+                    try:
+                        import base64
+                        update_data['logo'] = base64.b64encode(logo_file.getvalue()).decode('utf-8')
+                    except Exception as e:
+                        st.error(f"Error logo: {e}")
                 
                 # Organigrama nuevo
-                if org_file:
-                    import base64
-                    update_data['organigrama'] = base64.b64encode(org_file.getvalue()).decode('utf-8')
+                if org_file is not None:
+                    try:
+                        import base64
+                        update_data['organigrama'] = base64.b64encode(org_file.getvalue()).decode('utf-8')
+                    except Exception as e:
+                        st.error(f"Error organigrama: {e}")
                 
                 # Guardar
-                supabase.table('empresas').update(update_data).eq('id', empresa_id).execute()
-                st.success("Guardado!")
-                st.rerun()
+                try:
+                    supabase.table('empresas').update(update_data).eq('id', empresa_id).execute()
+                    st.success("Guardado!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error al guardar: {e}")
                     
     # --- PESTAÑA 2: DIAGNÓSTICO SITUACIONAL ---
     with tab2:
@@ -4617,6 +4623,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
