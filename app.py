@@ -1012,6 +1012,10 @@ def create_professional_table(data, col_widths=None, has_header=True):
     
     table.setStyle(TableStyle(style_commands))
     return table
+
+# Alias para compatibilidad con código existente
+create_table_pdf = create_professional_table
+
     
 def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, aprobado):
     """
@@ -4914,5 +4918,3 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
-
-
