@@ -739,6 +739,7 @@ def get_enhanced_styles():
         'APA_H1': 'Heading1Enhanced',
         'APA_H2': 'Heading2Enhanced',
         'APA_H3': 'Heading3Enhanced',
+        'APA_Title': 'Heading1Enhanced',
         'APA_Body': 'BodyTextEnhanced',
         'APA_Body_No_Indent': 'BodyTextNoIndent',
         'APA_Footer': 'CaptionEnhanced',
@@ -2895,7 +2896,7 @@ def aplicacion_principal():
                     with col1:
                         st.dataframe(analisis_df, use_container_width=True)
                     with col2:
-                        grafico_foda = generar_grafico_foda_radar_mejorado(puntajes_foda)
+                        grafico_foda = generar_grafico_foda_radar(puntajes_foda)
                         if grafico_foda: 
                             st.image(grafico_foda)
             
@@ -4913,3 +4914,4 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
