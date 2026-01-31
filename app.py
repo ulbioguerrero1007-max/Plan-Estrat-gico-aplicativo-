@@ -3090,12 +3090,17 @@ def aplicacion_principal():
         es_defensiva = "Defensiva" in str(estrategia_principal)
         es_supervivencia = "Supervivencia" in str(estrategia_principal)
         
+        # Manejar caso donde estrategia_principal es None
+        estrategia_foda_texto = estrategia_principal if estrategia_principal else "No definida"
+        postura_texto = 'crecimiento' if (es_ofensiva or es_adaptativa) else 'consolidación/defensa'
+        
         contexto_empresa = {
             'nombre': empresa_datos.get('nombre', 'La empresa'),
             'giro': empresa_datos.get('giro', 'su sector'),
-            'estrategia_principal': estrategia_principal or 'No definida',
+            'estrategia_foda': estrategia_foda_texto,
             'pest_total': pest_total,
-            'postura': 'crecimiento' if (es_ofensiva or es_adaptativa) else 'consolidación/defensa'
+            'num_estrategias': len(df_estrategias_planes),
+            'postura': postura_texto
         }
         
         st.info(f"""
@@ -3126,7 +3131,7 @@ def aplicacion_principal():
                         "CONTEXTO ESTRATÉGICO:",
                         f"- Estrategia principal FODA: {contexto_empresa['estrategia_foda']}",
                         f"- Postura estratégica: {contexto_empresa['postura']}",
-                        f"- Entorno PEST score: {contexto_empresa['pest_score']:.2f}",
+                        f"- Entorno PEST score: {contexto_empresa['pest_total']:.2f}",
                         "",
                         "FORMATO OBLIGATORIO - CADA PLAN DEBE SEGUIR ESTA ESTRUCTURA EXACTA:",
                         "",
@@ -4936,4 +4941,5 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
