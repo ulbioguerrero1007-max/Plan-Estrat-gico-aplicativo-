@@ -464,6 +464,15 @@ def generar_grafico_pest_bar(df_pest):
 def get_enhanced_styles():
     """Genera estilos de párrafo profesionales mejorados"""
     styles = getSampleStyleSheet()
+
+    # Lista con viñetas
+    styles.add(ParagraphStyle(
+        name='APA_List',
+        parent=styles['BodyTextEnhanced'],
+        leftIndent=0.5*inch,
+        firstLineIndent=-0.25*inch,
+        spaceAfter=4,
+    ))
     
     # Base
     styles.add(ParagraphStyle(
@@ -4742,6 +4751,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
