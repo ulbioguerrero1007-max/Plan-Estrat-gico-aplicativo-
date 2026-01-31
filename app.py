@@ -3094,7 +3094,7 @@ def aplicacion_principal():
         estrategia_foda_texto = estrategia_principal if estrategia_principal else "No definida"
         postura_texto = 'crecimiento' if (es_ofensiva or es_adaptativa) else 'consolidación/defensa'
         
-        contexto_empresa = {
+                contexto_empresa = {
             'nombre': empresa_datos.get('nombre', 'La empresa'),
             'giro': empresa_datos.get('giro', 'su sector'),
             'estrategia_foda': estrategia_foda_texto,
@@ -3105,7 +3105,7 @@ def aplicacion_principal():
         
         st.info(f"""
         **Contexto Estratégico Detectado:**
-        - Estrategia Principal: **{contexto_empresa['estrategia_principal']}**
+        - Estrategia Principal: **{contexto_empresa['estrategia_foda']}**
         - Postura: **{contexto_empresa['postura'].upper()}**
         - Entorno PEST: **{'Favorable' if pest_total > 2.5 else 'Desafiante'}** ({pest_total:.2f})
         """)
@@ -4941,5 +4941,6 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
