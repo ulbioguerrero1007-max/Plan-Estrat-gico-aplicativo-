@@ -273,7 +273,7 @@ def save_image(uploaded_file):
 def mostrar_imagen_bd(imagen_bytes, caption="Imagen", width=None):
     """
     Muestra una imagen guardada en la base de datos.
-    Maneja múltiples formatos de almacenamiento: bytes, hex string, base64 string.
+    Maneja múltiples formatos: bytes, hex string (con o sin \x), base64.
     """
     if not imagen_bytes:
         return False
@@ -285,22 +285,23 @@ def mostrar_imagen_bd(imagen_bytes, caption="Imagen", width=None):
         if isinstance(imagen_bytes, bytes):
             image_data = imagen_bytes
         
-        # Caso 2: Si es string (base64 o hex)
+        # Caso 2: Si es string (hex o base64)
         elif isinstance(imagen_bytes, str):
-            import base64
+            # Limpiar prefijos comunes de PostgreSQL bytea
+            hex_clean = imagen_bytes.replace('\\x', '').replace('0x', '').strip()
             
-            # Intentar como base64 primero (formato preferido)
+            # Intentar como hex primero (formato PostgreSQL bytea)
             try:
-                image_data = base64.b64decode(imagen_bytes)
+                if all(c in '0123456789abcdefABCDEF' for c in hex_clean):
+                    image_data = bytes.fromhex(hex_clean)
             except:
                 pass
             
-            # Si no funcionó, intentar convertir desde hex (formato antiguo)
+            # Si no funcionó, intentar como base64
             if image_data is None:
                 try:
-                    hex_clean = imagen_bytes.replace('\\x', '').replace('0x', '').replace("'", "").strip()
-                    if all(c in '0123456789abcdefABCDEF' for c in hex_clean):
-                        image_data = bytes.fromhex(hex_clean)
+                    import base64
+                    image_data = base64.b64decode(imagen_bytes)
                 except:
                     pass
         
@@ -308,8 +309,6 @@ def mostrar_imagen_bd(imagen_bytes, caption="Imagen", width=None):
         if image_data:
             st.image(image_data, caption=caption, width=width)
             return True
-        else:
-            return False
             
     except Exception as e:
         st.warning(f"No se pudo mostrar imagen: {e}")
@@ -2260,18 +2259,19 @@ def aplicacion_principal():
                 try:
                     # Intentar mostrar logo existente
                     if isinstance(logo_actual, str):
-                        import base64
-                        logo_bytes = base64.b64decode(logo_actual)
-                        st.image(logo_bytes, width=150, caption="Logo actual")
+                        # Convertir de hex a bytes
+                        hex_clean = logo_actual.replace('\\x', '').replace('0x', '').strip()
+                        logo_bytes = bytes.fromhex(hex_clean)
+                        st.image(logo_bytes, width=150, caption="Logo actual guardado")
                         logo_existe = True
                     elif isinstance(logo_actual, bytes):
-                        st.image(logo_actual, width=150, caption="Logo actual")
+                        st.image(logo_actual, width=150, caption="Logo actual guardado")
                         logo_existe = True
                 except Exception as e:
-                    st.warning(f"No se pudo mostrar el logo actual")
+                    st.warning(f"No se pudo mostrar el logo: {e}")
             
             if not logo_existe:
-                st.info("No hay logo guardado. Sube uno nuevo.")
+                st.info("💡 No hay logo guardado. Sube uno nuevo.")
             
             logo_file = st.file_uploader("Subir nuevo Logo (PNG, JPG, JPEG)", type=['png', 'jpg', 'jpeg'], disabled=not puede_editar)
             
@@ -2296,18 +2296,18 @@ def aplicacion_principal():
                 try:
                     # Intentar mostrar organigrama existente
                     if isinstance(organigrama_actual, str):
-                        import base64
-                        org_bytes = base64.b64decode(organigrama_actual)
-                        st.image(org_bytes, width=600, caption="Organigrama actual")
+                        hex_clean = organigrama_actual.replace('\\x', '').replace('0x', '').strip()
+                        org_bytes = bytes.fromhex(hex_clean)
+                        st.image(org_bytes, width=600, caption="Organigrama actual guardado")
                         organigrama_existe = True
                     elif isinstance(organigrama_actual, bytes):
-                        st.image(organigrama_actual, width=600, caption="Organigrama actual")
+                        st.image(organigrama_actual, width=600, caption="Organigrama actual guardado")
                         organigrama_existe = True
                 except Exception as e:
-                    st.warning(f"No se pudo mostrar el organigrama actual")
+                    st.warning(f"No se pudo mostrar el organigrama: {e}")
             
             if not organigrama_existe:
-                st.info("No hay organigrama guardado. Sube uno nuevo.")
+                st.info("💡 No hay organigrama guardado. Sube uno nuevo.")
             
             organigrama_file = st.file_uploader("Subir nuevo Organigrama (PNG, JPG, JPEG)", type=['png', 'jpg', 'jpeg'], disabled=not puede_editar)
             
@@ -2329,22 +2329,22 @@ def aplicacion_principal():
                 # Procesar logo si se subió uno nuevo
                 if logo_file is not None:
                     try:
-                        import base64
                         logo_bytes = logo_file.getvalue()
-                        logo_base64 = base64.b64encode(logo_bytes).decode('utf-8')
-                        update_data['logo'] = logo_base64
+                        # Convertir a hex string (formato que Supabase bytea espera)
+                        logo_hex = logo_bytes.hex()
+                        update_data['logo'] = logo_hex
                     except Exception as e:
-                        st.error(f"Error al procesar logo: {e}")
+                        st.error(f"❌ Error al procesar logo: {e}")
                 
                 # Procesar organigrama si se subió uno nuevo
                 if organigrama_file is not None:
                     try:
-                        import base64
                         organigrama_bytes = organigrama_file.getvalue()
-                        organigrama_base64 = base64.b64encode(organigrama_bytes).decode('utf-8')
-                        update_data['organigrama'] = organigrama_base64
+                        # Convertir a hex string
+                        organigrama_hex = organigrama_bytes.hex()
+                        update_data['organigrama'] = organigrama_hex
                     except Exception as e:
-                        st.error(f"Error al procesar organigrama: {e}")
+                        st.error(f"❌ Error al procesar organigrama: {e}")
                 
                 try:
                     # Actualizar en Supabase
@@ -4675,6 +4675,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
