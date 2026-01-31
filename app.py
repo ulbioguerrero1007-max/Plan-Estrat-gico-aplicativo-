@@ -465,16 +465,6 @@ def get_enhanced_styles():
     """Genera estilos de párrafo profesionales mejorados"""
     styles = getSampleStyleSheet()
 
-    # Lista con viñetas
-    styles.add(ParagraphStyle(
-        name='APA_List',
-        parent=styles['BodyTextEnhanced'],
-        leftIndent=0.5*inch,
-        firstLineIndent=-0.25*inch,
-        spaceAfter=4,
-    ))
-    
-    # Base
     styles.add(ParagraphStyle(
         name='EnhancedBase',
         fontName=Typography.FONT_MAIN,
@@ -484,8 +474,8 @@ def get_enhanced_styles():
         alignment=TA_JUSTIFY,
         spaceAfter=6,
     ))
-    
-    # Títulos
+
+         # Títulos
     styles.add(ParagraphStyle(
         name='Heading1Enhanced',
         parent=styles['EnhancedBase'],
@@ -583,6 +573,25 @@ def get_enhanced_styles():
         fontName=Typography.FONT_BOLD,
         textColor=white,
         alignment=TA_CENTER,
+    ))
+    # Lista con viñetas
+    styles.add(ParagraphStyle(
+        name='APA_List',
+        parent=styles['BodyTextEnhanced'],
+        leftIndent=0.5*inch,
+        firstLineIndent=-0.25*inch,
+        spaceAfter=4,
+    ))
+    
+    # Base
+    styles.add(ParagraphStyle(
+        name='EnhancedBase',
+        fontName=Typography.FONT_MAIN,
+        fontSize=Typography.SIZE_BODY,
+        leading=Typography.LEADING_BODY,
+        textColor=ColorPalette.TEXT_PRIMARY,
+        alignment=TA_JUSTIFY,
+        spaceAfter=6,
     ))
     
     return styles
@@ -4751,6 +4760,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
