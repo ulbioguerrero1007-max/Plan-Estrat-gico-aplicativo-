@@ -578,6 +578,8 @@ def get_enhanced_styles():
     
     return styles
 
+
+
 def create_header_footer(canvas, doc, logo_bytes=None, empresa_nombre="", 
                          version="", elaborado="", revisado="", aprobado="", fecha=""):
     """Dibuja encabezado y pie de página profesional"""
@@ -989,26 +991,26 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     # PARTE 1: RESUMEN EJECUTIVO (máx 5 hojas)
     # ============================================
     
-    story.append(Paragraph("RESUMEN EJECUTIVO", styles['APA_H1']))
+    story.append(Paragraph("RESUMEN EJECUTIVO", styles['Heading1Enhanced']))
     story.append(Spacer(1, 0.2*inch))
     
     story.append(Paragraph(
         f"El presente documento constituye el Plan Estratégico de <b>{empresa.get('nombre', 'la empresa')}</b>, "
         f"elaborado con fecha {fecha_actual}. Este resumen ejecutivo presenta los hallazgos más relevantes "
         f"del diagnóstico estratégico y las recomendaciones prioritarias para la alta dirección.",
-        styles['APA_Body']
+        styles['BodyTextEnhanced']
     ))
     story.append(Spacer(1, 0.2*inch))
     
     # Datos clave del diagnóstico
-    story.append(Paragraph("Diagnóstico Estratégico Clave", styles['APA_H2']))
+    story.append(Paragraph("Diagnóstico Estratégico Clave", styles['Heading2Enhanced']))
     
     if estrategia_principal:
         story.append(Paragraph(
             f"<b>Estrategia Principal Recomendada:</b> {estrategia_principal}. "
             f"Esta postura estratégica se determina a partir del análisis FODA cruzado y representa "
             f"la orientación prioritaria para el período de planificación.",
-            styles['APA_Body']
+            styles['BodyTextEnhanced']
         ))
     
     # Gráfico FODA radar (compacto)
@@ -1019,14 +1021,14 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
             story.append(Image(grafico_foda, width=3.5*inch, height=3.5*inch))
             story.append(Paragraph(
                 "<i>Figura 1. Posicionamiento estratégico según análisis FODA cruzado.</i>",
-                ParagraphStyle(name='Caption', parent=styles['APA_Body'], alignment=TA_CENTER, fontSize=10, firstLineIndent=0)
+                ParagraphStyle(name='Caption', parent=styles['BodyTextEnhanced'], alignment=TA_CENTER, fontSize=10, firstLineIndent=0)
             ))
     
     story.append(Spacer(1, 0.2*inch))
     
     # Análisis PEST resumido
     if not df_pest.empty:
-        story.append(Paragraph("Factores Críticos del Entorno", styles['APA_H2']))
+        story.append(Paragraph("Factores Críticos del Entorno", styles['Heading2Enhanced']))
         
         pest_criticos = df_pest.nlargest(3, 'valor_ponderado')
         factores_texto = []
@@ -1043,14 +1045,14 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
             story.append(Image(grafico_pest, width=4*inch, height=2.5*inch))
             story.append(Paragraph(
                 "<i>Figura 2. Distribución de factores PEST por impacto.</i>",
-                ParagraphStyle(name='Caption', parent=styles['APA_Body'], alignment=TA_CENTER, fontSize=10, firstLineIndent=0)
+                ParagraphStyle(name='Caption', parent=styles['BodyTextEnhanced'], alignment=TA_CENTER, fontSize=10, firstLineIndent=0)
             ))
     
     story.append(Spacer(1, 0.2*inch))
     
     # Estrategias priorizadas
     if not df_estrategias.empty:
-        story.append(Paragraph("Estrategias Prioritarias", styles['APA_H2']))
+        story.append(Paragraph("Estrategias Prioritarias", styles['Heading2Enhanced']))
         
         estrategias_alta = df_estrategias[df_estrategias['importancia'].isin(['Alta', 'Media Alta'])].head(5)
         
@@ -1064,7 +1066,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     
     # Indicadores financieros clave
     if not df_cb.empty:
-        story.append(Paragraph("Viabilidad Financiera", styles['APA_H2']))
+        story.append(Paragraph("Viabilidad Financiera", styles['Heading2Enhanced']))
         
         datos_cb = df_cb.iloc[0]
         
@@ -1090,13 +1092,13 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
                 story.append(Image(grafico_proy, width=5*inch, height=3*inch))
                 story.append(Paragraph(
                     "<i>Figura 3. Proyección financiera del plan estratégico.</i>",
-                    ParagraphStyle(name='Caption', parent=styles['APA_Body'], alignment=TA_CENTER, fontSize=10, firstLineIndent=0)
+                    ParagraphStyle(name='Caption', parent=styles['BodyTextEnhanced'], alignment=TA_CENTER, fontSize=10, firstLineIndent=0)
                 ))
     
     story.append(Spacer(1, 0.2*inch))
     
     # Recomendación final
-    story.append(Paragraph("Recomendación Ejecutiva", styles['APA_H2']))
+    story.append(Paragraph("Recomendación Ejecutiva", styles['Heading2Enhanced']))
     
     if not df_cb.empty:
         puntos_positivos = sum([
@@ -1124,7 +1126,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
                 "alternativas de menor inversión."
             )
         
-        story.append(Paragraph(recomendacion, styles['APA_Body']))
+        story.append(Paragraph(recomendacion, styles['BodyTextEnhanced']))
     
     story.append(PageBreak())
     
@@ -1143,20 +1145,20 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         story.append(Image(logo_bytes, width=2*inch, height=2*inch))
         story.append(Spacer(1, 0.5*inch))
     
-    story.append(Paragraph(f"<b>Versión:</b> {version}", styles['APA_Body_No_Indent']))
-    story.append(Paragraph(f"<b>Fecha:</b> {fecha_actual}", styles['APA_Body_No_Indent']))
+    story.append(Paragraph(f"<b>Versión:</b> {version}", styles['BodyTextNoIndent']))
+    story.append(Paragraph(f"<b>Fecha:</b> {fecha_actual}", styles['BodyTextNoIndent']))
     story.append(Spacer(1, 1*inch))
-    story.append(Paragraph(f"<b>Elaborado por:</b> {elaborado}", styles['APA_Body_No_Indent']))
-    story.append(Paragraph(f"<b>Revisado por:</b> {revisado}", styles['APA_Body_No_Indent']))
-    story.append(Paragraph(f"<b>Aprobado por:</b> {aprobado}", styles['APA_Body_No_Indent']))
+    story.append(Paragraph(f"<b>Elaborado por:</b> {elaborado}", styles['BodyTextNoIndent']))
+    story.append(Paragraph(f"<b>Revisado por:</b> {revisado}", styles['BodyTextNoIndent']))
+    story.append(Paragraph(f"<b>Aprobado por:</b> {aprobado}", styles['BodyTextNoIndent']))
     
     story.append(PageBreak())
     
     # 1. INTRODUCCIÓN Y FUNDAMENTOS (Datos Generales + Cultura Organizacional)
-    story.append(Paragraph("1. INTRODUCCIÓN Y FUNDAMENTOS", styles['APA_H1']))
+    story.append(Paragraph("1. INTRODUCCIÓN Y FUNDAMENTOS", styles['Heading1Enhanced']))
     
     # 1.1 Datos Generales
-    story.append(Paragraph("1.1 Datos Generales de la Empresa", styles['APA_H2']))
+    story.append(Paragraph("1.1 Datos Generales de la Empresa", styles['Heading2Enhanced']))
     
     datos_gen = [
         ['Campo', 'Información'],
@@ -1172,73 +1174,73 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     
     # Logo de la empresa
     if logo_bytes:
-        story.append(Paragraph("Logo de la Empresa", styles['APA_H3']))
+        story.append(Paragraph("Logo de la Empresa", styles['Heading3Enhanced']))
         story.append(Image(logo_bytes, width=2*inch, height=2*inch))
         story.append(Spacer(1, 0.2*inch))
     
     # 1.2 Cultura Organizacional (Misión, Visión, Valores)
-    story.append(Paragraph("1.2 Elementos Orientadores de la Cultura Organizacional", styles['APA_H2']))
+    story.append(Paragraph("1.2 Elementos Orientadores de la Cultura Organizacional", styles['Heading2Enhanced']))
     
     if empresa.get('mision'):
-        story.append(Paragraph("Misión", styles['APA_H3']))
-        story.append(Paragraph(empresa['mision'], styles['APA_Body']))
+        story.append(Paragraph("Misión", styles['Heading3Enhanced']))
+        story.append(Paragraph(empresa['mision'], styles['BodyTextEnhanced']))
         story.append(Spacer(1, 0.1*inch))
     
     if empresa.get('vision'):
-        story.append(Paragraph("Visión", styles['APA_H3']))
-        story.append(Paragraph(empresa['vision'], styles['APA_Body']))
+        story.append(Paragraph("Visión", styles['Heading3Enhanced']))
+        story.append(Paragraph(empresa['vision'], styles['BodyTextEnhanced']))
         story.append(Spacer(1, 0.1*inch))
     
     if empresa.get('valores'):
-        story.append(Paragraph("Valores y Principios", styles['APA_H3']))
+        story.append(Paragraph("Valores y Principios", styles['Heading3Enhanced']))
         valores = empresa['valores']
         if len(valores) > 200:
             lineas_valores = [v.strip() for v in valores.replace('\n', ',').split(',') if v.strip()]
             for val in lineas_valores[:5]:
                 story.append(Paragraph(f"• {val}", styles['APA_List']))
         else:
-            story.append(Paragraph(valores, styles['APA_Body']))
+            story.append(Paragraph(valores, styles['BodyTextEnhanced']))
     
     if empresa.get('objetivo_plan'):
-        story.append(Paragraph("Objetivo del Plan Estratégico", styles['APA_H3']))
-        story.append(Paragraph(empresa['objetivo_plan'], styles['APA_Body']))
+        story.append(Paragraph("Objetivo del Plan Estratégico", styles['Heading3Enhanced']))
+        story.append(Paragraph(empresa['objetivo_plan'], styles['BodyTextEnhanced']))
     
     # Organigrama
     if organigrama_bytes:
         try:
-            story.append(Paragraph("1.3 Organigrama de la Empresa", styles['APA_H2']))
+            story.append(Paragraph("1.3 Organigrama de la Empresa", styles['Heading2Enhanced']))
             story.append(Image(organigrama_bytes, width=6*inch, height=4*inch))
             story.append(Paragraph(
                 "<i>Figura 1.1. Estructura organizacional de la empresa.</i>",
-                ParagraphStyle(name='Caption', parent=styles['APA_Body'], alignment=TA_CENTER, fontSize=10, firstLineIndent=0)
+                ParagraphStyle(name='Caption', parent=styles['BodyTextEnhanced'], alignment=TA_CENTER, fontSize=10, firstLineIndent=0)
             ))
         except Exception as e:
-            story.append(Paragraph("1.3 Organigrama de la Empresa", styles['APA_H2']))
+            story.append(Paragraph("1.3 Organigrama de la Empresa", styles['Heading2Enhanced']))
             story.append(Paragraph(
                 "[El organigrama no pudo ser cargado - formato de imagen no válido]",
-                ParagraphStyle(name='Error', parent=styles['APA_Body'], textColor='red', alignment=TA_CENTER)
+                ParagraphStyle(name='Error', parent=styles['BodyTextEnhanced'], textColor='red', alignment=TA_CENTER)
             ))
     
     story.append(PageBreak())
     
     # 2. ANÁLISIS SITUACIONAL (Diagnóstico Interno y Externo)
-    story.append(Paragraph("2. ANÁLISIS SITUACIONAL", styles['APA_H1']))
+    story.append(Paragraph("2. ANÁLISIS SITUACIONAL", styles['Heading1Enhanced']))
     story.append(Paragraph(
         "El análisis situacional examina tanto los factores internos como externos que afectan "
         "a la organización, permitiendo identificar fortalezas, debilidades, oportunidades y amenazas.",
-        styles['APA_Body']
+        styles['BodyTextEnhanced']
     ))
     story.append(Spacer(1, 0.2*inch))
     
     # 2.1 Diagnóstico Interno
-    story.append(Paragraph("2.1 Diagnóstico Interno", styles['APA_H2']))
+    story.append(Paragraph("2.1 Diagnóstico Interno", styles['Heading2Enhanced']))
     
     # Análisis MADE (Marketing Interno)
     if not df_made.empty:
-        story.append(Paragraph("2.1.1 Análisis de Marketing Interno (MADE)", styles['APA_H3']))
+        story.append(Paragraph("2.1.1 Análisis de Marketing Interno (MADE)", styles['Heading3Enhanced']))
         story.append(Paragraph(
             "La matriz MADE evalúa las variables internas de marketing: Producto, Precio, Plaza y Promoción.",
-            styles['APA_Body']
+            styles['BodyTextEnhanced']
         ))
         
         datos_made_resumen = [['Variable', 'Factor', 'Rating', 'Ponderación']]
@@ -1257,20 +1259,20 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         # Análisis guardado de MADE
         analisis_made = empresa.get('analisis_made', '')
         if analisis_made:
-            story.append(Paragraph("Análisis de Marketing Interno", styles['APA_H3']))
-            story.append(Paragraph(analisis_made, styles['APA_Body']))
+            story.append(Paragraph("Análisis de Marketing Interno", styles['Heading3Enhanced']))
+            story.append(Paragraph(analisis_made, styles['BodyTextEnhanced']))
     
     story.append(Spacer(1, 0.2*inch))
     
     # 2.2 Diagnóstico Externo
-    story.append(Paragraph("2.2 Diagnóstico Externo", styles['APA_H2']))
+    story.append(Paragraph("2.2 Diagnóstico Externo", styles['Heading2Enhanced']))
     
     # Análisis MADI (Marketing Externo)
     if not df_madi.empty:
-        story.append(Paragraph("2.2.1 Análisis de Marketing Externo (MADI)", styles['APA_H3']))
+        story.append(Paragraph("2.2.1 Análisis de Marketing Externo (MADI)", styles['Heading3Enhanced']))
         story.append(Paragraph(
             "La matriz MADI evalúa las variables externas de marketing que impactan en la posición competitiva.",
-            styles['APA_Body']
+            styles['BodyTextEnhanced']
         ))
         
         datos_madi_resumen = [['Variable', 'Factor', 'Rating', 'Ponderación']]
@@ -1287,17 +1289,17 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         
         analisis_madi = empresa.get('analisis_madi', '')
         if analisis_madi:
-            story.append(Paragraph("Análisis de Marketing Externo", styles['APA_H3']))
-            story.append(Paragraph(analisis_madi, styles['APA_Body']))
+            story.append(Paragraph("Análisis de Marketing Externo", styles['Heading3Enhanced']))
+            story.append(Paragraph(analisis_madi, styles['BodyTextEnhanced']))
     
     story.append(Spacer(1, 0.2*inch))
     
     # Análisis PEST
     if not df_pest.empty:
-        story.append(Paragraph("2.2.2 Análisis del Entorno PEST", styles['APA_H3']))
+        story.append(Paragraph("2.2.2 Análisis del Entorno PEST", styles['Heading3Enhanced']))
         story.append(Paragraph(
             "El análisis PEST examina los factores Políticos, Económicos, Sociales y Tecnológicos.",
-            styles['APA_Body']
+            styles['BodyTextEnhanced']
         ))
         
         datos_pest_resumen = [['Categoría', 'Factor', 'Tipo FODA', 'Puntaje', 'Ponderado']]
@@ -1320,23 +1322,23 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
             story.append(Image(grafico_pest, width=5*inch, height=3*inch))
             story.append(Paragraph(
                 "<i>Figura 2.1. Análisis PEST - Distribución por categoría.</i>",
-                ParagraphStyle(name='Caption', parent=styles['APA_Body'], alignment=TA_CENTER, fontSize=10, firstLineIndent=0)
+                ParagraphStyle(name='Caption', parent=styles['BodyTextEnhanced'], alignment=TA_CENTER, fontSize=10, firstLineIndent=0)
             ))
         
         analisis_pest = empresa.get('analisis_pest', '')
         if analisis_pest:
-            story.append(Paragraph("Interpretación del Análisis PEST", styles['APA_H3']))
-            story.append(Paragraph(analisis_pest, styles['APA_Body']))
+            story.append(Paragraph("Interpretación del Análisis PEST", styles['Heading3Enhanced']))
+            story.append(Paragraph(analisis_pest, styles['BodyTextEnhanced']))
     
     story.append(Spacer(1, 0.2*inch))
     
     # Matriz FODA Cruzado
     if not df_foda.empty:
-        story.append(Paragraph("2.3 Matriz FODA Cruzado", styles['APA_H2']))
+        story.append(Paragraph("2.3 Matriz FODA Cruzado", styles['Heading2Enhanced']))
         story.append(Paragraph(
             "El análisis FODA cruzado identifica estrategias a partir de la combinación de "
             "fortalezas, debilidades, oportunidades y amenazas.",
-            styles['APA_Body']
+            styles['BodyTextEnhanced']
         ))
         
         datos_foda_resumen = [['Cuadrante', 'Factor Fila', 'Factor Columna', 'Impacto']]
@@ -1359,16 +1361,16 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
                 story.append(Image(grafico_foda, width=4*inch, height=4*inch))
                 story.append(Paragraph(
                     "<i>Figura 2.2. Posicionamiento estratégico según FODA cruzado.</i>",
-                    ParagraphStyle(name='Caption', parent=styles['APA_Body'], alignment=TA_CENTER, fontSize=10, firstLineIndent=0)
+                    ParagraphStyle(name='Caption', parent=styles['BodyTextEnhanced'], alignment=TA_CENTER, fontSize=10, firstLineIndent=0)
                 ))
         
         # Postura estratégica
         if analisis_foda_df is not None:
-            story.append(Paragraph("Postura Estratégica Recomendada", styles['APA_H3']))
+            story.append(Paragraph("Postura Estratégica Recomendada", styles['Heading3Enhanced']))
             story.append(Paragraph(
                 f"Basado en el análisis cruzado, la estrategia principal recomendada es "
                 f"<b>{estrategia_principal}</b>. La distribución de puntajes por estrategia es:",
-                styles['APA_Body']
+                styles['BodyTextEnhanced']
             ))
             
             datos_postura = [['Estrategia', 'Puntaje Total']]
@@ -1380,17 +1382,17 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         
         analisis_foda_texto = empresa.get('analisis_foda', '')
         if analisis_foda_texto:
-            story.append(Paragraph("Interpretación del Análisis FODA", styles['APA_H3']))
-            story.append(Paragraph(analisis_foda_texto, styles['APA_Body']))
+            story.append(Paragraph("Interpretación del Análisis FODA", styles['Heading3Enhanced']))
+            story.append(Paragraph(analisis_foda_texto, styles['BodyTextEnhanced']))
     
     story.append(PageBreak())
     
     # 3. ESTRATEGIAS
-    story.append(Paragraph("3. ESTRATEGIAS", styles['APA_H1']))
+    story.append(Paragraph("3. ESTRATEGIAS", styles['Heading1Enhanced']))
     story.append(Paragraph(
         "Las estrategias representan las acciones específicas diseñadas para alcanzar los objetivos "
         "organizacionales, derivadas del análisis situacional.",
-        styles['APA_Body']
+        styles['BodyTextEnhanced']
     ))
     story.append(Spacer(1, 0.2*inch))
     
@@ -1398,11 +1400,11 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         story.append(Paragraph(
             f"Se han formulado {len(df_estrategias)} estrategias distribuidas en los cuatro cuadrantes "
             f"del análisis FODA cruzado. La estrategia principal recomendada es <b>{estrategia_principal}</b>.",
-            styles['APA_Body']
+            styles['BodyTextEnhanced']
         ))
         story.append(Spacer(1, 0.2*inch))
         
-        story.append(Paragraph("3.1 Resumen de Estrategias por Cuadrante", styles['APA_H2']))
+        story.append(Paragraph("3.1 Resumen de Estrategias por Cuadrante", styles['Heading2Enhanced']))
         
         resumen_est = df_estrategias.groupby('cuadrante').agg({
             'estrategia': 'count',
@@ -1418,59 +1420,59 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         story.append(tabla_est)
         story.append(Spacer(1, 0.2*inch))
         
-        story.append(Paragraph("3.2 Estrategias Detalladas", styles['APA_H2']))
+        story.append(Paragraph("3.2 Estrategias Detalladas", styles['Heading2Enhanced']))
         
         for idx, row in df_estrategias.iterrows():
-            story.append(Paragraph(f"Estrategia {idx + 1}: [{row['cuadrante']}] {row['estrategia']}", styles['APA_H3']))
-            story.append(Paragraph(f"<b>Plan asignado:</b> {row['plan_asignado']}", styles['APA_Body_No_Indent']))
-            story.append(Paragraph(f"<b>Importancia:</b> {row['importancia']}", styles['APA_Body_No_Indent']))
-            story.append(Paragraph(f"<b>Actividades clave:</b> {row['actividades']}", styles['APA_Body']))
+            story.append(Paragraph(f"Estrategia {idx + 1}: [{row['cuadrante']}] {row['estrategia']}", styles['Heading3Enhanced']))
+            story.append(Paragraph(f"<b>Plan asignado:</b> {row['plan_asignado']}", styles['BodyTextNoIndent']))
+            story.append(Paragraph(f"<b>Importancia:</b> {row['importancia']}", styles['BodyTextNoIndent']))
+            story.append(Paragraph(f"<b>Actividades clave:</b> {row['actividades']}", styles['BodyTextEnhanced']))
             story.append(Spacer(1, 0.15*inch))
     else:
-        story.append(Paragraph("No se han generado estrategias en el sistema.", styles['APA_Body']))
+        story.append(Paragraph("No se han generado estrategias en el sistema.", styles['BodyTextEnhanced']))
     
     story.append(PageBreak())
     
     # 4. PLAN DE ACCIÓN (Planes Funcionales + Operativización)
-    story.append(Paragraph("4. PLAN DE ACCIÓN", styles['APA_H1']))
+    story.append(Paragraph("4. PLAN DE ACCIÓN", styles['Heading1Enhanced']))
     story.append(Paragraph(
         "El plan de acción detalla las actividades específicas, responsables, tiempos y recursos "
         "necesarios para implementar las estrategias formuladas.",
-        styles['APA_Body']
+        styles['BodyTextEnhanced']
     ))
     story.append(Spacer(1, 0.2*inch))
     
     # 4.1 Planes Funcionales
-    story.append(Paragraph("4.1 Planes Funcionales Estratégicos", styles['APA_H2']))
+    story.append(Paragraph("4.1 Planes Funcionales Estratégicos", styles['Heading2Enhanced']))
     
     planes = generar_planes_por_plantilla(estrategia_principal, pest_total)
     
     for nombre_plan, datos_plan in planes.items():
-        story.append(Paragraph(f"4.1.{list(planes.keys()).index(nombre_plan) + 1} {nombre_plan}", styles['APA_H3']))
-        story.append(Paragraph(datos_plan['introduccion'], styles['APA_Body']))
-        story.append(Paragraph(f"<b>Objetivo:</b> {datos_plan['objetivo']}", styles['APA_Body']))
+        story.append(Paragraph(f"4.1.{list(planes.keys()).index(nombre_plan) + 1} {nombre_plan}", styles['Heading3Enhanced']))
+        story.append(Paragraph(datos_plan['introduccion'], styles['BodyTextEnhanced']))
+        story.append(Paragraph(f"<b>Objetivo:</b> {datos_plan['objetivo']}", styles['BodyTextEnhanced']))
         story.append(Spacer(1, 0.1*inch))
     
     # Análisis de planes maestros si existe
     planes_maestros = empresa.get('analisis_operativo', '')
     if planes_maestros:
-        story.append(Paragraph("4.2 Planes Funcionales Detallados", styles['APA_H2']))
-        story.append(Paragraph(planes_maestros, styles['APA_Body']))
+        story.append(Paragraph("4.2 Planes Funcionales Detallados", styles['Heading2Enhanced']))
+        story.append(Paragraph(planes_maestros, styles['BodyTextEnhanced']))
     
     story.append(PageBreak())
     
     # 4.3 Operativización (Cuadro de Operativización)
-    story.append(Paragraph("4.3 Operativización y Presupuesto", styles['APA_H2']))
+    story.append(Paragraph("4.3 Operativización y Presupuesto", styles['Heading2Enhanced']))
     
     if not df_oper.empty:
         story.append(Paragraph(
             f"La operativización detalla {len(df_oper)} actividades derivadas de las estrategias formuladas, "
             f"con una inversión total estimada de <b>${total_costo:,.2f}</b>.",
-            styles['APA_Body']
+            styles['BodyTextEnhanced']
         ))
         story.append(Spacer(1, 0.2*inch))
         
-        story.append(Paragraph("4.3.1 Resumen de Inversión por Plan", styles['APA_H3']))
+        story.append(Paragraph("4.3.1 Resumen de Inversión por Plan", styles['Heading3Enhanced']))
         
         presupuesto_plan = df_oper.groupby('plan_asignado').agg({
             'costo': 'sum',
@@ -1490,7 +1492,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         story.append(tabla_pres)
         story.append(Spacer(1, 0.2*inch))
         
-        story.append(Paragraph("4.3.2 Cuadro de Operativización Detallado", styles['APA_H3']))
+        story.append(Paragraph("4.3.2 Cuadro de Operativización Detallado", styles['Heading3Enhanced']))
         
         datos_oper = [['Estrategia', 'Actividad', 'Plazo', 'Responsable', 'Costo']]
         for _, row in df_oper.head(30).iterrows():  # Mostrar primeras 30 para no sobrecargar
@@ -1509,11 +1511,11 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         if len(df_oper) > 30:
             story.append(Paragraph(
                 f"<i>Nota: Se muestran 30 de {len(df_oper)} actividades. El detalle completo está en los anexos.</i>",
-                styles['APA_Body']
+                styles['BodyTextEnhanced']
             ))
         
         # Actividades de mayor inversión
-        story.append(Paragraph("4.3.3 Actividades de Mayor Inversión", styles['APA_H3']))
+        story.append(Paragraph("4.3.3 Actividades de Mayor Inversión", styles['Heading3Enhanced']))
         
         actividades_criticas = df_oper.nlargest(5, 'costo')
         for idx, row in actividades_criticas.iterrows():
@@ -1523,27 +1525,27 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
                 styles['APA_List']
             ))
     else:
-        story.append(Paragraph("No se ha completado la operativización de estrategias.", styles['APA_Body']))
+        story.append(Paragraph("No se ha completado la operativización de estrategias.", styles['BodyTextEnhanced']))
     
     story.append(PageBreak())
     
     # 5. EVALUACIÓN Y CONTROL (CMI + Semaforización)
-    story.append(Paragraph("5. EVALUACIÓN Y CONTROL", styles['APA_H1']))
+    story.append(Paragraph("5. EVALUACIÓN Y CONTROL", styles['Heading1Enhanced']))
     story.append(Paragraph(
         "La evaluación y control permiten monitorear el desempeño de las estrategias mediante "
         "indicadores clave de desempeño (KPIs) y sistemas de alerta temprana.",
-        styles['APA_Body']
+        styles['BodyTextEnhanced']
     ))
     story.append(Spacer(1, 0.2*inch))
     
     # 5.1 Cuadro de Mando Integral (CMI)
-    story.append(Paragraph("5.1 Cuadro de Mando Integral (CMI)", styles['APA_H2']))
+    story.append(Paragraph("5.1 Cuadro de Mando Integral (CMI)", styles['Heading2Enhanced']))
     
     if not df_estrategias.empty:
         story.append(Paragraph(
             "El Cuadro de Mando Integral traduce las estrategias en indicadores medibles "
             "desde cuatro perspectivas: Financiera, Cliente, Procesos Internos, y Aprendizaje y Crecimiento.",
-            styles['APA_Body']
+            styles['BodyTextEnhanced']
         ))
         story.append(Spacer(1, 0.2*inch))
         
@@ -1564,7 +1566,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
                 pass
         
         if not df_cmi.empty:
-            story.append(Paragraph("5.1.1 Indicadores Clave por Perspectiva", styles['APA_H3']))
+            story.append(Paragraph("5.1.1 Indicadores Clave por Perspectiva", styles['Heading3Enhanced']))
             
             datos_cmi = [['Estrategia', 'Perspectiva', 'KPI', 'Frecuencia', 'Límites']]
             for _, row in df_cmi.head(15).iterrows():
@@ -1583,28 +1585,28 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
             if len(df_cmi) > 15:
                 story.append(Paragraph(
                     f"<i>Nota: Se muestran 15 de {len(df_cmi)} indicadores. El detalle completo está en los anexos.</i>",
-                    styles['APA_Body']
+                    styles['BodyTextEnhanced']
                 ))
         else:
-            story.append(Paragraph("No se pudo generar el CMI automáticamente.", styles['APA_Body']))
+            story.append(Paragraph("No se pudo generar el CMI automáticamente.", styles['BodyTextEnhanced']))
     else:
-        story.append(Paragraph("No hay estrategias disponibles para construir el CMI.", styles['APA_Body']))
+        story.append(Paragraph("No hay estrategias disponibles para construir el CMI.", styles['BodyTextEnhanced']))
     
     story.append(Spacer(1, 0.2*inch))
     
     # 5.2 Semaforización Estratégica
-    story.append(Paragraph("5.2 Semaforización Estratégica", styles['APA_H2']))
+    story.append(Paragraph("5.2 Semaforización Estratégica", styles['Heading2Enhanced']))
     
     analisis_semaforo = empresa.get('analisis_semaforo_resumen', '')
     if analisis_semaforo:
-        story.append(Paragraph(analisis_semaforo, styles['APA_Body']))
+        story.append(Paragraph(analisis_semaforo, styles['BodyTextEnhanced']))
     else:
         story.append(Paragraph(
             "El sistema de semaforización evalúa el estado de cada estrategia considerando alineación "
             "con objetivos, recursos asignados y contexto externo. Las estrategias se clasifican en: "
             "<b>🟢 Óptimas</b> (implementar según plan), <b>🟡 Atención</b> (requieren ajustes), "
             "y <b>🔴 Críticas</b> (necesitan revisión inmediata).",
-            styles['APA_Body']
+            styles['BodyTextEnhanced']
         ))
     
     story.append(PageBreak())
@@ -1613,15 +1615,15 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     # PARTE 3: ANEXOS (ilimitado)
     # ============================================
     
-    story.append(Paragraph("ANEXOS", styles['APA_H1']))
+    story.append(Paragraph("ANEXOS", styles['Heading1Enhanced']))
     story.append(Spacer(1, 0.2*inch))
     
     # Anexo A: Análisis Detallados de Matrices
-    story.append(Paragraph("Anexo A. Análisis Detallados de Matrices", styles['APA_H2']))
+    story.append(Paragraph("Anexo A. Análisis Detallados de Matrices", styles['Heading2Enhanced']))
     
     # A.1 MADE Completo
     if not df_made.empty:
-        story.append(Paragraph("A.1 Matriz MADE (Marketing Interno) - Datos Completos", styles['APA_H3']))
+        story.append(Paragraph("A.1 Matriz MADE (Marketing Interno) - Datos Completos", styles['Heading3Enhanced']))
         
         datos_made_full = [['Variable', 'Factor', 'Producto', 'Precio', 'Plaza', 'Promoción', 'Rating', 'Peso %', 'Valor']]
         for _, row in df_made.iterrows():
@@ -1643,7 +1645,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     
     # A.2 MADI Completo
     if not df_madi.empty:
-        story.append(Paragraph("A.2 Matriz MADI (Marketing Externo) - Datos Completos", styles['APA_H3']))
+        story.append(Paragraph("A.2 Matriz MADI (Marketing Externo) - Datos Completos", styles['Heading3Enhanced']))
         
         datos_madi_full = [['Variable', 'Factor', 'Producto', 'Precio', 'Plaza', 'Promoción', 'Rating', 'Peso %', 'Valor']]
         for _, row in df_madi.iterrows():
@@ -1665,7 +1667,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     
     # A.3 PEST Completo
     if not df_pest.empty:
-        story.append(Paragraph("A.3 Análisis PEST Completo", styles['APA_H3']))
+        story.append(Paragraph("A.3 Análisis PEST Completo", styles['Heading3Enhanced']))
         
         datos_pest_full = [['Categoría', 'Factor', 'Tipo FODA', 'Puntaje', 'Importancia', 'Ponderado']]
         for _, row in df_pest.iterrows():
@@ -1688,13 +1690,13 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
             story.append(Image(grafico_pest, width=6*inch, height=4*inch))
             story.append(Paragraph(
                 "Figura A.1. Análisis PEST - Distribución de factores por categoría.",
-                ParagraphStyle(name='Caption', parent=styles['APA_Body'], alignment=TA_CENTER, fontSize=10, firstLineIndent=0)
+                ParagraphStyle(name='Caption', parent=styles['BodyTextEnhanced'], alignment=TA_CENTER, fontSize=10, firstLineIndent=0)
             ))
         story.append(PageBreak())
     
     # A.4 FODA Cruzado Completo
     if not df_foda.empty:
-        story.append(Paragraph("A.4 Matriz FODA Cruzado Completa", styles['APA_H3']))
+        story.append(Paragraph("A.4 Matriz FODA Cruzado Completa", styles['Heading3Enhanced']))
         
         datos_foda_full = [['Cuadrante', 'Factor Fila', 'Factor Columna', 'Impacto']]
         for _, row in df_foda.iterrows():
@@ -1716,22 +1718,22 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
                 story.append(Image(grafico_foda, width=5*inch, height=5*inch))
                 story.append(Paragraph(
                     "Figura A.2. Posicionamiento estratégico - Matriz FODA cruzada.",
-                    ParagraphStyle(name='Caption', parent=styles['APA_Body'], alignment=TA_CENTER, fontSize=10, firstLineIndent=0)
+                    ParagraphStyle(name='Caption', parent=styles['BodyTextEnhanced'], alignment=TA_CENTER, fontSize=10, firstLineIndent=0)
                 ))
         story.append(PageBreak())
     
     # Anexo B: Dashboards y Visualizaciones
-    story.append(Paragraph("Anexo B. Dashboards de Análisis Estratégico", styles['APA_H2']))
+    story.append(Paragraph("Anexo B. Dashboards de Análisis Estratégico", styles['Heading2Enhanced']))
     
     story.append(Paragraph(
         "Este anexo presenta las visualizaciones completas del análisis estratégico.",
-        styles['APA_Body']
+        styles['BodyTextEnhanced']
     ))
     story.append(Spacer(1, 0.2*inch))
     
     # B.1 Distribución de Estrategias
     if not df_estrategias.empty:
-        story.append(Paragraph("B.1 Distribución de Estrategias por Cuadrante", styles['APA_H3']))
+        story.append(Paragraph("B.1 Distribución de Estrategias por Cuadrante", styles['Heading3Enhanced']))
         
         fig, ax = plt.subplots(figsize=(7, 4))
         est_counts = df_estrategias['cuadrante'].value_counts()
@@ -1758,7 +1760,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     
     # B.2 Proyección Financiera Detallada
     if not df_proy.empty:
-        story.append(Paragraph("B.2 Proyección Financiera Detallada", styles['APA_H3']))
+        story.append(Paragraph("B.2 Proyección Financiera Detallada", styles['Heading3Enhanced']))
         
         grafico_proy = generar_grafico_proyeccion(df_proy)
         if grafico_proy:
@@ -1780,7 +1782,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     
     # B.3 Análisis Costo-Beneficio Detallado
     if not df_cb.empty:
-        story.append(Paragraph("B.3 Análisis Costo-Beneficio Detallado", styles['APA_H3']))
+        story.append(Paragraph("B.3 Análisis Costo-Beneficio Detallado", styles['Heading3Enhanced']))
         
         datos_cb = df_cb.iloc[0]
         
@@ -1805,7 +1807,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     
     # Anexo C: Operativización Completa
     if not df_oper.empty:
-        story.append(Paragraph("Anexo C. Cuadro de Operativización Completo", styles['APA_H2']))
+        story.append(Paragraph("Anexo C. Cuadro de Operativización Completo", styles['Heading2Enhanced']))
         
         # Tabla completa de operativización (todas las actividades)
         datos_oper_full = [['N°', 'Estrategia', 'Actividad', 'Plazo', 'Responsable', 'Costo']]
@@ -1835,7 +1837,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     # Anexo D: CMI Completo
     if not df_cmi.empty:
         story.append(PageBreak())
-        story.append(Paragraph("Anexo D. Cuadro de Mando Integral Completo", styles['APA_H2']))
+        story.append(Paragraph("Anexo D. Cuadro de Mando Integral Completo", styles['Heading2Enhanced']))
         
         datos_cmi_full = [['Estrategia', 'Perspectiva', 'KPIs', 'Fórmulas', 'Frecuencia', 'LI', 'LC', 'LS']]
         for _, row in df_cmi.iterrows():
@@ -4740,6 +4742,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
