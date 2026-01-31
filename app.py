@@ -23,6 +23,44 @@ import numpy as np
 import unicodedata
 import time
 from supabase import create_client, Client
+from reportlab.lib.colors import HexColor, Color, white
+
+class ColorPalette:
+    """Paleta de colores profesional para documentos ejecutivos"""
+    PRIMARY = HexColor('#1e3a5f')      # Azul marino corporativo
+    PRIMARY_LIGHT = HexColor('#2c5282') # Azul medio
+    PRIMARY_DARK = HexColor('#0f1f33')  # Azul oscuro
+    SECONDARY = HexColor('#c9a227')    # Dorado/Diesel (acento)
+    SUCCESS = HexColor('#059669')      # Verde esmeralda
+    WARNING = HexColor('#d97706')      # Ámbar
+    DANGER = HexColor('#dc2626')       # Rojo rubí
+    INFO = HexColor('#2563eb')         # Azul eléctrico
+    TEXT_PRIMARY = HexColor('#1f2937')     # Gris muy oscuro
+    TEXT_SECONDARY = HexColor('#4b5563')   # Gris medio
+    TEXT_LIGHT = HexColor('#6b7280')       # Gris claro
+    BACKGROUND = HexColor('#ffffff')       # Blanco puro
+    BACKGROUND_ALT = HexColor('#f8fafc')   # Gris muy claro
+    BORDER = HexColor('#e2e8f0')       # Gris borde
+
+class Typography:
+    """Configuración tipográfica profesional"""
+    FONT_MAIN = 'Times-Roman'
+    FONT_BOLD = 'Times-Bold'
+    FONT_ITALIC = 'Times-Italic'
+    FONT_BOLD_ITALIC = 'Times-BoldItalic'
+    SIZE_TITLE = 16
+    SIZE_H1 = 14
+    SIZE_H2 = 12
+    SIZE_H3 = 11
+    SIZE_H4 = 10
+    SIZE_BODY = 11
+    SIZE_SMALL = 9
+    SIZE_FOOTER = 8
+    LEADING_TITLE = 20
+    LEADING_H1 = 18
+    LEADING_H2 = 16
+    LEADING_H3 = 14
+    LEADING_BODY = 14
 
 def get_ia_client():
     api_key = st.secrets.get("GEMINI_API_KEY")
@@ -423,187 +461,186 @@ def generar_grafico_pest_bar(df_pest):
     buf.seek(0)
     return buf
 
-def get_apa_styles():
-    """
-    Estilos según normas APA 7ma edición:
-    - Times New Roman 12pt
-    - Interlineado doble (leading=24)
-    - Márgenes de 1 pulgada (2.54 cm)
-    """
+def get_enhanced_styles():
+    """Genera estilos de párrafo profesionales mejorados"""
     styles = getSampleStyleSheet()
     
-    # Estilo base para todo el documento
+    # Base
     styles.add(ParagraphStyle(
-        name='APA_Base',
-        fontName='Times-Roman',
-        fontSize=12,
-        leading=24,  # Interlineado doble
+        name='EnhancedBase',
+        fontName=Typography.FONT_MAIN,
+        fontSize=Typography.SIZE_BODY,
+        leading=Typography.LEADING_BODY,
+        textColor=ColorPalette.TEXT_PRIMARY,
         alignment=TA_JUSTIFY,
-        spaceAfter=12,
-        firstLineIndent=0,  # Sin sangría en base
-    ))
-    
-    # Título principal (Portada)
-    styles.add(ParagraphStyle(
-        name='APA_Title',
-        parent=styles['APA_Base'],
-        fontName='Times-Bold',
-        fontSize=14,
-        alignment=TA_CENTER,
-        spaceAfter=24,
-        leading=24,
-        firstLineIndent=0,
-    ))
-    
-    # Encabezados nivel 1 (Centrados, negrita)
-    styles.add(ParagraphStyle(
-        name='APA_H1',
-        parent=styles['APA_Base'],
-        fontName='Times-Bold',
-        fontSize=13,
-        alignment=TA_CENTER,
-        spaceBefore=72,
-        spaceAfter=24,
-        leading=24,
-        firstLineIndent=0,
-    ))
-    
-    # Encabezados nivel 2 (Izquierda, negrita)
-    styles.add(ParagraphStyle(
-        name='APA_H2',
-        parent=styles['APA_Base'],
-        fontName='Times-Bold',
-        fontSize=12,
-        alignment=TA_LEFT,
-        spaceBefore=36,
-        spaceAfter=18,
-        leading=24,
-        firstLineIndent=0,
-    ))
-    
-    # Encabezados nivel 3 (Indentado, negrita)
-    styles.add(ParagraphStyle(
-        name='APA_H3',
-        parent=styles['APA_Base'],
-        fontName='Times-Bold',
-        alignment=TA_LEFT,
-        spaceBefore=24,
-        spaceAfter=12,
-        leading=24,
-        firstLineIndent=0.5*inch,
-    ))
-    
-    # Texto normal (cuerpo)
-    styles.add(ParagraphStyle(
-        name='APA_Body',
-        parent=styles['APA_Base'],
-        fontName='Times-Roman',
-        alignment=TA_JUSTIFY,
-        spaceAfter=0,
-        leading=24,
-    ))
-    
-    # Texto sin sangría
-    styles.add(ParagraphStyle(
-        name='APA_Body_No_Indent',
-        parent=styles['APA_Body'],
-        firstLineIndent=0,
-    ))
-    
-    # Lista con viñetas
-    styles.add(ParagraphStyle(
-        name='APA_List',
-        parent=styles['APA_Body'],
-        leftIndent=0.5*inch,
-        firstLineIndent=-0.25*inch,
         spaceAfter=6,
     ))
     
-    # Pie de página
+    # Títulos
     styles.add(ParagraphStyle(
-        name='APA_Footer',
-        fontName='Times-Roman',
-        fontSize=10,
-        leading=12,
-        alignment=TA_CENTER,
+        name='Heading1Enhanced',
+        parent=styles['EnhancedBase'],
+        fontName=Typography.FONT_BOLD,
+        fontSize=Typography.SIZE_H1,
+        leading=Typography.LEADING_H1,
+        textColor=ColorPalette.PRIMARY,
+        alignment=TA_LEFT,
+        spaceBefore=24,
+        spaceAfter=12,
     ))
     
-    # Encabezado
     styles.add(ParagraphStyle(
-        name='APA_Header',
-        fontName='Times-Roman',
-        fontSize=10,
-        leading=12,
-        alignment=TA_RIGHT,
+        name='Heading2Enhanced',
+        parent=styles['EnhancedBase'],
+        fontName=Typography.FONT_BOLD,
+        fontSize=Typography.SIZE_H2,
+        leading=Typography.LEADING_H2,
+        textColor=ColorPalette.PRIMARY_DARK,
+        alignment=TA_LEFT,
+        spaceBefore=18,
+        spaceAfter=8,
+    ))
+    
+    styles.add(ParagraphStyle(
+        name='Heading3Enhanced',
+        parent=styles['EnhancedBase'],
+        fontName=Typography.FONT_BOLD_ITALIC,
+        fontSize=Typography.SIZE_H3,
+        leading=Typography.LEADING_H3,
+        textColor=ColorPalette.TEXT_PRIMARY,
+        alignment=TA_LEFT,
+        spaceBefore=12,
+        spaceAfter=6,
+        leftIndent=0.25*inch,
+    ))
+    
+    # Texto
+    styles.add(ParagraphStyle(
+        name='BodyTextEnhanced',
+        parent=styles['EnhancedBase'],
+        fontName=Typography.FONT_MAIN,
+        fontSize=Typography.SIZE_BODY,
+        leading=Typography.LEADING_BODY,
+        alignment=TA_JUSTIFY,
+        spaceAfter=8,
+        firstLineIndent=0.5*inch,
+    ))
+    
+    styles.add(ParagraphStyle(
+        name='BodyTextNoIndent',
+        parent=styles['BodyTextEnhanced'],
+        firstLineIndent=0,
+    ))
+    
+    styles.add(ParagraphStyle(
+        name='BodyTextHighlight',
+        parent=styles['BodyTextEnhanced'],
+        backColor=ColorPalette.BACKGROUND_ALT,
+        borderPadding=8,
+        borderWidth=1,
+        borderColor=ColorPalette.BORDER,
+        leftIndent=0.25*inch,
+        rightIndent=0.25*inch,
+        firstLineIndent=0,
+    ))
+    
+    # Caption
+    styles.add(ParagraphStyle(
+        name='CaptionEnhanced',
+        parent=styles['EnhancedBase'],
+        fontName=Typography.FONT_ITALIC,
+        fontSize=Typography.SIZE_SMALL,
+        leading=11,
+        textColor=ColorPalette.TEXT_SECONDARY,
+        alignment=TA_CENTER,
+        spaceBefore=6,
+        spaceAfter=12,
+    ))
+    
+    # Tablas
+    styles.add(ParagraphStyle(
+        name='TableText',
+        parent=styles['EnhancedBase'],
+        fontSize=9,
+        leading=11,
+        alignment=TA_LEFT,
+        spaceAfter=0,
+        firstLineIndent=0,
+    ))
+    
+    styles.add(ParagraphStyle(
+        name='TableHeader',
+        parent=styles['TableText'],
+        fontName=Typography.FONT_BOLD,
+        textColor=white,
+        alignment=TA_CENTER,
     ))
     
     return styles
 
-def encabezado_pie_pagina(canvas, doc, logo_bytes, nombre_empresa, version, elaborado, revisado, aprobado, fecha):
-    """
-    Dibuja encabezado y pie de página en cada página según formato formal.
-    """
+def create_header_footer(canvas, doc, logo_bytes=None, empresa_nombre="", 
+                         version="", elaborado="", revisado="", aprobado="", fecha=""):
+    """Dibuja encabezado y pie de página profesional"""
     canvas.saveState()
+    width, height = A4
+    margin = inch
     
-    # ENCABEZADO
-    # Línea superior
-    canvas.line(doc.leftMargin, letter[1] - 0.6*inch, 
-                doc.width + doc.leftMargin, letter[1] - 0.6*inch)
+    # Header
+    header_bottom = height - 1.2*inch
     
-    # Logo (izquierda)
+    # Barra de color
+    canvas.setFillColor(ColorPalette.PRIMARY)
+    canvas.rect(0, header_bottom, width, 0.7*inch, fill=1, stroke=0)
+    
+    # Línea dorada
+    canvas.setStrokeColor(ColorPalette.SECONDARY)
+    canvas.setLineWidth(2)
+    canvas.line(margin, header_bottom, width - margin, header_bottom)
+    
+    # Logo
     if logo_bytes:
         try:
             logo = Image(logo_bytes, width=0.6*inch, height=0.6*inch)
-            logo.drawOn(canvas, doc.leftMargin, doc.height + doc.topMargin - 0.2*inch)
+            logo.drawOn(canvas, margin, header_bottom + 0.05*inch)
         except:
             pass
     
-    # Nombre de empresa (centro)
-    canvas.setFont('Times-Bold', 11)
-    canvas.drawCentredString(doc.width/2 + doc.leftMargin, 
-                            letter[1] - 0.6*inch, 
-                            nombre_empresa[:50])
+    # Textos header
+    canvas.setFillColor(white)
+    canvas.setFont(Typography.FONT_BOLD, 12)
+    canvas.drawCentredString(width/2, header_bottom + 0.35*inch, 
+                            empresa_nombre[:50].upper())
     
-    # Versión y fecha (derecha)
-    canvas.setFont('Times-Roman', 9)
-    canvas.drawRightString(doc.width + doc.leftMargin, 
-                          letter[1] - 0.6*inch, 
-                          f"Versión: {version}")
-    canvas.drawRightString(doc.width + doc.leftMargin, 
-                          doc.height + doc.topMargin - 0.7*inch, 
-                          f"Fecha: {fecha}")
+    canvas.setFont(Typography.FONT_MAIN, 9)
+    canvas.drawRightString(width - margin, header_bottom + 0.35*inch, 
+                          f"Versión {version}")
     
-    # Línea inferior del encabezado
-    canvas.line(doc.leftMargin, doc.height + doc.topMargin - 1.0*inch, 
-                doc.width + doc.leftMargin, doc.height + doc.topMargin - 1.0*inch)
+    canvas.setFont(Typography.FONT_MAIN, 8)
+    canvas.drawRightString(width - margin, header_bottom + 0.15*inch, fecha)
     
-    # PIE DE PÁGINA
-    # Línea superior del pie
-    canvas.line(doc.leftMargin, 0.8*inch, 
-                doc.width + doc.leftMargin, 0.8*inch)
+    # Footer
+    footer_top = 0.8*inch
     
-    # Texto del pie (tres columnas)
-    canvas.setFont('Times-Roman', 9)
+    canvas.setStrokeColor(ColorPalette.BORDER)
+    canvas.setLineWidth(0.5)
+    canvas.line(margin, footer_top, width - margin, footer_top)
     
-    # Elaborado por (izquierda)
-    canvas.drawString(doc.leftMargin, doc.bottomMargin + 0.3*inch, 
-                     f"Elaborado por: {elaborado}")
+    canvas.setFillColor(ColorPalette.TEXT_SECONDARY)
+    canvas.setFont(Typography.FONT_MAIN, 8)
     
-    # Revisado por (centro)
-    canvas.drawCentredString(doc.width/2 + doc.leftMargin, 
-                            doc.bottomMargin + 0.3*inch, 
-                            f"Revisado por: {revisado}")
+    canvas.drawString(margin, footer_top - 0.15*inch, f"Elaborado: {elaborado}")
+    canvas.drawCentredString(width/2, footer_top - 0.15*inch, f"Revisado: {revisado}")
+    canvas.drawRightString(width - margin, footer_top - 0.15*inch, f"Aprobado: {aprobado}")
     
-    # Aprobado por (derecha)
-    canvas.drawRightString(doc.width + doc.leftMargin, 
-                          doc.bottomMargin + 0.3*inch, 
-                          f"Aprobado por: {aprobado}")
+    # Número de página
+    canvas.setFillColor(ColorPalette.PRIMARY)
+    canvas.setFont(Typography.FONT_BOLD, 10)
+    canvas.drawCentredString(width/2, 0.35*inch, f"Página {doc.page}")
     
-    # Número de página (centro, abajo)
-    canvas.setFont('Times-Roman', 10)
-    canvas.drawCentredString(doc.width/2 + doc.leftMargin, 
-                            doc.bottomMargin + 0.1*inch, 
-                            f"Página {doc.page}")
+    # Línea decorativa
+    canvas.setStrokeColor(ColorPalette.SECONDARY)
+    canvas.setLineWidth(1.5)
+    canvas.line(width/2 - 0.5*inch, 0.2*inch, width/2 + 0.5*inch, 0.2*inch)
     
     canvas.restoreState()
 
@@ -634,94 +671,174 @@ def generar_grafico_foda_radar_pdf(puntajes):
     buf.seek(0)
     return buf
 
-def generar_grafico_barras_pest(df_pest):
-    """Genera gráfico de barras PEST para el PDF."""
-    if df_pest.empty: 
+def generar_grafico_foda_radar_mejorado(puntajes):
+    """Genera gráfico de radar FODA con diseño profesional mejorado"""
+    if puntajes is None or puntajes.empty:
+        return None
+    
+    labels = ['Ofensiva\n(FO)', 'Defensiva\n(FA)', 
+              'Adaptativa\n(DO)', 'Supervivencia\n(DA)']
+    stats = puntajes.reindex(['FO', 'FA', 'DO', 'DA']).fillna(0).values
+    
+    # Configurar estilo
+    plt.style.use('seaborn-v0_8-whitegrid')
+    
+    fig, ax = plt.subplots(figsize=(7, 7), subplot_kw=dict(polar=True))
+    
+    # Ángulos
+    angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False).tolist()
+    stats = np.concatenate((stats, [stats[0]]))
+    angles += angles[:1]
+    
+    # Colores profesionales convertidos a RGB
+    color_fill = (30/255, 58/255, 95/255)  # PRIMARY
+    color_line = (201/255, 162/255, 39/255)  # SECONDARY
+    
+    # Dibujar área
+    ax.fill(angles, stats, color=color_fill, alpha=0.25)
+    ax.plot(angles, stats, color=color_line, linewidth=3, marker='o', 
+            markersize=8, markerfacecolor='white', markeredgewidth=2)
+    
+    # Configurar ejes
+    ax.set_yticklabels([])
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(labels, fontsize=11, fontweight='bold', color='#1f2937')
+    
+    # Título
+    ax.set_title("Posicionamiento Estratégico FODA", 
+                fontsize=14, fontweight='bold', color='#1e3a5f', pad=20)
+    
+    # Grid mejorado
+    ax.grid(True, linestyle='--', alpha=0.5, color='gray')
+    ax.spines['polar'].set_color('#e2e8f0')
+    
+    plt.tight_layout()
+    buf = BytesIO()
+    plt.savefig(buf, format='PNG', dpi=200, bbox_inches='tight', facecolor='white')
+    plt.close(fig)
+    buf.seek(0)
+    return buf
+
+
+def generar_grafico_barras_pest_mejorado(df_pest):
+    """Genera gráfico de barras PEST con diseño profesional"""
+    if df_pest.empty:
         return None
     
     pest_scores = df_pest.groupby('categoria')['valor_ponderado'].sum().sort_values(ascending=True)
     
-    fig, ax = plt.subplots(figsize=(7, 4))
-    colors = {'Político': '#d62728', 'Económico': '#ff7f0e', 'Social': '#2ca02c', 'Tecnológico': '#1f77b4'}
-    bar_colors = [colors.get(cat, '#1f77b4') for cat in pest_scores.index]
+    # Colores por categoría
+    colores_categoria = {
+        'Político': '#dc2626',
+        'Económico': '#059669',
+        'Social': '#2563eb',
+        'Tecnológico': '#c9a227'
+    }
     
-    bars = ax.barh(pest_scores.index, pest_scores.values, color=bar_colors, edgecolor='black', linewidth=0.5)
-    ax.set_title('Análisis PEST - Puntuación por Categoría', fontsize=12, fontweight='bold', pad=15)
-    ax.set_xlabel('Suma de Valores Ponderados', fontsize=10)
-    ax.set_ylabel('')
-    
-    # Agregar valores en las barras
-    for i, (bar, val) in enumerate(zip(bars, pest_scores.values)):
-        ax.text(val + 0.5, i, f'{val:.1f}', va='center', fontsize=9)
-    
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.grid(axis='x', alpha=0.3, linestyle='--')
-    
-    plt.tight_layout()
-    buf = BytesIO()
-    plt.savefig(buf, format='PNG', dpi=150, bbox_inches='tight', facecolor='white')
-    plt.close(fig)
-    buf.seek(0)
-    return buf
-
-def generar_grafico_proyeccion(df_proy):
-    """Genera gráfico de proyección financiera para el PDF."""
-    if df_proy.empty:
-        return None
+    colores = [colores_categoria.get(cat, '#1e3a5f') for cat in pest_scores.index]
     
     fig, ax = plt.subplots(figsize=(8, 5))
     
-    ax.plot(df_proy['anio'], df_proy['ingresos_proyectados'], 
-            marker='o', linewidth=2.5, label='Ingresos Proyectados', color='#2ca02c')
-    ax.plot(df_proy['anio'], df_proy['costos_proyectados'], 
-            marker='s', linewidth=2.5, label='Costos Proyectados', color='#d62728')
-    ax.plot(df_proy['anio'], df_proy['utilidad_neta_proyectada'], 
-            marker='^', linewidth=2.5, label='Utilidad Neta', color='#1f77b4')
+    bars = ax.barh(pest_scores.index, pest_scores.values, 
+                   color=colores, edgecolor='white', linewidth=2)
     
-    ax.set_title('Proyección Financiera a 5 Años', fontsize=12, fontweight='bold', pad=15)
-    ax.set_xlabel('Año', fontsize=10)
-    ax.set_ylabel('Monto ($)', fontsize=10)
-    ax.legend(loc='best', framealpha=0.9)
-    ax.grid(True, alpha=0.3, linestyle='--')
-    ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'${x/1e6:.1f}M' if x >= 1e6 else f'${x/1e3:.0f}K'))
+    # Valores en las barras
+    for i, (bar, val) in enumerate(zip(bars, pest_scores.values)):
+        ax.text(val + 0.5, i, f'{val:.1f}', va='center', 
+               fontsize=10, fontweight='bold', color='#1f2937')
+    
+    # Título y etiquetas
+    ax.set_title('Análisis PEST - Impacto por Categoría', 
+                fontsize=14, fontweight='bold', color='#1e3a5f', pad=15)
+    ax.set_xlabel('Puntuación Ponderada', fontsize=11, color='#4b5563')
+    
+    # Estilo limpio
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_color('#e2e8f0')
+    ax.spines['bottom'].set_color('#e2e8f0')
+    ax.tick_params(colors='#4b5563')
+    
+    # Grid
+    ax.grid(axis='x', alpha=0.3, linestyle='--', color='gray')
+    ax.set_axisbelow(True)
     
     plt.tight_layout()
     buf = BytesIO()
-    plt.savefig(buf, format='PNG', dpi=150, bbox_inches='tight', facecolor='white')
+    plt.savefig(buf, format='PNG', dpi=200, bbox_inches='tight', facecolor='white')
     plt.close(fig)
     buf.seek(0)
     return buf
 
-def create_table_pdf(data, col_widths=None, style=None):
-    """Crea una tabla formateada para PDF."""
-    from reportlab.lib.colors import HexColor
-    
+
+def procesar_imagen_mejorada(imagen_data):
+    """Procesa datos de imagen de la base de datos"""
+    if not imagen_data:
+        return None
+    try:
+        if isinstance(imagen_data, bytes):
+            return BytesIO(imagen_data)
+        elif isinstance(imagen_data, str):
+            hex_clean = imagen_data.replace('\\x', '').replace('0x', '').replace("'", "").strip()
+            try:
+                image_bytes = bytes.fromhex(hex_clean)
+            except ValueError:
+                import base64
+                image_bytes = base64.b64decode(imagen_data)
+            
+            from PIL import Image as PILImage
+            test_img = PILImage.open(BytesIO(image_bytes))
+            test_img.verify()
+            return BytesIO(image_bytes)
+    except Exception as e:
+        print(f"Error procesando imagen: {e}")
+        return None
+    return None
+
+def create_professional_table(data, col_widths=None, has_header=True):
+    """Crea tabla con diseño profesional moderno"""
     if col_widths is None:
-        col_widths = [1.5*inch] * len(data[0])
+        num_cols = len(data[0]) if data else 1
+        col_widths = [inch * 1.5] * num_cols
     
-    table = Table(data, colWidths=col_widths, repeatRows=1)
+    table = Table(data, colWidths=col_widths, repeatRows=1 if has_header else 0)
     
-    if style is None:
-        style = TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), HexColor('#4472C4')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), HexColor('#FFFFFF')),
-            ('FONTNAME', (0, 0), (-1, 0), 'Times-Bold'),
+    style_commands = [
+        ('FONTNAME', (0, 0), (-1, -1), Typography.FONT_MAIN),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('TEXTCOLOR', (0, 0), (-1, -1), ColorPalette.TEXT_PRIMARY),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('LINEBELOW', (0, 0), (-1, -2), 0.5, ColorPalette.BORDER),
+        ('LINEABOVE', (0, 0), (-1, 0), 1, ColorPalette.PRIMARY),
+        ('LINEBELOW', (0, -1), (-1, -1), 1, ColorPalette.PRIMARY),
+        ('GRID', (0, 0), (-1, -1), 0.25, ColorPalette.BORDER),
+    ]
+    
+    if has_header:
+        style_commands.extend([
+            ('BACKGROUND', (0, 0), (-1, 0), ColorPalette.PRIMARY),
+            ('TEXTCOLOR', (0, 0), (-1, 0), white),
+            ('FONTNAME', (0, 0), (-1, 0), Typography.FONT_BOLD),
             ('FONTSIZE', (0, 0), (-1, 0), 10),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-            ('BACKGROUND', (0, 1), (-1, -1), HexColor('#F2F2F2')),
-            ('GRID', (0, 0), (-1, -1), 0.5, HexColor('#000000')),
-            ('FONTNAME', (0, 1), (-1, -1), 'Times-Roman'),
-            ('FONTSIZE', (0, 1), (-1, -1), 9),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 6),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING', (0, 0), (-1, 0), 8),
         ])
     
-    table.setStyle(style)
+    # Zebra striping
+    for i in range(1 if has_header else 0, len(data)):
+        if i % 2 == 0:
+            style_commands.append(
+                ('BACKGROUND', (0, i), (-1, i), ColorPalette.BACKGROUND_ALT)
+            )
+    
+    table.setStyle(TableStyle(style_commands))
     return table
-
+    
 def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, aprobado):
     """
     Genera el documento PDF completo con formato APA y estructura solicitada:
@@ -780,7 +897,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         showBoundary=0  # 0 = no mostrar borde, 1 = debug
     )
     
-    styles = get_apa_styles()
+    styles = get_enhanced_styles()
     story = []
     
     # Preparar logo
@@ -862,7 +979,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
 
     # Función para encabezado/pie en cada página
     def header_footer(canvas, doc):
-        encabezado_pie_pagina(
+        create_header_footer(
             canvas, doc, logo_bytes, 
             empresa.get('nombre', 'Empresa'), 
             version, elaborado, revisado, aprobado, fecha_actual
@@ -962,7 +1079,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
             ['Inversión Total', f"${float(datos_cb['inversion_total']):,.2f}", 'Requerimiento de capital'],
         ]
         
-        tabla_fin = create_table_pdf(datos_fin, col_widths=[2*inch, 1.5*inch, 2*inch])
+        tabla_fin = create_professional_table(datos_fin, col_widths=[2*inch, 1.5*inch, 2*inch])
         story.append(tabla_fin)
         
         # Gráfico de proyección
@@ -1237,7 +1354,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         
         # Gráfico FODA
         if puntajes_foda is not None and not puntajes_foda.empty:
-            grafico_foda = generar_grafico_foda_radar_pdf(puntajes_foda)
+            grafico_foda = generar_grafico_foda_radar_mejorado(puntajes_foda)
             if grafico_foda:
                 story.append(Image(grafico_foda, width=4*inch, height=4*inch))
                 story.append(Paragraph(
@@ -1566,7 +1683,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         story.append(Spacer(1, 0.1*inch))
         
         # Gráfico PEST detallado
-        grafico_pest = generar_grafico_barras_pest(df_pest)
+        grafico_pest = generar_grafico_barras_pest_mejorado(df_pest)
         if grafico_pest:
             story.append(Image(grafico_pest, width=6*inch, height=4*inch))
             story.append(Paragraph(
@@ -4623,6 +4740,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
