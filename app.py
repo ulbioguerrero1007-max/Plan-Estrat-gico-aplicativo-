@@ -273,7 +273,7 @@ def save_image(uploaded_file):
 def mostrar_imagen_bd(imagen_bytes, caption="Imagen", width=None):
     """
     Muestra una imagen guardada en la base de datos.
-    Maneja múltiples formatos: bytes, hex string (con o sin \x), base64.
+    Maneja múltiples formatos: bytes, hex string (con o sin \\x), base64.
     """
     if not imagen_bytes:
         return False
@@ -288,7 +288,7 @@ def mostrar_imagen_bd(imagen_bytes, caption="Imagen", width=None):
         # Caso 2: Si es string (hex o base64)
         elif isinstance(imagen_bytes, str):
             # Limpiar prefijos comunes de PostgreSQL bytea
-            hex_clean = imagen_bytes.replace('\\x', '').replace('0x', '').strip()
+            hex_clean = imagen_bytes.replace('\\\\x', '').replace('0x', '').strip()
             
             # Intentar como hex primero (formato PostgreSQL bytea)
             try:
@@ -297,7 +297,7 @@ def mostrar_imagen_bd(imagen_bytes, caption="Imagen", width=None):
             except:
                 pass
             
-            # Si no funcionó, intentar como base64
+            # Si no funciono, intentar como base64
             if image_data is None:
                 try:
                     import base64
@@ -305,7 +305,7 @@ def mostrar_imagen_bd(imagen_bytes, caption="Imagen", width=None):
                 except:
                     pass
         
-        # Mostrar imagen si tenemos datos válidos
+        # Mostrar imagen si tenemos datos validos
         if image_data:
             st.image(image_data, caption=caption, width=width)
             return True
@@ -2239,9 +2239,9 @@ def aplicacion_principal():
         "7. Operativización/Presupuesto", "8. Dashboard de Análisis", "9. Resumen y Conclusiones"
     ])
     
-    # --- PESTAÑA 1: INTRODUCCIÓN ---
+    # --- PESTAÑA 1: INTRODUCCION ---
     with tab1:
-        st.header("Introducción y Cultura Organizacional")
+        st.header("Introduccion y Cultura Organizacional")
         
         with st.form("form_intro"):
             st.subheader("Datos Generales")
@@ -2250,7 +2250,7 @@ def aplicacion_principal():
             
             # LOGO - Mostrar actual y permitir subir nuevo
             st.divider()
-            st.subheader("🖼️ Logo de la Empresa")
+            st.subheader("Logo de la Empresa")
             
             logo_actual = empresa_data.get('logo')
             logo_existe = False
@@ -2259,8 +2259,8 @@ def aplicacion_principal():
                 try:
                     # Intentar mostrar logo existente
                     if isinstance(logo_actual, str):
-                        # Convertir de hex a bytes
-                        hex_clean = logo_actual.replace('\\x', '').replace('0x', '').strip()
+                        # Convertir de hex a bytes - limpiar prefijo \\x de PostgreSQL
+                        hex_clean = logo_actual.replace('\\\\x', '').replace('0x', '').strip()
                         logo_bytes = bytes.fromhex(hex_clean)
                         st.image(logo_bytes, width=150, caption="Logo actual guardado")
                         logo_existe = True
@@ -2271,23 +2271,23 @@ def aplicacion_principal():
                     st.warning(f"No se pudo mostrar el logo: {e}")
             
             if not logo_existe:
-                st.info("💡 No hay logo guardado. Sube uno nuevo.")
+                st.info("No hay logo guardado. Sube uno nuevo.")
             
             logo_file = st.file_uploader("Subir nuevo Logo (PNG, JPG, JPEG)", type=['png', 'jpg', 'jpeg'], disabled=not puede_editar)
             
             st.divider()
             st.subheader("Cultura Organizacional")
-            objetivo_plan = st.text_area("Objetivo del Plan Estratégico", empresa_data.get('objetivo_plan', ''), disabled=not puede_editar)
-            mision = st.text_area("Misión", empresa_data.get('mision', ''), disabled=not puede_editar)
-            vision = st.text_area("Visión", empresa_data.get('vision', ''), disabled=not puede_editar)
+            objetivo_plan = st.text_area("Objetivo del Plan Estrategico", empresa_data.get('objetivo_plan', ''), disabled=not puede_editar)
+            mision = st.text_area("Mision", empresa_data.get('mision', ''), disabled=not puede_editar)
+            vision = st.text_area("Vision", empresa_data.get('vision', ''), disabled=not puede_editar)
             obj_gen = st.text_area("Objetivo General", empresa_data.get('obj_general', ''), disabled=not puede_editar)
-            obj_esp = st.text_area("Objetivos Específicos", empresa_data.get('obj_especificos', ''), disabled=not puede_editar)
-            politicas = st.text_area("Políticas de la Empresa", empresa_data.get('politicas', ''), disabled=not puede_editar)
+            obj_esp = st.text_area("Objetivos Especificos", empresa_data.get('obj_especificos', ''), disabled=not puede_editar)
+            politicas = st.text_area("Politicas de la Empresa", empresa_data.get('politicas', ''), disabled=not puede_editar)
             valores = st.text_area("Valores y Principios", empresa_data.get('valores', ''), disabled=not puede_editar)
             
             # ORGANIGRAMA - AL FINAL DE TODO
             st.divider()
-            st.subheader("🗂️ Organigrama de la Empresa")
+            st.subheader("Organigrama de la Empresa")
             
             organigrama_actual = empresa_data.get('organigrama')
             organigrama_existe = False
@@ -2296,7 +2296,7 @@ def aplicacion_principal():
                 try:
                     # Intentar mostrar organigrama existente
                     if isinstance(organigrama_actual, str):
-                        hex_clean = organigrama_actual.replace('\\x', '').replace('0x', '').strip()
+                        hex_clean = organigrama_actual.replace('\\\\x', '').replace('0x', '').strip()
                         org_bytes = bytes.fromhex(hex_clean)
                         st.image(org_bytes, width=600, caption="Organigrama actual guardado")
                         organigrama_existe = True
@@ -2307,11 +2307,11 @@ def aplicacion_principal():
                     st.warning(f"No se pudo mostrar el organigrama: {e}")
             
             if not organigrama_existe:
-                st.info("💡 No hay organigrama guardado. Sube uno nuevo.")
+                st.info("No hay organigrama guardado. Sube uno nuevo.")
             
             organigrama_file = st.file_uploader("Subir nuevo Organigrama (PNG, JPG, JPEG)", type=['png', 'jpg', 'jpeg'], disabled=not puede_editar)
             
-            submitted = st.form_submit_button("💾 Guardar Toda la Información", disabled=not puede_editar)
+            submitted = st.form_submit_button("Guardar Toda la Informacion", disabled=not puede_editar)
             
             if submitted:
                 update_data = {
@@ -2326,7 +2326,7 @@ def aplicacion_principal():
                     "valores": valores
                 }
                 
-                # Procesar logo si se subió uno nuevo
+                # Procesar logo si se subio uno nuevo
                 if logo_file is not None:
                     try:
                         logo_bytes = logo_file.getvalue()
@@ -2334,9 +2334,9 @@ def aplicacion_principal():
                         logo_hex = logo_bytes.hex()
                         update_data['logo'] = logo_hex
                     except Exception as e:
-                        st.error(f"❌ Error al procesar logo: {e}")
+                        st.error(f"Error al procesar logo: {e}")
                 
-                # Procesar organigrama si se subió uno nuevo
+                # Procesar organigrama si se subio uno nuevo
                 if organigrama_file is not None:
                     try:
                         organigrama_bytes = organigrama_file.getvalue()
@@ -2344,15 +2344,15 @@ def aplicacion_principal():
                         organigrama_hex = organigrama_bytes.hex()
                         update_data['organigrama'] = organigrama_hex
                     except Exception as e:
-                        st.error(f"❌ Error al procesar organigrama: {e}")
+                        st.error(f"Error al procesar organigrama: {e}")
                 
                 try:
                     # Actualizar en Supabase
                     result = supabase.table('empresas').update(update_data).eq('id', empresa_id).execute()
-                    st.success("✅ Todos los datos guardados correctamente en la nube.")
+                    st.success("Todos los datos guardados correctamente en la nube.")
                     st.rerun()
                 except Exception as e:
-                    st.error(f"❌ Error al guardar: {e}")
+                    st.error(f"Error al guardar: {e}")
                     
     # --- PESTAÑA 2: DIAGNÓSTICO SITUACIONAL ---
     with tab2:
@@ -4675,6 +4675,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
