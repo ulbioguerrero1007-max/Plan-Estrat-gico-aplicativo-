@@ -78,7 +78,8 @@ def generar_analisis_ia(tipo_matriz, datos_contexto):
 
 def generar_analisis(prompt, client=None):
     errores = []
-    prompt_limpio = prompt + "\n\nIMPORTANTE: Proporciona el análisis en texto claro y profesional. NO uses asteriscos (*), almohadillas (#), negritas ni ningún formato Markdown. Usa solo párrafos bien estructurados."
+    # Prompt mejorado para forzar formato estructurado
+    prompt_limpio = prompt + "\n\nIMPORTANTE: Proporciona el análisis con formato claro y profesional. Usa saltos de línea entre secciones, numeración para listas (1., 2., 3.), guiones para items (-), y separadores visuales (=== TÍTULO ===). NO uses asteriscos (*), almohadillas (#), ni negritas. Usa solo texto plano bien estructurado con espaciado adecuado."
     try:
         modelos_disponibles = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
         modelos_a_probar = []
@@ -90,14 +91,25 @@ def generar_analisis(prompt, client=None):
             try:
                 model = genai.GenerativeModel(
                     model_name=nombre_modelo,
-                    system_instruction="Eres un consultor senior de estrategia empresarial. Tu lenguaje es formal, directo y limpio. No usas decoraciones innecesarias en el texto como asteriscos o almohadillas."
+                    system_instruction="Eres un consultor senior de estrategia empresarial. Tu lenguaje es formal, directo y limpio. Organiza la información con secciones claras, numeración, guiones y saltos de línea. Nunca uses asteriscos, almohadillas ni negritas. Usa formato de texto plano profesional con espaciado adecuado entre secciones."
                 )
                 response = model.generate_content(prompt_limpio)
                 texto = response.text
+                
+                # Limpiar cualquier markdown residual
                 texto = re.sub(r'\*+', '', texto)
                 texto = re.sub(r'#+', '', texto)
                 texto = re.sub(r'_+', '', texto)
-                texto = texto.replace("****", "").replace("###", "").replace("##", "")
+                texto = re.sub(r'\*\*', '', texto)
+                texto = re.sub(r'#{2,}', '', texto)
+                
+                # Normalizar saltos de línea - asegurar separación entre secciones
+                texto = re.sub(r'\n{3,}', '\n\n', texto)  # Máximo 2 saltos de línea seguidos
+                texto = re.sub(r'([.:])\n([A-Z])', r'\1\n\n\2', texto)  # Separar párrafos
+                
+                # Asegurar que los separadores de plan tengan formato consistente
+                texto = re.sub(r'={2,}\s*([A-ZÁÉÍÓÚÑa-záéíóúñ\s]+?)\s*={2,}', r'\n\n=== \1 ===\n\n', texto)
+                
                 return texto.strip()
             except Exception as e:
                 errores.append(f"{nombre_modelo}: {str(e)}")
@@ -106,7 +118,7 @@ def generar_analisis(prompt, client=None):
         return f"Error de conexión: {str(e)}"
     return f"Error en análisis. Intentados: {', '.join(errores)}"
 
-st.set_page_config(page_title="Estratega Pro | Business Intelligence", page_icon="♟️", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Estratega Pro UG-UCE", page_icon="♟️", layout="wide", initial_sidebar_state="expanded")
 st.markdown("""
     <style>
     .main { background-color: #f5f5f5; }
@@ -3107,53 +3119,48 @@ def aplicacion_principal():
                     # Construir prompt como lista de líneas para evitar problemas con triple comillas
                     lineas_prompt = [
                         "Actúa como un consultor senior de estrategia empresarial con 20 años de experiencia.",
+                        "",
                         f"Elabora 7 PLANES FUNCIONALES ESTRATÉGICOS de alto nivel para {contexto_empresa['nombre']},",
                         f"empresa del sector {contexto_empresa['giro']}.",
                         "",
                         "CONTEXTO ESTRATÉGICO:",
-                        f"- Estrategia principal FODA: {contexto_empresa['estrategia_principal']}",
+                        f"- Estrategia principal FODA: {contexto_empresa['estrategia_foda']}",
                         f"- Postura estratégica: {contexto_empresa['postura']}",
-                        f"- Entorno PEST score: {contexto_empresa['pest_total']:.2f}",
-                        f"- Estrategias generadas: {contexto_estrategias if contexto_estrategias else 'No hay estrategias previas'}",
+                        f"- Entorno PEST score: {contexto_empresa['pest_score']:.2f}",
                         "",
-                        "ESTRUCTURA REQUERIDA PARA CADA PLAN (7 planes totales):",
+                        "FORMATO OBLIGATORIO - CADA PLAN DEBE SEGUIR ESTA ESTRUCTURA EXACTA:",
                         "",
-                        "1. PLAN ADMINISTRATIVO",
-                        "2. PLAN OPERATIVO",
-                        "3. PLAN TECNOLÓGICO",
-                        "4. PLAN FINANCIERO",
-                        "5. PLAN DE MONITOREO Y CONTROL",
-                        "6. PLAN DE MEJORA",
-                        "7. PLAN DE CONTINGENCIA",
-                        "",
-                        "PARA CADA PLAN DEBES INCLUIR EXACTAMENTE:",
-                        "",
-                        "=== [NOMBRE DEL PLAN] ===",
+                        "=== PLAN [NOMBRE] ===",
                         "",
                         "1. FUNDAMENTO ESTRATÉGICO",
-                        "[Explicación de por qué este plan es crítico para la empresa en su contexto actual, 3-4 párrafos profundos]",
+                        "[1-2 párrafos explicando por qué este plan es crítico]",
                         "",
                         "2. OBJETIVO GENERAL DEL PLAN",
                         "[Objetivo SMART específico]",
                         "",
-                        "3. OBJETIVOS ESPECÍFICOS (mínimo 3)",
+                        "3. OBJETIVOS ESPECÍFICOS",
                         "- Objetivo 1",
-                        "- Objetivo 2",
+                        "- Objetivo 2", 
                         "- Objetivo 3",
                         "",
-                        "4. ESTRATEGIAS DE IMPLEMENTACIÓN (mínimo 4 estrategias concretas)",
+                        "4. ESTRATEGIAS DE IMPLEMENTACIÓN",
+                        "",
                         "A. [Nombre estrategia 1]",
                         "   - Descripción detallada",
                         "   - Acciones clave",
+                        "",
                         "B. [Nombre estrategia 2]",
                         "   - Descripción detallada",
                         "   - Acciones clave",
-                        "[C continuar...]",
                         "",
-                        "5. KPIs Y METAS (mínimo 5 KPIs por plan)",
+                        "C. [Continuar...]",
+                        "",
+                        "5. KIPs Y METAS",
                         "- KPI 1: [Nombre] | Meta: [X] | Frecuencia: [mensual/trimestral]",
                         "- KPI 2: [Nombre] | Meta: [X] | Frecuencia: [mensual/trimestral]",
-                        "[Continuar...]",
+                        "- KPI 3: [Nombre] | Meta: [X] | Frecuencia: [mensual/trimestral]",
+                        "- KPI 4: [Nombre] | Meta: [X] | Frecuencia: [mensual/trimestral]",
+                        "- KPI 5: [Nombre] | Meta: [X] | Frecuencia: [mensual/trimestral]",
                         "",
                         "6. RECURSOS REQUERIDOS",
                         "- Humanos: [Detalle]",
@@ -3171,18 +3178,29 @@ def aplicacion_principal():
                         "- Riesgo 2: [Descripción] | Mitigación: [Acción]",
                         "",
                         "9. ALINEACIÓN CON ESTRATEGIA FODA",
-                        "[Cómo este plan contribuye específicamente a FO, FA, DO o DA]",
+                        "[Explicación de contribución a FO, FA, DO o DA]",
                         "",
-                        "REQUISITOS DE CALIDAD:",
-                        "- Lenguaje ejecutivo y profesional",
-                        "- Contenido específico, no genérico",
-                        "- Cada plan debe tener 800-1200 palabras mínimo",
-                        "- Los KPIs deben ser cuantificables y realistas",
-                        "- Las estrategias deben ser accionables",
-                        "- Considerar el contexto PEST y FODA proporcionado",
-                        "- NO usar frases vacías como 'mejorar procesos' sin especificar cómo",
+                        "LOS 7 PLANES A GENERAR:",
                         "",
-                        "GENERA LOS 7 PLANES COMPLETOS AHORA:"
+                        "=== PLAN ADMINISTRATIVO ===",
+                        "=== PLAN OPERATIVO ===",
+                        "=== PLAN TECNOLÓGICO ===", 
+                        "=== PLAN FINANCIERO ===",
+                        "=== PLAN DE MONITOREO Y CONTROL ===",
+                        "=== PLAN DE MEJORA ===",
+                        "=== PLAN DE CONTINGENCIA ===",
+                        "",
+                        "REGLAS ESTRICTAS:",
+                        "- Usa === para separar cada plan",
+                        "- Deja línea en blanco antes y después de cada título",
+                        "- Usa números (1., 2., 3.) para secciones principales",
+                        "- Usa guiones (-) para items de lista",
+                        "- Usa letras (A., B., C.) para estrategias",
+                        "- NO uses asteriscos (*), almohadillas (#) ni negritas",
+                        "- Máximo 1200 palabras por plan",
+                        "- Lenguaje ejecutivo directo",
+                        "",
+                        "Genera los 7 planes completos ahora:"
                     ]
                     
                     prompt_planes_maestros = "\n".join(lineas_prompt)
@@ -4918,3 +4936,4 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
