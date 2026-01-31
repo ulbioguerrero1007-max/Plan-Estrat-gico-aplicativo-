@@ -426,40 +426,163 @@ No incluyas encabezados ni texto adicional, solo las líneas de datos separadas 
     df_cmi['Perspectiva'] = pd.Categorical(df_cmi['Perspectiva'], categories=perspectiva_orden, ordered=True)
     return df_cmi.sort_values(by='Perspectiva').reset_index(drop=True)
 
-def generar_grafico_foda_radar(puntajes):
-    if puntajes is None or puntajes.empty: 
+# ============================================================================
+# FUNCIONES DE GRÁFICOS MEJORADAS (Agregar estas funciones a tu app.py)
+# ============================================================================
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+def generar_grafico_foda_radar_mejorado(puntajes):
+    """Genera gráfico de radar FODA con diseño profesional mejorado"""
+    if puntajes is None or puntajes.empty:
         return None
-    labels = np.array(['Ofensiva\n(FO)', 'Defensiva\n(FA)', 'Adaptativa\n(DO)', 'Supervivencia\n(DA)'])
+    
+    labels = ['Ofensiva\n(FO)', 'Defensiva\n(FA)', 
+              'Adaptativa\n(DO)', 'Supervivencia\n(DA)']
     stats = puntajes.reindex(['FO', 'FA', 'DO', 'DA']).fillna(0).values
+    
+    # Configurar estilo
+    plt.style.use('default')
+    
+    fig, ax = plt.subplots(figsize=(7, 7), subplot_kw=dict(polar=True))
+    
+    # Ángulos
     angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False).tolist()
     stats = np.concatenate((stats, [stats[0]]))
     angles += angles[:1]
-    fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
-    ax.fill(angles, stats, color='blue', alpha=0.25)
-    ax.plot(angles, stats, color='blue', linewidth=2)
+    
+    # Colores profesionales convertidos a RGB
+    color_fill = (30/255, 58/255, 95/255)  # PRIMARY #1e3a5f
+    color_line = (201/255, 162/255, 39/255)  # SECONDARY #c9a227
+    
+    # Dibujar área
+    ax.fill(angles, stats, color=color_fill, alpha=0.25)
+    ax.plot(angles, stats, color=color_line, linewidth=3, marker='o', 
+            markersize=8, markerfacecolor='white', markeredgewidth=2)
+    
+    # Configurar ejes
     ax.set_yticklabels([])
     ax.set_xticks(angles[:-1])
-    ax.set_xticklabels(labels)
-    ax.set_title("Posicionamiento Estratégico FODA", size=15, color='black', y=1.1)
+    ax.set_xticklabels(labels, fontsize=11, fontweight='bold', color='#1f2937')
+    
+    # Título
+    ax.set_title("Posicionamiento Estratégico FODA", 
+                fontsize=14, fontweight='bold', color='#1e3a5f', pad=20)
+    
+    # Grid mejorado
+    ax.grid(True, linestyle='--', alpha=0.5, color='gray')
+    ax.spines['polar'].set_color('#e2e8f0')
+    
+    plt.tight_layout()
     buf = BytesIO()
-    plt.savefig(buf, format='PNG', bbox_inches='tight')
+    plt.savefig(buf, format='PNG', dpi=200, bbox_inches='tight', facecolor='white')
     plt.close(fig)
     buf.seek(0)
     return buf
 
-def generar_grafico_pest_bar(df_pest):
-    if df_pest.empty: 
+
+def generar_grafico_barras_pest_mejorado(df_pest):
+    """Genera gráfico de barras PEST con diseño profesional"""
+    if df_pest.empty:
         return None
-    pest_scores = df_pest.groupby('categoria')['valor_ponderado'].sum()
-    fig, ax = plt.subplots(figsize=(7, 4))
-    pest_scores.plot(kind='barh', ax=ax, color=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'])
-    ax.set_title('Puntuación Ponderada por Categoría PEST')
-    ax.set_xlabel('Suma de Valores Ponderados')
+    
+    pest_scores = df_pest.groupby('categoria')['valor_ponderado'].sum().sort_values(ascending=True)
+    
+    # Colores por categoría
+    colores_categoria = {
+        'Político': '#dc2626',
+        'Económico': '#059669',
+        'Social': '#2563eb',
+        'Tecnológico': '#c9a227'
+    }
+    
+    colores = [colores_categoria.get(cat, '#1e3a5f') for cat in pest_scores.index]
+    
+    fig, ax = plt.subplots(figsize=(8, 5))
+    
+    bars = ax.barh(pest_scores.index, pest_scores.values, 
+                   color=colores, edgecolor='white', linewidth=2)
+    
+    # Valores en las barras
+    for i, (bar, val) in enumerate(zip(bars, pest_scores.values)):
+        ax.text(val + 0.5, i, f'{val:.1f}', va='center', 
+               fontsize=10, fontweight='bold', color='#1f2937')
+    
+    # Título y etiquetas
+    ax.set_title('Análisis PEST - Impacto por Categoría', 
+                fontsize=14, fontweight='bold', color='#1e3a5f', pad=15)
+    ax.set_xlabel('Puntuación Ponderada', fontsize=11, color='#4b5563')
+    
+    # Estilo limpio
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_color('#e2e8f0')
+    ax.spines['bottom'].set_color('#e2e8f0')
+    ax.tick_params(colors='#4b5563')
+    
+    # Grid
+    ax.grid(axis='x', alpha=0.3, linestyle='--', color='gray')
+    ax.set_axisbelow(True)
+    
+    plt.tight_layout()
     buf = BytesIO()
-    plt.savefig(buf, format='PNG', bbox_inches='tight')
+    plt.savefig(buf, format='PNG', dpi=200, bbox_inches='tight', facecolor='white')
     plt.close(fig)
     buf.seek(0)
     return buf
+
+
+def generar_grafico_proyeccion_mejorado(df_proy):
+    """Genera gráfico de proyección financiera con diseño profesional"""
+    if df_proy.empty:
+        return None
+    
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    # Colores profesionales
+    color_ingresos = '#059669'  # Verde éxito
+    color_costos = '#dc2626'    # Rojo peligro
+    color_utilidad = '#1e3a5f'  # Azul primario
+    
+    ax.plot(df_proy['anio'], df_proy['ingresos_proyectados'], 
+            marker='o', linewidth=2.5, label='Ingresos Proyectados', 
+            color=color_ingresos, markersize=8)
+    ax.plot(df_proy['anio'], df_proy['costos_proyectados'], 
+            marker='s', linewidth=2.5, label='Costos Proyectados', 
+            color=color_costos, markersize=8)
+    ax.plot(df_proy['anio'], df_proy['utilidad_neta_proyectada'], 
+            marker='^', linewidth=3, label='Utilidad Neta', 
+            color=color_utilidad, markersize=10, markerfacecolor='white',
+            markeredgewidth=2)
+    
+    ax.set_title('Proyección Financiera a 5 Años', 
+                fontsize=14, fontweight='bold', color='#1e3a5f', pad=15)
+    ax.set_xlabel('Año', fontsize=11, color='#4b5563')
+    ax.set_ylabel('Monto ($)', fontsize=11, color='#4b5563')
+    ax.legend(loc='best', framealpha=0.9, fontsize=10)
+    ax.grid(True, alpha=0.3, linestyle='--', color='gray')
+    ax.set_axisbelow(True)
+    
+    # Formato de ejes
+    ax.yaxis.set_major_formatter(plt.FuncFormatter(
+        lambda x, p: f'${x/1e6:.1f}M' if x >= 1e6 else f'${x/1e3:.0f}K'
+    ))
+    
+    # Estilo limpio
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_color('#e2e8f0')
+    ax.spines['bottom'].set_color('#e2e8f0')
+    ax.tick_params(colors='#4b5563')
+    
+    plt.tight_layout()
+    buf = BytesIO()
+    plt.savefig(buf, format='PNG', dpi=200, bbox_inches='tight', facecolor='white')
+    plt.close(fig)
+    buf.seek(0)
+    return buf
+    
 def get_enhanced_styles():
     """Genera estilos de párrafo profesionales mejorados"""
     styles = getSampleStyleSheet()
@@ -694,7 +817,7 @@ def create_header_footer(canvas, doc, logo_bytes=None, empresa_nombre="",
     
     canvas.restoreState()
 
-def generar_grafico_foda_radar_pdf(puntajes):
+def generar_grafico_foda_radar_mejorado(puntajes):
     """Genera gráfico de radar FODA para el PDF."""
     if puntajes is None or puntajes.empty: 
         return None
@@ -1064,7 +1187,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     # Gráfico FODA radar (compacto)
     if puntajes_foda is not None and not puntajes_foda.empty:
         story.append(Spacer(1, 0.1*inch))
-        grafico_foda = generar_grafico_foda_radar_pdf(puntajes_foda)
+        grafico_foda = generar_grafico_foda_radar_mejorado(puntajes_foda)
         if grafico_foda:
             story.append(Image(grafico_foda, width=3.5*inch, height=3.5*inch))
             story.append(Paragraph(
@@ -1087,7 +1210,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
             story.append(Paragraph(f"• {ft}", styles['APA_List']))
         
         # Gráfico PEST compacto
-        grafico_pest = generar_grafico_barras_pest(df_pest)
+        grafico_pest = generar_grafico_barras_pest_mejorado(df_pest)
         if grafico_pest:
             story.append(Spacer(1, 0.1*inch))
             story.append(Image(grafico_pest, width=4*inch, height=2.5*inch))
@@ -1135,7 +1258,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         # Gráfico de proyección
         if not df_proy.empty:
             story.append(Spacer(1, 0.1*inch))
-            grafico_proy = generar_grafico_proyeccion(df_proy)
+            grafico_proy = generar_grafico_proyeccion_mejorado(df_proy)
             if grafico_proy:
                 story.append(Image(grafico_proy, width=5*inch, height=3*inch))
                 story.append(Paragraph(
@@ -1365,7 +1488,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         story.append(Spacer(1, 0.1*inch))
         
         # Gráfico PEST
-        grafico_pest = generar_grafico_barras_pest(df_pest)
+        grafico_pest = generar_grafico_barras_pest_mejorado(df_pest)
         if grafico_pest:
             story.append(Image(grafico_pest, width=5*inch, height=3*inch))
             story.append(Paragraph(
@@ -1761,7 +1884,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         
         # Gráfico FODA
         if puntajes_foda is not None and not puntajes_foda.empty:
-            grafico_foda = generar_grafico_foda_radar_pdf(puntajes_foda)
+            grafico_foda = generar_grafico_foda_radar_mejorado(puntajes_foda)
             if grafico_foda:
                 story.append(Image(grafico_foda, width=5*inch, height=5*inch))
                 story.append(Paragraph(
@@ -1810,7 +1933,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     if not df_proy.empty:
         story.append(Paragraph("B.2 Proyección Financiera Detallada", styles['Heading3Enhanced']))
         
-        grafico_proy = generar_grafico_proyeccion(df_proy)
+        grafico_proy = generar_grafico_proyeccion_mejorado(df_proy)
         if grafico_proy:
             story.append(Image(grafico_proy, width=6*inch, height=4*inch))
             story.append(Spacer(1, 0.1*inch))
@@ -4790,6 +4913,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
