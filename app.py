@@ -460,25 +460,44 @@ def generar_grafico_pest_bar(df_pest):
     plt.close(fig)
     buf.seek(0)
     return buf
-
 def get_enhanced_styles():
     """Genera estilos de párrafo profesionales mejorados"""
     styles = getSampleStyleSheet()
-
-    styles.add(ParagraphStyle(
-        name='EnhancedBase',
+    
+    # =========================================================================
+    # Función auxiliar para agregar estilo solo si no existe
+    # =========================================================================
+    def add_style_safe(name, parent=None, **kwargs):
+        if name in styles:
+            # Si ya existe, lo eliminamos primero
+            del styles[name]
+        
+        if parent is not None:
+            if isinstance(parent, str):
+                parent = styles[parent]
+            styles.add(ParagraphStyle(name=name, parent=parent, **kwargs))
+        else:
+            styles.add(ParagraphStyle(name=name, **kwargs))
+    
+    # =========================================================================
+    # 1. Estilo base
+    # =========================================================================
+    add_style_safe(
+        'EnhancedBase',
         fontName=Typography.FONT_MAIN,
         fontSize=Typography.SIZE_BODY,
         leading=Typography.LEADING_BODY,
         textColor=ColorPalette.TEXT_PRIMARY,
         alignment=TA_JUSTIFY,
         spaceAfter=6,
-    ))
-
-         # Títulos
-    styles.add(ParagraphStyle(
-        name='Heading1Enhanced',
-        parent=styles['EnhancedBase'],
+    )
+    
+    # =========================================================================
+    # 2. Títulos (dependen de EnhancedBase)
+    # =========================================================================
+    add_style_safe(
+        'Heading1Enhanced',
+        parent='EnhancedBase',
         fontName=Typography.FONT_BOLD,
         fontSize=Typography.SIZE_H1,
         leading=Typography.LEADING_H1,
@@ -486,11 +505,11 @@ def get_enhanced_styles():
         alignment=TA_LEFT,
         spaceBefore=24,
         spaceAfter=12,
-    ))
+    )
     
-    styles.add(ParagraphStyle(
-        name='Heading2Enhanced',
-        parent=styles['EnhancedBase'],
+    add_style_safe(
+        'Heading2Enhanced',
+        parent='EnhancedBase',
         fontName=Typography.FONT_BOLD,
         fontSize=Typography.SIZE_H2,
         leading=Typography.LEADING_H2,
@@ -498,11 +517,11 @@ def get_enhanced_styles():
         alignment=TA_LEFT,
         spaceBefore=18,
         spaceAfter=8,
-    ))
+    )
     
-    styles.add(ParagraphStyle(
-        name='Heading3Enhanced',
-        parent=styles['EnhancedBase'],
+    add_style_safe(
+        'Heading3Enhanced',
+        parent='EnhancedBase',
         fontName=Typography.FONT_BOLD_ITALIC,
         fontSize=Typography.SIZE_H3,
         leading=Typography.LEADING_H3,
@@ -511,29 +530,34 @@ def get_enhanced_styles():
         spaceBefore=12,
         spaceAfter=6,
         leftIndent=0.25*inch,
-    ))
+    )
     
-    # Texto
-    styles.add(ParagraphStyle(
-        name='BodyTextEnhanced',
-        parent=styles['EnhancedBase'],
+    # =========================================================================
+    # 3. Texto body (depende de EnhancedBase)
+    # =========================================================================
+    add_style_safe(
+        'BodyTextEnhanced',
+        parent='EnhancedBase',
         fontName=Typography.FONT_MAIN,
         fontSize=Typography.SIZE_BODY,
         leading=Typography.LEADING_BODY,
         alignment=TA_JUSTIFY,
         spaceAfter=8,
         firstLineIndent=0.5*inch,
-    ))
+    )
     
-    styles.add(ParagraphStyle(
-        name='BodyTextNoIndent',
-        parent=styles['BodyTextEnhanced'],
+    # =========================================================================
+    # 4. Variantes de body (dependen de BodyTextEnhanced)
+    # =========================================================================
+    add_style_safe(
+        'BodyTextNoIndent',
+        parent='BodyTextEnhanced',
         firstLineIndent=0,
-    ))
+    )
     
-    styles.add(ParagraphStyle(
-        name='BodyTextHighlight',
-        parent=styles['BodyTextEnhanced'],
+    add_style_safe(
+        'BodyTextHighlight',
+        parent='BodyTextEnhanced',
         backColor=ColorPalette.BACKGROUND_ALT,
         borderPadding=8,
         borderWidth=1,
@@ -541,12 +565,14 @@ def get_enhanced_styles():
         leftIndent=0.25*inch,
         rightIndent=0.25*inch,
         firstLineIndent=0,
-    ))
+    )
     
-    # Caption
-    styles.add(ParagraphStyle(
-        name='CaptionEnhanced',
-        parent=styles['EnhancedBase'],
+    # =========================================================================
+    # 5. Otros estilos
+    # =========================================================================
+    add_style_safe(
+        'CaptionEnhanced',
+        parent='EnhancedBase',
         fontName=Typography.FONT_ITALIC,
         fontSize=Typography.SIZE_SMALL,
         leading=11,
@@ -554,45 +580,49 @@ def get_enhanced_styles():
         alignment=TA_CENTER,
         spaceBefore=6,
         spaceAfter=12,
-    ))
+    )
     
-    # Tablas
-    styles.add(ParagraphStyle(
-        name='TableText',
-        parent=styles['EnhancedBase'],
+    add_style_safe(
+        'TableText',
+        parent='EnhancedBase',
         fontSize=9,
         leading=11,
         alignment=TA_LEFT,
         spaceAfter=0,
         firstLineIndent=0,
-    ))
+    )
     
-    styles.add(ParagraphStyle(
-        name='TableHeader',
-        parent=styles['TableText'],
+    add_style_safe(
+        'TableHeader',
+        parent='TableText',
         fontName=Typography.FONT_BOLD,
         textColor=white,
         alignment=TA_CENTER,
-    ))
-    # Lista con viñetas
-    styles.add(ParagraphStyle(
-        name='APA_List',
-        parent=styles['BodyTextEnhanced'],
+    )
+    
+    # Lista con viñetas (compatible con código antiguo)
+    add_style_safe(
+        'APA_List',
+        parent='BodyTextEnhanced',
         leftIndent=0.5*inch,
         firstLineIndent=-0.25*inch,
         spaceAfter=4,
-    ))
+    )
     
-    # Base
-    styles.add(ParagraphStyle(
-        name='EnhancedBase',
-        fontName=Typography.FONT_MAIN,
-        fontSize=Typography.SIZE_BODY,
-        leading=Typography.LEADING_BODY,
-        textColor=ColorPalette.TEXT_PRIMARY,
-        alignment=TA_JUSTIFY,
-        spaceAfter=6,
-    ))
+    # =========================================================================
+    # 6. ALIAS para compatibilidad con código antiguo (opcional pero recomendado)
+    # =========================================================================
+    alias_map = {
+        'APA_H1': 'Heading1Enhanced',
+        'APA_H2': 'Heading2Enhanced',
+        'APA_H3': 'Heading3Enhanced',
+        'APA_Body': 'BodyTextEnhanced',
+        'APA_Body_No_Indent': 'BodyTextNoIndent',
+        'APA_Footer': 'CaptionEnhanced',
+    }
+    
+    for old_name, new_name in alias_map.items():
+        add_style_safe(old_name, parent=new_name)
     
     return styles
 
@@ -4760,6 +4790,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
