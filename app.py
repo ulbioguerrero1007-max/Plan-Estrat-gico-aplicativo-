@@ -78,7 +78,34 @@ def generar_analisis_ia(tipo_matriz, datos_contexto):
 
 def generar_analisis(prompt, client=None):
     errores = []
-    prompt_limpio = prompt + "\n\nIMPORTANTE: Proporciona el análisis en texto claro y profesional. NO uses asteriscos (*), almohadillas (#), negritas ni ningún formato Markdown. Usa solo párrafos bien estructurados."
+    # Prompt mejorado para FORZAR formato estructurado con saltos de línea explícitos
+    prompt_formato = """
+    
+ESTRUCTURA REQUERIDA - USA ESTE FORMATO EXACTO:
+
+=== TITULO PRINCIPAL ===
+
+1. PRIMERA SECCION
+[Texto aqui]
+
+2. SEGUNDA SECCION  
+- Item uno
+- Item dos
+- Item tres
+
+3. TERCERA SECCION
+A. Subseccion A
+   - Detalle 1
+   - Detalle 2
+   
+B. Subseccion B
+   - Detalle 1
+
+===
+    
+"""
+    prompt_limpio = prompt + prompt_formato + "\n\nREGLAS ESTRICTAS:\n- USA === para separar secciones principales\n- USA numeros (1., 2., 3.) para secciones\n- USA guiones (-) para items de lista\n- USA letras (A., B., C.) para subsecciones\n- DEJA lineas en blanco ENTRE cada seccion\n- NO uses asteriscos (*), almohadillas (#), negritas ni markdown\n- SALTO DE LINEA doble entre parrafos\n\nGenera ahora:"
+    
     try:
         modelos_disponibles = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
         modelos_a_probar = []
@@ -90,14 +117,64 @@ def generar_analisis(prompt, client=None):
             try:
                 model = genai.GenerativeModel(
                     model_name=nombre_modelo,
-                    system_instruction="Eres un consultor senior de estrategia empresarial. Tu lenguaje es formal, directo y limpio. No usas decoraciones innecesarias en el texto como asteriscos o almohadillas."
+                    system_instruction="""Eres consultor senior de estrategia. 
+REGLAS DE FORMATO OBLIGATORIAS:
+1. SIEMPRE usa === TITULO === para cada seccion principal
+2. SIEMPRE deja linea en blanco antes y despues de ===
+3. SIEMPRE usa numeros (1., 2., 3.) para secciones
+4. SIEMPRE usa guiones (-) para listas
+5. SIEMPRE usa letras (A., B., C.) para subsecciones  
+6. SIEMPRE doble salto de linea entre parrafos
+7. NUNCA uses asteriscos, almohadillas, negritas ni markdown
+8. NUNCA juntes todo el texto - respeta los saltos de linea
+
+Ejemplo de formato correcto:
+
+=== PLAN ADMINISTRATIVO ===
+
+1. FUNDAMENTO ESTRATEGICO
+
+[Parrafo aqui]
+
+
+[Parrafo aqui]
+
+2. OBJETIVOS
+
+- Objetivo uno
+- Objetivo dos
+
+3. ESTRATEGIAS
+
+A. Estrategia uno
+   - Accion 1
+   - Accion 2
+
+B. Estrategia dos
+   - Accion 1
+
+===
+"""
                 )
                 response = model.generate_content(prompt_limpio)
                 texto = response.text
+                
+                # Limpieza de markdown
                 texto = re.sub(r'\*+', '', texto)
                 texto = re.sub(r'#+', '', texto)
                 texto = re.sub(r'_+', '', texto)
-                texto = texto.replace("****", "").replace("###", "").replace("##", "")
+                texto = re.sub(r'`', '', texto)
+                
+                # Normalizar separadores
+                texto = re.sub(r'={3,}', '===', texto)
+                
+                # Asegurar saltos de línea dobles entre secciones
+                texto = re.sub(r'([^\n])\n([A-Z0-9])', r'\1\n\n\2', texto)
+                
+                # Asegurar que === tenga saltos de línea alrededor
+                texto = re.sub(r'\n*===\s*', r'\n\n=== ', texto)
+                texto = re.sub(r'\s*===\n*', r' ===\n\n', texto)
+                
                 return texto.strip()
             except Exception as e:
                 errores.append(f"{nombre_modelo}: {str(e)}")
@@ -3120,83 +3197,116 @@ def aplicacion_principal():
                     
                     # Construir prompt como lista de líneas para evitar problemas con triple comillas
                     lineas_prompt = [
-                        "Actúa como un consultor senior de estrategia empresarial con 20 años de experiencia.",
-                        f"Elabora 7 PLANES FUNCIONALES ESTRATÉGICOS de alto nivel para {contexto_empresa['nombre']},",
+                        "Actúa como consultor senior de estrategia empresarial con 20 años de experiencia.",
+                        "",
+                        f"Elabora 7 PLANES FUNCIONALES ESTRATEGICOS para {contexto_empresa['nombre']},",
                         f"empresa del sector {contexto_empresa['giro']}.",
                         "",
-                        "CONTEXTO ESTRATÉGICO:",
-                        f"- Estrategia principal FODA: {contexto_empresa['estrategia_principal']}",
-                        f"- Postura estratégica: {contexto_empresa['postura']}",
-                        f"- Entorno PEST score: {contexto_empresa['pest_total']:.2f}",
-                        f"- Estrategias generadas: {contexto_estrategias if contexto_estrategias else 'No hay estrategias previas'}",
+                        "CONTEXTO:",
+                        f"- Estrategia FODA: {contexto_empresa['estrategia_foda']}",
+                        f"- Postura: {contexto_empresa['postura']}",
+                        f"- PEST score: {contexto_empresa['pest_total']:.2f}",
                         "",
-                        "ESTRUCTURA REQUERIDA PARA CADA PLAN (7 planes totales):",
+                        "FORMATO OBLIGATORIO - USA EXACTAMENTE ESTA ESTRUCTURA:",
                         "",
-                        "1. PLAN ADMINISTRATIVO",
-                        "2. PLAN OPERATIVO",
-                        "3. PLAN TECNOLÓGICO",
-                        "4. PLAN FINANCIERO",
-                        "5. PLAN DE MONITOREO Y CONTROL",
-                        "6. PLAN DE MEJORA",
-                        "7. PLAN DE CONTINGENCIA",
+                        "=== PLAN ADMINISTRATIVO ===",
                         "",
-                        "PARA CADA PLAN DEBES INCLUIR EXACTAMENTE:",
+                        "1. FUNDAMENTO ESTRATEGICO",
                         "",
-                        "=== [NOMBRE DEL PLAN] ===",
+                        "[1-2 parrafos explicando el fundamento]",
                         "",
-                        "1. FUNDAMENTO ESTRATÉGICO",
-                        "[Explicación de por qué este plan es crítico para la empresa en su contexto actual, 1-2 párrafos profundos]",
                         "",
-                        "2. OBJETIVO GENERAL DEL PLAN",
-                        "[Objetivo SMART específico]",
+                        "2. OBJETIVO GENERAL",
                         "",
-                        "3. OBJETIVOS ESPECÍFICOS (mínimo 3)",
+                        "[Objetivo SMART]",
+                        "",
+                        "",
+                        "3. OBJETIVOS ESPECIFICOS",
+                        "",
                         "- Objetivo 1",
                         "- Objetivo 2",
                         "- Objetivo 3",
                         "",
-                        "4. ESTRATEGIAS DE IMPLEMENTACIÓN (mínimo 4 estrategias concretas)",
-                        "A. [Nombre estrategia 1]",
-                        "   - Descripción detallada",
-                        "   - Acciones clave",
-                        "B. [Nombre estrategia 2]",
-                        "   - Descripción detallada",
-                        "   - Acciones clave",
-                        "[C continuar...]",
                         "",
-                        "5. KPIs Y METAS (mínimo 5 KPIs por plan)",
-                        "- KPI 1: [Nombre] | Meta: [X] | Frecuencia: [mensual/trimestral]",
-                        "- KPI 2: [Nombre] | Meta: [X] | Frecuencia: [mensual/trimestral]",
-                        "[Continuar...]",
+                        "4. ESTRATEGIAS DE IMPLEMENTACION",
+                        "",
+                        "A. [Nombre estrategia 1]",
+                        "   - Descripcion",
+                        "   - Acciones clave",
+                        "",
+                        "B. [Nombre estrategia 2]",
+                        "   - Descripcion",
+                        "   - Acciones clave",
+                        "",
+                        "C. [Continuar...]",
+                        "",
+                        "",
+                        "5. KPIs Y METAS",
+                        "",
+                        "- KPI 1: [Nombre] | Meta: [X] | Frecuencia: [mensual]",
+                        "- KPI 2: [Nombre] | Meta: [X] | Frecuencia: [trimestral]",
+                        "- KPI 3: [Nombre] | Meta: [X] | Frecuencia: [trimestral]",
+                        "- KPI 4: [Nombre] | Meta: [X] | Frecuencia: [trimestral]",
+                        "- KPI 5: [Nombre] | Meta: [X] | Frecuencia: [trimestral]",
+                        "",
                         "",
                         "6. RECURSOS REQUERIDOS",
+                        "",
                         "- Humanos: [Detalle]",
-                        "- Financieros: [Presupuesto estimado]",
-                        "- Tecnológicos: [Infraestructura]",
+                        "- Financieros: [Presupuesto]",
+                        "- Tecnologicos: [Infraestructura]",
                         "- Temporales: [Cronograma]",
                         "",
+                        "",
                         "7. RESPONSABLES Y GOBIERNO",
+                        "",
                         "- Responsable principal: [Rol]",
-                        "- Comité de seguimiento: [Miembros]",
-                        "- Frecuencia de revisión: [Semanal/Mensual]",
+                        "- Comite de seguimiento: [Miembros]",
+                        "- Frecuencia de revision: [Mensual]",
                         "",
-                        "8. RIESGOS Y MITIGACIÓN",
-                        "- Riesgo 1: [Descripción] | Mitigación: [Acción]",
-                        "- Riesgo 2: [Descripción] | Mitigación: [Acción]",
                         "",
-                        "9. ALINEACIÓN CON ESTRATEGIA FODA",
-                        "[Cómo este plan contribuye específicamente a FO, FA, DO o DA]",
+                        "8. RIESGOS Y MITIGACION",
                         "",
-                        "REQUISITOS DE CALIDAD:",
-                        "- Lenguaje ejecutivo y profesional",
-                        "- Contenido específico, no genérico",
-                        "- Cada plan debe tener 800-1200 palabras mínimo",
-                        "- Los KPIs deben ser cuantificables y realistas",
-                        "- Las estrategias deben ser accionables",
-                        "- Considerar el contexto PEST y FODA proporcionado",
-                        "- NO usar frases vacías como 'mejorar procesos' sin especificar cómo",
+                        "- Riesgo 1: [Descripcion] | Mitigacion: [Accion]",
+                        "- Riesgo 2: [Descripcion] | Mitigacion: [Accion]",
                         "",
-                        "GENERA LOS 7 PLANES COMPLETOS AHORA:"
+                        "",
+                        "9. ALINEACION CON ESTRATEGIA FODA",
+                        "",
+                        "[Explicacion de contribucion]",
+                        "",
+                        "",
+                        "=== PLAN OPERATIVO ===",
+                        "[Misma estructura exacta]",
+                        "",
+                        "=== PLAN TECNOLOGICO ===",
+                        "[Misma estructura exacta]",
+                        "",
+                        "=== PLAN FINANCIERO ===",
+                        "[Misma estructura exacta]",
+                        "",
+                        "=== PLAN DE MONITOREO Y CONTROL ===",
+                        "[Misma estructura exacta]",
+                        "",
+                        "=== PLAN DE MEJORA ===",
+                        "[Misma estructura exacta]",
+                        "",
+                        "=== PLAN DE CONTINGENCIA ===",
+                        "[Misma estructura exacta]",
+                        "",
+                        "",
+                        "REGLAS ABSOLUTAS:",
+                        "- USA === para cada plan (obligatorio)",
+                        "- USA numeros (1., 2., 3.) para secciones",
+                        "- USA guiones (-) para items",
+                        "- USA letras (A., B., C.) para subsecciones",
+                        "- DEJA linea en blanco ENTRE cada elemento",
+                        "- DOBLE salto de linea entre parrafos",
+                        "- NO uses asteriscos (*), almohadillas (#), negritas",
+                        "- NO juntes el texto todo junto",
+                        "- Respeta TODOS los saltos de linea",
+                        "",
+                        "Genera los 7 planes completos ahora:"
                     ]
                     
                     prompt_planes_maestros = "\n".join(lineas_prompt)
@@ -4932,4 +5042,5 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
