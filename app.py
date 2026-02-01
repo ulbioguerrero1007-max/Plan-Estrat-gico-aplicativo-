@@ -1798,42 +1798,37 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     ))
     story.append(Spacer(1, 0.2*inch))
     
-# 4.1 Planes Funcionales
+    # 4.1 Planes Funcionales
     story.append(Paragraph("4.1 Planes Funcionales Estratégicos", styles['Heading2Enhanced']))
     story.append(Spacer(1, 0.1*inch))
     
-    # Generar planes con nueva función (ahora con soporte IA)
-    # Reemplazar esto:
-planes_resultado = generar_planes_por_plantilla(estrategia_principal, pest_total, empresa_id)
-
-if isinstance(planes_resultado, str):
-    # procesar como string
-elif isinstance(planes_resultado, dict):
-    # procesar como dict
-
-# POR ESTO (simplificado):
-planes_contenido = generar_planes_por_plantilla(estrategia_principal, pest_total, empresa_id)
-
-# Siempre es string, procesar directamente
-import re
-patron = r'={2,}\s*(\d+\.\s+PLAN\s+[A-ZÁÉÍÓÚÑa-záéíóúñ\s]+)\s*={2,}'
-secciones = re.split(patron, planes_contenido)
-
-if len(secciones) > 1:
-    for i in range(1, len(secciones), 2):
-        if i < len(secciones):
-            titulo_plan = secciones[i].strip()
-            contenido_plan = secciones[i+1] if i+1 < len(secciones) else ""
-            
-            story.append(Paragraph(titulo_plan, styles['Heading1Enhanced']))
-            story.append(Spacer(1, 0.15*inch))
-            
-            elementos_plan = formatear_contenido_plan(contenido_plan, styles)
-            story.extend(elementos_plan)
-            story.append(PageBreak())
-else:
-    # Si no se detectaron separadores, mostrar todo como texto
-    story.append(Paragraph(planes_contenido, styles['BodyTextEnhanced']))
+    # Generar planes con IA (siempre devuelve string)
+    planes_contenido = generar_planes_por_plantilla(estrategia_principal, pest_total, empresa_id)
+    
+    # Procesar el string de planes
+    import re
+    patron = r'={2,}\s*(\d+\.\s+PLAN\s+[A-ZÁÉÍÓÚÑa-záéíóúñ\s]+)\s*={2,}'
+    secciones = re.split(patron, planes_contenido)
+    
+    if len(secciones) > 1:
+        # Procesar cada plan encontrado
+        for i in range(1, len(secciones), 2):
+            if i < len(secciones):
+                titulo_plan = secciones[i].strip()
+                contenido_plan = secciones[i+1] if i+1 < len(secciones) else ""
+                
+                # Agregar título del plan
+                story.append(Paragraph(titulo_plan, styles['Heading1Enhanced']))
+                story.append(Spacer(1, 0.15*inch))
+                
+                # Formatear contenido con la función de formateo
+                elementos_plan = formatear_contenido_plan(contenido_plan, styles)
+                story.extend(elementos_plan)
+                
+                story.append(PageBreak())
+    else:
+        # Si no se detectaron separadores, mostrar todo como texto plano
+        story.append(Paragraph(planes_contenido, styles['BodyTextEnhanced']))
     
     # Caso 2: Si viene dict de plantillas (fallback)
     elif isinstance(planes_resultado, dict):
@@ -5141,6 +5136,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
