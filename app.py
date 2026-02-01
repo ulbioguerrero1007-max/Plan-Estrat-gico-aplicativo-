@@ -4252,10 +4252,10 @@ def aplicacion_principal():
     puede_editar = es_propietario or es_editor
 
     tab1, tab2, tab_est, tab3, tab4, tab5, tab6, tab_dash, tab7 = st.tabs([
-        "1. Introducción", "2. Diagnóstico Situacional", "3. Estrategia", 
-        "4. Planes", "5. CMI/Indicadores", "6. Semaforización", 
-        "7. Operativización/Presupuesto", "8. Dashboard de Análisis", "9. Resumen y Conclusiones"
-    ])
+    "1. Introducción", "2. Diagnóstico Situacional", "3. Estrategia", 
+    "4. Planes", "5. CMI/Indicadores", "6. Semaforización", 
+    "7. Operativización/Presupuesto", "8. Dashboard de Análisis", "9. Resumen y Conclusiones"
+])
     
     # --- PESTAÑA 1: INTRODUCCION ---
     with tab1:
@@ -6723,6 +6723,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
