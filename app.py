@@ -465,7 +465,7 @@ def analizar_foda(df_foda):
     resumen = f"La estrategia principal recomendada es **{analisis_df.iloc[0]['Estrategia']}** ({analisis_df.iloc[0]['Puntaje Total']} puntos), seguida por **{analisis_df.iloc[1]['Estrategia']}** ({analisis_df.iloc[1]['Puntaje Total']} puntos)."
     return analisis_df, resumen, estrategia_principal, puntajes_ordenados
 
-def generar_planes_por_plantilla(estrategia_foda, pest_total):
+def generar_planes_por_plantilla(estrategia_foda, pest_total, empresa_id=None):
     planes = {}
     planes['Plan Administrativo'] = {
         'introduccion': "El plan administrativo se enfocará en fortalecer la base de la organización y fomentar la innovación continua.",
@@ -5086,5 +5086,6 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
