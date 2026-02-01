@@ -1746,7 +1746,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     # ============================================
     
     # PORTADA INTERNA DEL PLAN
-    story.append(Spacer(1, 2*inch))
+    story.append(Spacer(1, 1*inch))
     story.append(Paragraph("PLAN ESTRATÉGICO", styles['APA_Title']))
     story.append(Spacer(1, 0.3*inch))
     story.append(Paragraph(empresa.get('nombre', 'EMPRESA').upper(), styles['APA_Title']))
@@ -2088,44 +2088,12 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     ))
     story.append(Spacer(1, 0.2*inch))
     
-    # 4.1 Planes Funcionales
-    story.append(Paragraph("4.1 Planes Funcionales Estratégicos", styles['Heading2Enhanced']))
-    story.append(Spacer(1, 0.1*inch))
-    
-    # Generar planes con IA (siempre devuelve string)
-    planes_contenido = generar_planes_por_plantilla(estrategia_principal, pest_total, empresa_id)
-    
-    # Procesar el string de planes dividiendo por los separadores === PLAN X ===
-    import re
-    patron = r'={2,}\s*(\d+\.\s+PLAN\s+[A-ZÁÉÍÓÚÑa-záéíóúñ\s]+)\s*={2,}'
-    secciones = re.split(patron, planes_contenido)
-    
-    if len(secciones) > 1:
-        # Procesar cada plan encontrado
-        for i in range(1, len(secciones), 2):
-            if i < len(secciones):
-                titulo_plan = secciones[i].strip()
-                contenido_plan = secciones[i+1] if i+1 < len(secciones) else ""
-                
-                # Agregar título del plan como Heading 1
-                story.append(Paragraph(titulo_plan, styles['Heading1Enhanced']))
-                story.append(Spacer(1, 0.15*inch))
-                
-                # Formatear contenido con la función de formateo
-                elementos_plan = formatear_contenido_plan(contenido_plan, styles)
-                story.extend(elementos_plan)
-                
-                story.append(PageBreak())
-    else:
-        # Si no se detectaron separadores, mostrar todo como texto plano
-        story.append(Paragraph(planes_contenido, styles['BodyTextEnhanced']))
-        story.append(PageBreak())
     
     # 4.2 Planes Funcionales Detallados (si existe análisis guardado)
     # Planes Maestros con formato estructurado
     planes_maestros = empresa.get('analisis_operativo', '')
     if planes_maestros and str(planes_maestros).strip():
-        story.append(Paragraph("4.2 Planes Funcionales Detallados", styles['Heading2Enhanced']))
+        story.append(Paragraph("4.1 Planes Funcionales Detallados", styles['Heading2Enhanced']))
         story.append(Spacer(1, 0.1*inch))
         
         # Los planes maestros son muy largos, dividir en secciones si es posible
@@ -2159,7 +2127,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         story.append(PageBreak())
     
     # 4.3 Operativización (Cuadro de Operativización)
-    story.append(Paragraph("4.3 Operativización y Presupuesto", styles['Heading2Enhanced']))
+    story.append(Paragraph("4.2 Operativización y Presupuesto", styles['Heading2Enhanced']))
     
     if not df_oper.empty:
         story.append(Paragraph(
@@ -2169,7 +2137,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         ))
         story.append(Spacer(1, 0.2*inch))
         
-        story.append(Paragraph("4.3.1 Resumen de Inversión por Plan", styles['Heading3Enhanced']))
+        story.append(Paragraph("4.2.1 Resumen de Inversión por Plan", styles['Heading3Enhanced']))
         
         presupuesto_plan = df_oper.groupby('plan_asignado').agg({
             'costo': 'sum',
@@ -2189,7 +2157,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         story.append(tabla_pres)
         story.append(Spacer(1, 0.2*inch))
         
-        story.append(Paragraph("4.3.2 Cuadro de Operativización Detallado", styles['Heading3Enhanced']))
+        story.append(Paragraph("4.2.2 Cuadro de Operativización Detallado", styles['Heading3Enhanced']))
         
         datos_oper = [['Estrategia', 'Actividad', 'Plazo', 'Responsable', 'Costo']]
         for _, row in df_oper.head(30).iterrows():  # Mostrar primeras 30 para no sobrecargar
@@ -2212,7 +2180,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
             ))
         
         # Actividades de mayor inversión
-        story.append(Paragraph("4.3.3 Actividades de Mayor Inversión", styles['Heading3Enhanced']))
+        story.append(Paragraph("4.2.3 Actividades de Mayor Inversión", styles['Heading3Enhanced']))
         
         actividades_criticas = df_oper.nlargest(5, 'costo')
         for idx, row in actividades_criticas.iterrows():
@@ -5453,6 +5421,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
