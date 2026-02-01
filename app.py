@@ -694,9 +694,11 @@ Genera los 7 planes completos ahora:"""
 def generar_cuadro_de_mando_ia(estrategias_df):
     if estrategias_df.empty:
         return pd.DataFrame(columns=['Estrategia', 'Perspectiva', 'KPIs', 'Formulas', 'Frecuencia', 'LI', 'LC', 'LS'])
+    
     contexto_estrategias = ""
     for _, row in estrategias_df.iterrows():
         contexto_estrategias += f"- Estrategia: {row['estrategia']} (Plan: {row['plan_asignado']})\n"
+    
     prompt = f"""Actúa como un experto en Balanced Scorecard. Basado en las siguientes estrategias:
 {contexto_estrategias}
 Genera una tabla de Cuadro de Mando Integral (CMI) con las siguientes columnas exactas:
@@ -710,8 +712,10 @@ Genera una tabla de Cuadro de Mando Integral (CMI) con las siguientes columnas e
 8. (LS): Límite Superior (Verde/Satisfactorio).
 Formato de salida: ESTRATEGIA|PERSPECTIVA|KPI|FORMULA|FRECUENCIA|LI|LC|LS
 No incluyas encabezados ni texto adicional, solo las líneas de datos separadas por pipe (|)."""
+    
     resultado_ia = generar_analisis(prompt)
     cmi_rows = []
+    
     for line in resultado_ia.strip().split("\n"):
         partes = line.split("|")
         if len(partes) >= 8:
@@ -725,11 +729,40 @@ No incluyas encabezados ni texto adicional, solo las líneas de datos separadas 
                 "LC": partes[6].strip(),
                 "LS": partes[7].strip()
             })
+    
     df_cmi = pd.DataFrame(cmi_rows)
+    
+    # VERIFICAR QUE LAS COLUMNAS NECESARIAS EXISTAN
+    columnas_requeridas = ['Estrategia', 'Perspectiva', 'KPIs', 'Formulas', 'Frecuencia', 'LI', 'LC', 'LS']
+    
+    # Si el DataFrame está vacío o faltan columnas, retornar DataFrame vacío con columnas correctas
+    if df_cmi.empty:
+        return pd.DataFrame(columns=columnas_requeridas)
+    
+    # Asegurar que todas las columnas existan
+    for col in columnas_requeridas:
+        if col not in df_cmi.columns:
+            df_cmi[col] = ''
+    
+    # Ordenar columnas
+    df_cmi = df_cmi[columnas_requeridas]
+    
+    # Ordenar por perspectiva solo si la columna existe y tiene datos válidos
     perspectiva_orden = ['Financiera', 'Cliente', 'Procesos', 'Aprendizaje y Control']
-    df_cmi['Perspectiva'] = pd.Categorical(df_cmi['Perspectiva'], categories=perspectiva_orden, ordered=True)
-    return df_cmi.sort_values(by='Perspectiva').reset_index(drop=True)
-
+    
+    # Filtrar solo perspectivas válidas antes de ordenar
+    df_cmi['Perspectiva'] = df_cmi['Perspectiva'].apply(
+        lambda x: x if x in perspectiva_orden else 'Procesos'
+    )
+    
+    try:
+        df_cmi['Perspectiva'] = pd.Categorical(df_cmi['Perspectiva'], categories=perspectiva_orden, ordered=True)
+        df_cmi = df_cmi.sort_values(by='Perspectiva').reset_index(drop=True)
+    except Exception as e:
+        # Si falla el ordenamiento, simplemente retornar el DataFrame sin ordenar
+        pass
+    
+    return df_cmi
 # ============================================================================
 # FUNCIONES DE GRÁFICOS MEJORADAS (Agregar estas funciones a tu app.py)
 # ============================================================================
@@ -6676,6 +6709,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
