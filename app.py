@@ -466,55 +466,106 @@ def analizar_foda(df_foda):
     return analisis_df, resumen, estrategia_principal, puntajes_ordenados
 
 def generar_planes_por_plantilla(estrategia_foda, pest_total, empresa_id=None):
-    planes = {}
-    planes['Plan Administrativo'] = {
-        'introduccion': "El plan administrativo se enfocará en fortalecer la base de la organización y fomentar la innovación continua.",
-        'objetivo': "Implementar un programa de formación en liderazgo y gestión de proyectos para los mandos medios en los próximos 6 meses."
-    }
-    planes['Plan Operativo'] = {
-        'introduccion': "El plan operativo se enfocará en optimizar la cadena de valor y escalar las operaciones de manera eficiente para soportar el crecimiento.",
-        'objetivo': "Optimizar los procesos críticos de producción/servicio para reducir los tiempos de entrega en un 15% en el próximo año."
-    }
-    if "Ofensiva" in estrategia_foda or "Adaptativa" in estrategia_foda:
-        intro_tec = "La estrategia de crecimiento requiere un apalancamiento tecnológico. Se debe invertir en innovación para ganar ventaja competitiva."
-        obj_tec = "Evaluar e implementar una nueva herramienta de CRM o ERP en los próximos 9 meses para mejorar la relación con clientes y la eficiencia operativa."
-    else:
-        intro_tec = "La tecnología debe usarse para robustecer la operación y defender la posición actual. La prioridad es la seguridad y la estabilidad."
-        obj_tec = "Realizar una auditoría de ciberseguridad completa en el próximo trimestre y actualizar los sistemas críticos para mitigar vulnerabilidades."
-    planes['Plan Tecnológico'] = {'introduccion': intro_tec, 'objetivo': obj_tec}
+    """
+    Genera los 7 planes funcionales usando exclusivamente IA.
+    Si falla, devuelve mensaje de error en lugar de plantillas.
+    """
     
-    if "Ofensiva" in estrategia_foda or "Adaptativa" in estrategia_foda:
-        intro_fin = "El entorno es favorable y la estrategia es de crecimiento. El plan financiero debe enfocarse en asegurar los fondos para la expansión."
-        obj_fin = "Preparar un caso de negocio y una ronda de financiación (o asegurar una línea de crédito) en los próximos 6 meses para financiar las nuevas iniciativas estratégicas."
-    else:
-        intro_fin = "La situación financiera debe ser gestionada con prudencia. La prioridad es la optimización de costos, la gestión de la liquidez y la maximización de la rentabilidad actual."
-        obj_fin = "Implementar un plan de reducción de costos no esenciales para mejorar el margen de beneficio neto en un 2% en los próximos 6 meses, sin afectar la operación crítica."
-    planes['Plan Financiero'] = {'introduccion': intro_fin, 'objetivo': obj_fin}
+    # Obtener contexto adicional si hay empresa_id
+    contexto_empresa = ""
+    if empresa_id:
+        empresa = get_datos_empresa(empresa_id)
+        if empresa:
+            contexto_empresa = f"""
+Nombre de la empresa: {empresa.get('nombre', 'La empresa')}
+Giro: {empresa.get('giro', 'No especificado')}
+Misión: {empresa.get('mision', 'No disponible')[:200]}
+"""
     
-    planes['Plan de Monitoreo y control'] = {
-        'introduccion': "Dado que la estrategia implica nuevas iniciativas y crecimiento, se requiere un sistema de monitoreo ágil y riguroso para asegurar que los objetivos se cumplan.",
-        'objetivo': "Implementar un dashboard de KPIs (Indicadores Clave) en tiempo real para los nuevos proyectos y establecer un ciclo de revisión estratégica mensual."
-    }
+    # Determinar contexto estratégico
+    es_ofensiva = "Ofensiva" in str(estrategia_foda)
+    es_adaptativa = "Adaptativa" in str(estrategia_foda)
+    contexto_postura = "crecimiento agresivo" if (es_ofensiva or es_adaptativa) else "consolidación defensiva"
     
-    if "Ofensiva" in estrategia_foda:
-        intro_mej = "La posición estratégica es Ofensiva. El plan debe centrarse en usar las fortalezas para capitalizar al máximo las oportunidades de mercado."
-        obj_mej = "Lanzar una nueva línea de producto/servicio que explote nuestras fortalezas en los próximos 12 meses, para capturar un 5% más de cuota de mercado."
-    elif "Adaptativa" in estrategia_foda:
-        intro_mej = "La estrategia recomendada es Adaptativa. Se deben desarrollar áreas internas para poder aprovechar las oportunidades externas."
-        obj_mej = "Iniciar un programa de capacitación técnica en el próximo trimestre para cerrar brechas de debilidades y abordar 2 nuevas oportunidades de mercado."
-    else:
-        intro_mej = "La estrategia es Defensiva/Supervivencia. La prioridad es proteger la posición actual, usando fortalezas para mitigar amenazas."
-        obj_mej = "Implementar un plan de retención de clientes clave en los próximos 6 meses, para reducir la tasa de abandono en un 10%."
-    planes['Plan de Mejora'] = {'introduccion': intro_mej, 'objetivo': obj_mej}
+    # Prompt maestro para IA
+    prompt_maestro = f"""Actúa como un consultor senior de estrategia empresarial con 20 años de experiencia.
+
+CONTEXTO ESTRATÉGICO:
+{contexto_empresa}
+Estrategia FODA principal: {estrategia_foda}
+Postura estratégica: {contexto_postura}
+Entorno PEST score: {pest_total:.2f} ({'favorable' if pest_total > 2.5 else 'desafiante'})
+
+GENERA LOS 7 PLANES FUNCIONALES ESTRATÉGICOS SIGUIENDO ESTA ESTRUCTURA EXACTA:
+
+=== 1. PLAN ADMINISTRATIVO ===
+
+1.1 FUNDAMENTO ESTRATÉGICO
+    [2-3 párrafos explicando por qué este plan es crítico]
+
+1.2 OBJETIVO GENERAL DEL PLAN
+    [Objetivo SMART específico]
+
+1.3 OBJETIVOS ESPECÍFICOS
+    • Objetivo 1: [Descripción]
+    • Objetivo 2: [Descripción]
+    • Objetivo 3: [Descripción]
+
+1.4 ESTRATEGIAS DE IMPLEMENTACIÓN
+    A. [Nombre estrategia]
+       - Descripción detallada
+       - Recursos necesarios
+       
+    B. [Nombre estrategia]
+       - Descripción detallada
+       - Recursos necesarios
+
+1.5 KPIs Y METAS
+    • KPI 1: [Nombre] | Meta: [X] | Frecuencia: [mensual]
+
+1.6 RECURSOS REQUERIDOS
+    • Humanos: [Detalle]
+    • Financieros: [Presupuesto]
+
+1.7 RESPONSABLES Y GOBIERNO
+    • Responsable: [Rol]
+
+1.8 RIESGOS Y MITIGACIÓN
+    • Riesgo: [Descripción] | Mitigación: [Acción]
+
+1.9 ALINEACIÓN CON ESTRATEGIA FODA
+    [Explicación]
+
+=== 2. PLAN OPERATIVO ===
+[Repetir estructura 2.1 a 2.9]
+
+=== 3. PLAN TECNOLÓGICO ===
+[Repetir estructura 3.1 a 3.9]
+
+=== 4. PLAN FINANCIERO ===
+[Repetir estructura 4.1 a 4.9]
+
+=== 5. PLAN DE MONITOREO Y CONTROL ===
+[Repetir estructura 5.1 a 5.9]
+
+=== 6. PLAN DE MEJORA ===
+[Repetir estructura 6.1 a 6.9]
+
+=== 7. PLAN DE CONTINGENCIA ===
+[Repetir estructura 7.1 a 7.9]
+
+REGLAS:
+- USA numeración X.Y para subtítulos
+- USA viñetas (•) para listas
+- DEJA líneas en blanco entre secciones
+- Adapta contenido a: {contexto_postura} y PEST {pest_total:.2f}
+
+Genera los 7 planes completos ahora:"""
+
+    # Llamar a IA
+    planes_generados = generar_analisis(prompt_maestro)
     
-    if pest_total < 2.5:
-        intro_con = f"El análisis del entorno (PEST: {pest_total:.2f}) revela vulnerabilidad a factores externos. Es crucial desarrollar planes para mitigar riesgos."
-        obj_con = "Formar un comité de gestión de riesgos que, en 2 meses, identifique los 3 principales riesgos externos y desarrolle un plan de respuesta específico."
-    else:
-        intro_con = f"La empresa muestra buena respuesta al entorno (PEST: {pest_total:.2f}). El plan se enfocará en la monitorización proactiva de eventos inesperados."
-        obj_con = "Establecer un sistema de vigilancia del entorno trimestral y realizar un simulacro de crisis anual."
-    planes['Plan de Contingencia'] = {'introduccion': intro_con, 'objetivo': obj_con}
-    return planes
+    return planes_generados
 
 def generar_cuadro_de_mando_ia(estrategias_df):
     if estrategias_df.empty:
@@ -1752,33 +1803,37 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     story.append(Spacer(1, 0.1*inch))
     
     # Generar planes con nueva función (ahora con soporte IA)
-    planes_resultado = generar_planes_por_plantilla(estrategia_principal, pest_total, empresa_id)
-    
-    # Caso 1: Si viene string de IA (formato === PLAN X ===)
-    if isinstance(planes_resultado, str):
-        # Dividir por los separadores === PLAN ... ===
-        import re
-        patron = r'={2,}\s*(\d+\.\s+PLAN\s+[A-ZÁÉÍÓÚÑa-záéíóúñ\s]+)\s*={2,}'
-        secciones = re.split(patron, planes_resultado)
-        
-        if len(secciones) > 1:
-            for i in range(1, len(secciones), 2):
-                if i < len(secciones):
-                    titulo_plan = secciones[i].strip()
-                    contenido_plan = secciones[i+1] if i+1 < len(secciones) else ""
-                    
-                    # Agregar título como Heading 1
-                    story.append(Paragraph(titulo_plan, styles['Heading1Enhanced']))
-                    story.append(Spacer(1, 0.15*inch))
-                    
-                    # Formatear contenido con la nueva función
-                    elementos_plan = formatear_contenido_plan(contenido_plan, styles)
-                    story.extend(elementos_plan)
-                    
-                    story.append(PageBreak())
-        else:
-            # Si no se detectaron separadores, mostrar como texto plano
-            story.append(Paragraph(planes_resultado, styles['BodyTextEnhanced']))
+    # Reemplazar esto:
+planes_resultado = generar_planes_por_plantilla(estrategia_principal, pest_total, empresa_id)
+
+if isinstance(planes_resultado, str):
+    # procesar como string
+elif isinstance(planes_resultado, dict):
+    # procesar como dict
+
+# POR ESTO (simplificado):
+planes_contenido = generar_planes_por_plantilla(estrategia_principal, pest_total, empresa_id)
+
+# Siempre es string, procesar directamente
+import re
+patron = r'={2,}\s*(\d+\.\s+PLAN\s+[A-ZÁÉÍÓÚÑa-záéíóúñ\s]+)\s*={2,}'
+secciones = re.split(patron, planes_contenido)
+
+if len(secciones) > 1:
+    for i in range(1, len(secciones), 2):
+        if i < len(secciones):
+            titulo_plan = secciones[i].strip()
+            contenido_plan = secciones[i+1] if i+1 < len(secciones) else ""
+            
+            story.append(Paragraph(titulo_plan, styles['Heading1Enhanced']))
+            story.append(Spacer(1, 0.15*inch))
+            
+            elementos_plan = formatear_contenido_plan(contenido_plan, styles)
+            story.extend(elementos_plan)
+            story.append(PageBreak())
+else:
+    # Si no se detectaron separadores, mostrar todo como texto
+    story.append(Paragraph(planes_contenido, styles['BodyTextEnhanced']))
     
     # Caso 2: Si viene dict de plantillas (fallback)
     elif isinstance(planes_resultado, dict):
@@ -5086,6 +5141,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
