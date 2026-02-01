@@ -1320,6 +1320,137 @@ def create_professional_table(data, col_widths=None, has_header=True):
 # Alias para compatibilidad con código existente
 create_table_pdf = create_professional_table
 
+def parsear_texto_a_story(texto, styles):
+    """
+    Convierte texto estructurado de la IA en elementos de ReportLab.
+    Respeta titulos, subtitulos, listas y parrafos.
+    """
+    import re
+    
+    if not texto or not str(texto).strip():
+        return []
+    
+    elementos = []
+    lineas = str(texto).split('\n')
+    i = 0
+    
+    while i < len(lineas):
+        linea = lineas[i].rstrip()
+        
+        # Saltar lineas vacias
+        if not linea.strip():
+            i += 1
+            continue
+        
+        linea_stripped = linea.strip()
+        
+        # DETECTAR TITULO PRINCIPAL (1., 2., 3., etc. sin subpunto)
+        # Ejemplo: "1. TITULO PRINCIPAL" o "2. RESUMEN EJECUTIVO"
+        if re.match(r'^\d+\.\s+[A-ZÁÉÍÓÚÑ]', linea_stripped) and not re.match(r'^\d+\.\d+', linea_stripped):
+            titulo = limpiar_para_paragraph(linea_stripped)
+            elementos.append(Paragraph(titulo, styles['Heading2Enhanced']))
+            elementos.append(Spacer(1, 0.15*inch))
+            i += 1
+            continue
+        
+        # DETECTAR SUBTITULO (3.1, 3.2, 5.1, etc.)
+        # Ejemplo: "3.1 Oportunidades Clave"
+        if re.match(r'^\d+\.\d+\s+', linea_stripped):
+            subtitulo = limpiar_para_paragraph(linea_stripped)
+            elementos.append(Paragraph(subtitulo, styles['Heading3Enhanced']))
+            elementos.append(Spacer(1, 0.1*inch))
+            i += 1
+            continue
+        
+        # DETECTAR ELEMENTO DE LISTA (- al inicio con espacio)
+        # Ejemplo: "- Punto clave 1: descripcion"
+        if re.match(r'^-\s+', linea_stripped):
+            # Recolectar toda la lista consecutiva
+            items_lista = []
+            while i < len(lineas):
+                linea_actual = lineas[i].rstrip().strip()
+                if not linea_actual or not re.match(r'^-\s+', linea_actual):
+                    break
+                # Quitar el guion inicial y limpiar
+                item = re.sub(r'^-\s+', '', linea_actual)
+                items_lista.append(item)
+                i += 1
+            
+            # Crear elementos de lista con indentacion
+            for item in items_lista:
+                item_limpio = limpiar_para_paragraph(item, max_length=300)
+                if item_limpio:
+                    # Usar estilo de lista con sangria
+                    elementos.append(Paragraph(f"        - {item_limpio}", styles['APA_List']))
+            
+            if items_lista:
+                elementos.append(Spacer(1, 0.05*inch))
+            continue
+        
+        # DETECTAR PARRAFO NORMAL
+        # Recolectar lineas consecutivas hasta encontrar separador
+        parrafo_lineas = [linea_stripped]
+        i += 1
+        
+        while i < len(lineas):
+            siguiente = lineas[i].rstrip()
+            siguiente_stripped = siguiente.strip()
+            
+            # Condiciones para detener: vacio, titulo, subtitulo, o lista
+            if (not siguiente_stripped or 
+                re.match(r'^\d+\.\s+[A-ZÁÉÍÓÚÑ]', siguiente_stripped) or
+                re.match(r'^\d+\.\d+', siguiente_stripped) or
+                re.match(r'^-\s+', siguiente_stripped)):
+                break
+            
+            parrafo_lineas.append(siguiente_stripped)
+            i += 1
+        
+        # Unir lineas del parrafo (wrapping natural del texto)
+        parrafo_completo = ' '.join(parrafo_lineas)
+        parrafo_limpio = limpiar_para_paragraph(parrafo_completo, max_length=800)
+        
+        if parrafo_limpio and len(parrafo_limpio) > 5:
+            elementos.append(Paragraph(parrafo_limpio, styles['BodyTextEnhanced']))
+            elementos.append(Spacer(1, 0.08*inch))
+    
+    return elementos
+
+
+def agregar_analisis_estructurado(story, titulo_seccion, contenido_analisis, styles):
+    """
+    Funcion auxiliar para agregar un analisis completo al story.
+    Maneja errores y asegura que siempre haya contenido.
+    """
+    if not contenido_analisis or not str(contenido_analisis).strip():
+        # Si no hay analisis, agregar mensaje placeholder
+        story.append(Paragraph(f"{titulo_seccion}: No se ha generado analisis.", styles['BodyTextEnhanced']))
+        story.append(Spacer(1, 0.1*inch))
+        return
+    
+    # Agregar titulo de la subseccion
+    story.append(Paragraph(titulo_seccion, styles['Heading3Enhanced']))
+    story.append(Spacer(1, 0.05*inch))
+    
+    # Parsear y agregar contenido estructurado
+    try:
+        elementos = parsear_texto_a_story(contenido_analisis, styles)
+        
+        if elementos:
+            for elem in elementos:
+                story.append(elem)
+        else:
+            # Fallback: si el parseo devuelve vacio, agregar como parrafo simple
+            texto_limpio = limpiar_para_paragraph(contenido_analisis, max_length=1000)
+            story.append(Paragraph(texto_limpio, styles['BodyTextEnhanced']))
+            story.append(Spacer(1, 0.1*inch))
+            
+    except Exception as e:
+        # Si falla el parseo, agregar texto plano
+        print(f"Error parseando analisis '{titulo_seccion}': {e}")
+        texto_fallback = limpiar_para_paragraph(str(contenido_analisis)[:500])
+        story.append(Paragraph(texto_fallback, styles['BodyTextEnhanced']))
+        story.append(Spacer(1, 0.1*inch))
     
 def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, aprobado):
     """
@@ -1703,112 +1834,132 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     
     story.append(PageBreak())
     
-    # 2. ANÁLISIS SITUACIONAL (Diagnóstico Interno y Externo)
-    story.append(Paragraph("2. ANÁLISIS SITUACIONAL", styles['Heading1Enhanced']))
+    # =========================================================================
+    # SECCION 2: ANALISIS SITUACIONAL (VERSION CORREGIDA)
+    # =========================================================================
+    
+    story.append(Paragraph("2. ANALISIS SITUACIONAL", styles['Heading1Enhanced']))
     story.append(Paragraph(
-        "El análisis situacional examina tanto los factores internos como externos que afectan "
-        "a la organización, permitiendo identificar fortalezas, debilidades, oportunidades y amenazas.",
+        "El analisis situacional examina tanto los factores internos como externos que afectan "
+        "a la organizacion, permitiendo identificar fortalezas, debilidades, oportunidades y amenazas.",
         styles['BodyTextEnhanced']
     ))
     story.append(Spacer(1, 0.2*inch))
     
-    # 2.1 Diagnóstico Interno
-    story.append(Paragraph("2.1 Diagnóstico Interno", styles['Heading2Enhanced']))
+    # 2.1 Diagnostico Interno
+    story.append(Paragraph("2.1 Diagnostico Interno", styles['Heading2Enhanced']))
     
-    # Análisis MADE (Marketing Interno)
+    # Analisis MADE (Marketing Interno)
     if not df_made.empty:
-        story.append(Paragraph("2.1.1 Análisis de Marketing Interno (MADE)", styles['Heading3Enhanced']))
+        story.append(Paragraph("2.1.1 Analisis de Marketing Interno (MADE)", styles['Heading3Enhanced']))
         story.append(Paragraph(
-            "La matriz MADE evalúa las variables internas de marketing: Producto, Precio, Plaza y Promoción.",
+            "La matriz MADE evalua las variables internas de marketing: Producto, Precio, Plaza y Promocion.",
             styles['BodyTextEnhanced']
         ))
+        story.append(Spacer(1, 0.1*inch))
         
-        datos_made_resumen = [['Variable', 'Factor', 'Rating', 'Ponderación']]
+        # Tabla resumen MADE
+        datos_made_resumen = [['Variable', 'Factor', 'Rating', 'Ponderacion']]
         for _, row in df_made.head(10).iterrows():
             datos_made_resumen.append([
-                row.get('variable', '')[:20],
-                row.get('factor', '')[:30],
+                limpiar_para_paragraph(str(row.get('variable', '')))[:20],
+                limpiar_para_paragraph(str(row.get('factor', '')))[:30],
                 str(row.get('rating', '')),
                 f"{row.get('weight_percent', '')}%"
             ])
         
-        tabla_made = create_table_pdf(datos_made_resumen, col_widths=[1.2*inch, 2.5*inch, 0.8*inch, 1*inch])
+        tabla_made = create_professional_table(datos_made_resumen, col_widths=[1.2*inch, 2.5*inch, 0.8*inch, 1*inch])
         story.append(tabla_made)
-        story.append(Spacer(1, 0.1*inch))
+        story.append(Spacer(1, 0.15*inch))
         
-        # Análisis guardado de MADE
+        # Analisis de IA con formato estructurado
         analisis_made = empresa.get('analisis_made', '')
-        if analisis_made:
-            story.append(Paragraph("Análisis de Marketing Interno", styles['Heading3Enhanced']))
-            story.append(Paragraph(analisis_made, styles['BodyTextEnhanced']))
+        agregar_analisis_estructurado(
+            story, 
+            "Analisis de Marketing Interno", 
+            analisis_made, 
+            styles
+        )
     
     story.append(Spacer(1, 0.2*inch))
     
-    # 2.2 Diagnóstico Externo
-    story.append(Paragraph("2.2 Diagnóstico Externo", styles['Heading2Enhanced']))
+    # 2.2 Diagnostico Externo
+    story.append(Paragraph("2.2 Diagnostico Externo", styles['Heading2Enhanced']))
     
-    # Análisis MADI (Marketing Externo)
+    # Analisis MADI (Marketing Externo)
     if not df_madi.empty:
-        story.append(Paragraph("2.2.1 Análisis de Marketing Externo (MADI)", styles['Heading3Enhanced']))
+        story.append(Paragraph("2.2.1 Analisis de Marketing Externo (MADI)", styles['Heading3Enhanced']))
         story.append(Paragraph(
-            "La matriz MADI evalúa las variables externas de marketing que impactan en la posición competitiva.",
+            "La matriz MADI evalua las variables externas de marketing que impactan en la posicion competitiva.",
             styles['BodyTextEnhanced']
         ))
+        story.append(Spacer(1, 0.1*inch))
         
-        datos_madi_resumen = [['Variable', 'Factor', 'Rating', 'Ponderación']]
+        datos_madi_resumen = [['Variable', 'Factor', 'Rating', 'Ponderacion']]
         for _, row in df_madi.head(10).iterrows():
             datos_madi_resumen.append([
-                row.get('variable', '')[:20],
-                row.get('factor', '')[:30],
+                limpiar_para_paragraph(str(row.get('variable', '')))[:20],
+                limpiar_para_paragraph(str(row.get('factor', '')))[:30],
                 str(row.get('rating', '')),
                 f"{row.get('weight_percent', '')}%"
             ])
         
-        tabla_madi = create_table_pdf(datos_madi_resumen, col_widths=[1.2*inch, 2.5*inch, 0.8*inch, 1*inch])
+        tabla_madi = create_professional_table(datos_madi_resumen, col_widths=[1.2*inch, 2.5*inch, 0.8*inch, 1*inch])
         story.append(tabla_madi)
+        story.append(Spacer(1, 0.15*inch))
         
+        # Analisis de IA con formato estructurado
         analisis_madi = empresa.get('analisis_madi', '')
-        if analisis_madi:
-            story.append(Paragraph("Análisis de Marketing Externo", styles['Heading3Enhanced']))
-            story.append(Paragraph(analisis_madi, styles['BodyTextEnhanced']))
+        agregar_analisis_estructurado(
+            story, 
+            "Analisis de Marketing Externo", 
+            analisis_madi, 
+            styles
+        )
     
     story.append(Spacer(1, 0.2*inch))
     
-    # Análisis PEST
+    # Analisis PEST
     if not df_pest.empty:
-        story.append(Paragraph("2.2.2 Análisis del Entorno PEST", styles['Heading3Enhanced']))
+        story.append(Paragraph("2.2.2 Analisis del Entorno PEST", styles['Heading3Enhanced']))
         story.append(Paragraph(
-            "El análisis PEST examina los factores Políticos, Económicos, Sociales y Tecnológicos.",
+            "El analisis PEST examina los factores Politicos, Economicos, Sociales y Tecnologicos.",
             styles['BodyTextEnhanced']
         ))
-        
-        datos_pest_resumen = [['Categoría', 'Factor', 'Tipo FODA', 'Puntaje', 'Ponderado']]
-        for _, row in df_pest.head(15).iterrows():
-            datos_pest_resumen.append([
-                row['categoria'],
-                row['factor'][:35] + '...' if len(row['factor']) > 35 else row['factor'],
-                row['tipo_foda'],
-                str(row['puntaje']),
-                f"{row['valor_ponderado']:.2f}"
-            ])
-        
-        tabla_pest = create_table_pdf(datos_pest_resumen, col_widths=[1*inch, 2.5*inch, 1*inch, 0.8*inch, 1*inch])
-        story.append(tabla_pest)
         story.append(Spacer(1, 0.1*inch))
         
-        # Gráfico PEST
+        datos_pest_resumen = [['Categoria', 'Factor', 'Tipo FODA', 'Puntaje', 'Ponderado']]
+        for _, row in df_pest.head(15).iterrows():
+            datos_pest_resumen.append([
+                limpiar_para_paragraph(str(row.get('categoria', ''))),
+                limpiar_para_paragraph(str(row.get('factor', '')))[:35] + '...' if len(str(row.get('factor', ''))) > 35 else limpiar_para_paragraph(str(row.get('factor', ''))),
+                limpiar_para_paragraph(str(row.get('tipo_foda', ''))),
+                str(row.get('puntaje', '')),
+                f"{row.get('valor_ponderado', 0):.2f}"
+            ])
+        
+        tabla_pest = create_professional_table(datos_pest_resumen, col_widths=[1*inch, 2.5*inch, 1*inch, 0.8*inch, 1*inch])
+        story.append(tabla_pest)
+        story.append(Spacer(1, 0.15*inch))
+        
+        # Grafico PEST
         grafico_pest = generar_grafico_barras_pest_mejorado(df_pest)
         if grafico_pest:
             story.append(Image(grafico_pest, width=5*inch, height=3*inch))
             story.append(Paragraph(
-                "<i>Figura 2.1. Análisis PEST - Distribución por categoría.</i>",
+                "<i>Figura 2.1. Analisis PEST - Distribucion por categoria.</i>",
                 ParagraphStyle(name='Caption', parent=styles['BodyTextEnhanced'], alignment=TA_CENTER, fontSize=10, firstLineIndent=0)
             ))
+            story.append(Spacer(1, 0.1*inch))
         
+        # Analisis de IA con formato estructurado
         analisis_pest = empresa.get('analisis_pest', '')
-        if analisis_pest:
-            story.append(Paragraph("Interpretación del Análisis PEST", styles['Heading3Enhanced']))
-            story.append(Paragraph(analisis_pest, styles['BodyTextEnhanced']))
+        agregar_analisis_estructurado(
+            story, 
+            "Interpretacion del Analisis PEST", 
+            analisis_pest, 
+            styles
+        )
     
     story.append(Spacer(1, 0.2*inch))
     
@@ -1816,56 +1967,68 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     if not df_foda.empty:
         story.append(Paragraph("2.3 Matriz FODA Cruzado", styles['Heading2Enhanced']))
         story.append(Paragraph(
-            "El análisis FODA cruzado identifica estrategias a partir de la combinación de "
+            "El analisis FODA cruzado identifica estrategias a partir de la combinacion de "
             "fortalezas, debilidades, oportunidades y amenazas.",
             styles['BodyTextEnhanced']
         ))
+        story.append(Spacer(1, 0.1*inch))
         
         datos_foda_resumen = [['Cuadrante', 'Factor Fila', 'Factor Columna', 'Impacto']]
         for _, row in df_foda.head(20).iterrows():
             datos_foda_resumen.append([
-                row['cuadrante'],
-                str(row['factor_fila'])[:30] + '...' if len(str(row['factor_fila'])) > 30 else str(row['factor_fila']),
-                str(row['factor_columna'])[:30] + '...' if len(str(row['factor_columna'])) > 30 else str(row['factor_columna']),
-                str(row['impacto'])
+                limpiar_para_paragraph(str(row.get('cuadrante', ''))),
+                limpiar_para_paragraph(str(row.get('factor_fila', '')))[:30] + '...' if len(str(row.get('factor_fila', ''))) > 30 else limpiar_para_paragraph(str(row.get('factor_fila', ''))),
+                limpiar_para_paragraph(str(row.get('factor_columna', '')))[:30] + '...' if len(str(row.get('factor_columna', ''))) > 30 else limpiar_para_paragraph(str(row.get('factor_columna', ''))),
+                str(row.get('impacto', ''))
             ])
         
-        tabla_foda = create_table_pdf(datos_foda_resumen, col_widths=[1*inch, 2.5*inch, 2.5*inch, 0.8*inch])
+        tabla_foda = create_professional_table(datos_foda_resumen, col_widths=[1*inch, 2.5*inch, 2.5*inch, 0.8*inch])
         story.append(tabla_foda)
-        story.append(Spacer(1, 0.1*inch))
+        story.append(Spacer(1, 0.15*inch))
         
-        # Gráfico FODA
+        # Grafico FODA
         if puntajes_foda is not None and not puntajes_foda.empty:
             grafico_foda = generar_grafico_foda_radar_mejorado(puntajes_foda)
             if grafico_foda:
                 story.append(Image(grafico_foda, width=4*inch, height=4*inch))
                 story.append(Paragraph(
-                    "<i>Figura 2.2. Posicionamiento estratégico según FODA cruzado.</i>",
+                    "<i>Figura 2.2. Posicionamiento estrategico segun FODA cruzado.</i>",
                     ParagraphStyle(name='Caption', parent=styles['BodyTextEnhanced'], alignment=TA_CENTER, fontSize=10, firstLineIndent=0)
                 ))
+                story.append(Spacer(1, 0.1*inch))
         
-        # Postura estratégica
+        # Postura estrategica
         if analisis_foda_df is not None:
-            story.append(Paragraph("Postura Estratégica Recomendada", styles['Heading3Enhanced']))
+            story.append(Paragraph("Postura Estrategica Recomendada", styles['Heading3Enhanced']))
             story.append(Paragraph(
-                f"Basado en el análisis cruzado, la estrategia principal recomendada es "
-                f"<b>{estrategia_principal}</b>. La distribución de puntajes por estrategia es:",
+                f"Basado en el analisis cruzado, la estrategia principal recomendada es "
+                f"<b>{estrategia_principal}</b>. La distribucion de puntajes por estrategia es:",
                 styles['BodyTextEnhanced']
             ))
+            story.append(Spacer(1, 0.1*inch))
             
             datos_postura = [['Estrategia', 'Puntaje Total']]
             for _, row in analisis_foda_df.iterrows():
-                datos_postura.append([row['Estrategia'], str(row['Puntaje Total'])])
+                datos_postura.append([
+                    limpiar_para_paragraph(str(row['Estrategia'])),
+                    str(row['Puntaje Total'])
+                ])
             
-            tabla_postura = create_table_pdf(datos_postura, col_widths=[3*inch, 2*inch])
+            tabla_postura = create_professional_table(datos_postura, col_widths=[3*inch, 2*inch])
             story.append(tabla_postura)
+            story.append(Spacer(1, 0.15*inch))
         
+        # Analisis de IA con formato estructurado
         analisis_foda_texto = empresa.get('analisis_foda', '')
-        if analisis_foda_texto:
-            story.append(Paragraph("Interpretación del Análisis FODA", styles['Heading3Enhanced']))
-            story.append(Paragraph(analisis_foda_texto, styles['BodyTextEnhanced']))
+        agregar_analisis_estructurado(
+            story, 
+            "Interpretacion del Analisis FODA", 
+            analisis_foda_texto, 
+            styles
+        )
     
     story.append(PageBreak())
+    
     
     # 3. ESTRATEGIAS
     story.append(Paragraph("3. ESTRATEGIAS", styles['Heading1Enhanced']))
@@ -1959,10 +2122,40 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         story.append(PageBreak())
     
     # 4.2 Planes Funcionales Detallados (si existe análisis guardado)
+    # Planes Maestros con formato estructurado
     planes_maestros = empresa.get('analisis_operativo', '')
-    if planes_maestros and planes_maestros != planes_contenido:
-        story.append(Paragraph("4.2 Análisis Operativo Adicional", styles['Heading2Enhanced']))
-        story.append(Paragraph(planes_maestros, styles['BodyTextEnhanced']))
+    if planes_maestros and str(planes_maestros).strip():
+        story.append(Paragraph("4.2 Planes Funcionales Detallados", styles['Heading2Enhanced']))
+        story.append(Spacer(1, 0.1*inch))
+        
+        # Los planes maestros son muy largos, dividir en secciones si es posible
+        try:
+            # Intentar dividir por los 7 planes si estan marcados
+            secciones_planes = re.split(r'\n(?=\d+\.\s+PLAN\s+)', str(planes_maestros))
+            
+            if len(secciones_planes) > 1:
+                # Hay secciones claramente divididas
+                for seccion in secciones_planes:
+                    if seccion.strip():
+                        elementos_plan = parsear_texto_a_story(seccion, styles)
+                        for elem in elementos_plan:
+                            story.append(elem)
+                        story.append(Spacer(1, 0.1*inch))
+            else:
+                # No hay division clara, parsear todo junto
+                elementos_planes = parsear_texto_a_story(planes_maestros, styles)
+                for elem in elementos_planes:
+                    story.append(elem)
+                    
+        except Exception as e:
+            # Fallback: texto plano
+            print(f"Error parseando planes maestros: {e}")
+            texto_planes = limpiar_para_paragraph(planes_maestros, max_length=2000)
+            # Dividir en chunks si es muy largo
+            chunks = [texto_planes[i:i+500] for i in range(0, len(texto_planes), 500)]
+            for chunk in chunks:
+                story.append(Paragraph(chunk, styles['BodyTextEnhanced']))
+                story.append(Spacer(1, 0.05*inch))
         story.append(PageBreak())
     
     # 4.3 Operativización (Cuadro de Operativización)
@@ -5260,6 +5453,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
