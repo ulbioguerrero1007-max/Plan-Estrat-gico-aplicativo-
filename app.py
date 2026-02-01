@@ -62,6 +62,76 @@ class Typography:
     LEADING_H3 = 14
     LEADING_BODY = 14
 
+def formatear_contenido_plan(contenido, styles):
+    """
+    Convierte el contenido estructurado de un plan en elementos PDF bien formateados.
+    Detecta numerales, viñetas y jerarquía automáticamente.
+    """
+    import re
+    from reportlab.platypus import Paragraph, Spacer
+    from reportlab.lib.units import inch
+    
+    story = []
+    lineas = contenido.split('\n')
+    i = 0
+    
+    while i < len(lineas):
+        linea = lineas[i].rstrip()
+        
+        # Saltar líneas vacías al inicio de secciones
+        if not linea.strip():
+            story.append(Spacer(1, 0.05*inch))
+            i += 1
+            continue
+        
+        # Detectar títulos de sección principal (1., 2., 3., etc.)
+        if re.match(r'^\d+\.\s+[A-ZÁÉÍÓÚÑ]', linea):
+            story.append(Paragraph(linea, styles['Heading2Enhanced']))
+            story.append(Spacer(1, 0.08*inch))
+            
+        # Detectar subtítulos (1.1, 1.2, etc.)
+        elif re.match(r'^\d+\.\d+\s+', linea):
+            story.append(Paragraph(linea, styles['Heading3Enhanced']))
+            story.append(Spacer(1, 0.05*inch))
+            
+        # Detectar letras de estrategia (A., B., C., D.)
+        elif re.match(r'^[A-D]\.\s+', linea.strip()):
+            story.append(Paragraph(linea.strip(), styles['Heading3Enhanced']))
+            
+        # Detectar viñetas (•, -, *)
+        elif linea.strip().startswith('•') or linea.strip().startswith('-') or linea.strip().startswith('*'):
+            viñeta_texto = linea.strip()[1:].strip()
+            
+            # Buscar continuación de la viñeta (líneas siguientes indentadas)
+            j = i + 1
+            while j < len(lineas):
+                siguiente = lineas[j]
+                # Si la siguiente línea está indentada o es sub-item, es continuación
+                if siguiente.startswith('       -') or siguiente.startswith('        -'):
+                    viñeta_texto += "<br/>" + "&nbsp;" * 6 + "• " + siguiente.replace('       -', '').replace('        -', '').strip()
+                    j += 1
+                elif siguiente.startswith('    ') and len(siguiente.strip()) > 0:
+                    viñeta_texto += " " + siguiente.strip()
+                    j += 1
+                else:
+                    break
+            
+            story.append(Paragraph("• " + viñeta_texto, styles['APA_List']))
+            i = j - 1  # Saltar líneas procesadas
+            
+        # Detectar sub-items indentados con guión
+        elif linea.startswith('       -') or linea.startswith('        -'):
+            texto = linea.replace('       -', '').replace('        -', '').strip()
+            story.append(Paragraph("&nbsp;" * 6 + "• " + texto, styles['APA_List']))
+            
+        # Texto normal (párrafo)
+        elif len(linea.strip()) > 5:
+            story.append(Paragraph(linea.strip(), styles['BodyTextEnhanced']))
+            
+        i += 1
+    
+    return story
+
 def get_ia_client():
     api_key = st.secrets.get("GEMINI_API_KEY")
     if not api_key:
@@ -1677,16 +1747,55 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     ))
     story.append(Spacer(1, 0.2*inch))
     
-    # 4.1 Planes Funcionales
+# 4.1 Planes Funcionales
     story.append(Paragraph("4.1 Planes Funcionales Estratégicos", styles['Heading2Enhanced']))
+    story.append(Spacer(1, 0.1*inch))
     
-    planes = generar_planes_por_plantilla(estrategia_principal, pest_total)
+    # Generar planes con nueva función (ahora con soporte IA)
+    planes_resultado = generar_planes_por_plantilla(estrategia_principal, pest_total, empresa_id)
     
-    for nombre_plan, datos_plan in planes.items():
-        story.append(Paragraph(f"4.1.{list(planes.keys()).index(nombre_plan) + 1} {nombre_plan}", styles['Heading3Enhanced']))
-        story.append(Paragraph(datos_plan['introduccion'], styles['BodyTextEnhanced']))
-        story.append(Paragraph(f"<b>Objetivo:</b> {datos_plan['objetivo']}", styles['BodyTextEnhanced']))
-        story.append(Spacer(1, 0.1*inch))
+    # Caso 1: Si viene string de IA (formato === PLAN X ===)
+    if isinstance(planes_resultado, str):
+        # Dividir por los separadores === PLAN ... ===
+        import re
+        patron = r'={2,}\s*(\d+\.\s+PLAN\s+[A-ZÁÉÍÓÚÑa-záéíóúñ\s]+)\s*={2,}'
+        secciones = re.split(patron, planes_resultado)
+        
+        if len(secciones) > 1:
+            for i in range(1, len(secciones), 2):
+                if i < len(secciones):
+                    titulo_plan = secciones[i].strip()
+                    contenido_plan = secciones[i+1] if i+1 < len(secciones) else ""
+                    
+                    # Agregar título como Heading 1
+                    story.append(Paragraph(titulo_plan, styles['Heading1Enhanced']))
+                    story.append(Spacer(1, 0.15*inch))
+                    
+                    # Formatear contenido con la nueva función
+                    elementos_plan = formatear_contenido_plan(contenido_plan, styles)
+                    story.extend(elementos_plan)
+                    
+                    story.append(PageBreak())
+        else:
+            # Si no se detectaron separadores, mostrar como texto plano
+            story.append(Paragraph(planes_resultado, styles['BodyTextEnhanced']))
+    
+    # Caso 2: Si viene dict de plantillas (fallback)
+    elif isinstance(planes_resultado, dict):
+        for idx, (nombre_plan, contenido_plan) in enumerate(planes_resultado.items(), 1):
+            # Título del plan
+            story.append(Paragraph(f"4.1.{idx} {nombre_plan.upper()}", styles['Heading1Enhanced']))
+            story.append(Spacer(1, 0.15*inch))
+            
+            # Formatear contenido
+            elementos_plan = formatear_contenido_plan(contenido_plan, styles)
+            story.extend(elementos_plan)
+            
+            story.append(PageBreak())
+    
+    # Caso 3: Error o formato no reconocido
+    else:
+        story.append(Paragraph("Error al generar planes funcionales.", styles['BodyTextEnhanced']))
     
     # Análisis de planes maestros si existe
     planes_maestros = empresa.get('analisis_operativo', '')
@@ -4977,4 +5086,5 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
