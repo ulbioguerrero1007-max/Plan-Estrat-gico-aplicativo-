@@ -2557,7 +2557,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         return None
         
 
-def generar_word_completo(empresa_id, version, elaborado, revisado, aprobado):
+def generar_word_completo_mejorada(empresa_id, version, elaborado, revisado, aprobado):
     """
     Genera el documento Word completo con formato profesional
     """
@@ -2719,6 +2719,1224 @@ def generar_word_completo(empresa_id, version, elaborado, revisado, aprobado):
     
     # Guardar en buffer
     word_buffer = io.BytesIO()
+    doc.save(word_buffer)
+    word_buffer.seek(0)
+    return word_buffer
+
+def generar_word_completo_mejorado(empresa_id, version, elaborado, revisado, aprobado):
+    """
+    Genera el documento Word completo con el mismo diseño profesional que el PDF.
+    Incluye encabezados/pies de página, colores corporativos, tablas estilizadas y gráficos.
+    """
+    from docx import Document
+    from docx.shared import Inches, Pt, RGBColor, Cm
+    from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
+    from docx.enum.table import WD_TABLE_ALIGNMENT, WD_CELL_VERTICAL_ALIGNMENT
+    from docx.enum.style import WD_STYLE_TYPE
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+    from io import BytesIO
+    from datetime import datetime
+    
+    empresa = get_datos_empresa(empresa_id)
+    if not empresa:
+        return None
+    
+    # Obtener todos los datos necesarios (igual que en PDF)
+    df_pest = get_datos_tabla('matrices', empresa_id, tipo_matriz_filter='PEST')
+    df_foda = get_datos_tabla('foda_cruzado', empresa_id)
+    df_estrategias = get_datos_tabla('estrategias_generadas', empresa_id)
+    df_oper = get_datos_tabla('operativizacion', empresa_id)
+    df_pg = get_datos_tabla('perdida_ganancia', empresa_id)
+    df_proy = get_datos_tabla('proyeccion_financiera', empresa_id)
+    df_cb = get_datos_tabla('analisis_costo_beneficio', empresa_id)
+    df_made = get_datos_tabla('matriz_marketing', empresa_id, tipo_matriz_filter='MADE')
+    df_madi = get_datos_tabla('matriz_marketing', empresa_id, tipo_matriz_filter='MADI')
+    
+    # Calcular análisis FODA
+    analisis_foda_df, resumen_foda, estrategia_principal, puntajes_foda = analizar_foda(df_foda)
+    pest_total = df_pest['valor_ponderado'].sum() if not df_pest.empty else 0
+    total_costo = pd.to_numeric(df_oper['costo'], errors='coerce').fillna(0).sum() if not df_oper.empty else 0
+    
+    fecha_actual = datetime.now().strftime('%d/%m/%Y')
+    
+    # Crear documento
+    doc = Document()
+    
+    # Configurar márgenes (1 pulgada = 2.54 cm en todos los lados - formato APA)
+    sections = doc.sections
+    for section in sections:
+        section.top_margin = Cm(2.54)
+        section.bottom_margin = Cm(2.54)
+        section.left_margin = Cm(2.54)
+        section.right_margin = Cm(2.54)
+    
+    # =========================================================================
+    # CONFIGURAR ESTILOS PERSONALIZADOS (Colores corporativos)
+    # =========================================================================
+    
+    # Colores corporativos
+    COLOR_PRIMARY = RGBColor(30, 58, 95)      # Azul marino #1e3a5f
+    COLOR_SECONDARY = RGBColor(201, 162, 39)  # Dorado #c9a227
+    COLOR_TEXT = RGBColor(31, 41, 55)         # Gris oscuro #1f2937
+    COLOR_WHITE = RGBColor(255, 255, 255)
+    
+    # Modificar estilo Normal
+    style_normal = doc.styles['Normal']
+    style_normal.font.name = 'Helvetica'
+    style_normal.font.size = Pt(11)
+    style_normal.font.color.rgb = COLOR_TEXT
+    
+    # Crear/Modificar estilos de título
+    def set_heading_style(doc, level, font_size, color, bold=True):
+        """Configura estilo de título"""
+        style_name = f'Heading {level}'
+        try:
+            style = doc.styles[style_name]
+        except KeyError:
+            style = doc.styles.add_style(style_name, WD_STYLE_TYPE.PARAGRAPH)
+        
+        style.font.name = 'Helvetica'
+        style.font.size = Pt(font_size)
+        style.font.color.rgb = color
+        style.font.bold = bold
+        style.paragraph_format.space_before = Pt(12 if level > 1 else 24)
+        style.paragraph_format.space_after = Pt(6)
+        style.paragraph_format.keep_with_next = True
+        return style
+    
+    # Configurar jerarquía de títulos
+    set_heading_style(doc, 1, 16, COLOR_PRIMARY)      # Título principal
+    set_heading_style(doc, 2, 14, COLOR_PRIMARY)      # Secciones
+    set_heading_style(doc, 3, 12, COLOR_TEXT)         # Subsecciones
+    set_heading_style(doc, 4, 11, COLOR_TEXT, bold=True)  # Sub-subsecciones
+    
+    # =========================================================================
+    # FUNCIONES AUXILIARES PARA FORMATO
+    # =========================================================================
+    
+    def add_custom_heading(doc, text, level=1):
+        """Agrega título con formato personalizado"""
+        p = doc.add_heading(text, level=level)
+        p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        return p
+    
+    def add_formatted_paragraph(doc, text, bold=False, italic=False, alignment=WD_ALIGN_PARAGRAPH.JUSTIFY):
+        """Agrega párrafo con formato"""
+        p = doc.add_paragraph()
+        run = p.add_run(text)
+        run.font.name = 'Helvetica'
+        run.font.size = Pt(11)
+        run.font.color.rgb = COLOR_TEXT
+        run.bold = bold
+        run.italic = italic
+        p.alignment = alignment
+        p.paragraph_format.first_line_indent = Cm(1.25) if alignment == WD_ALIGN_PARAGRAPH.JUSTIFY else Cm(0)
+        p.paragraph_format.space_after = Pt(8)
+        return p
+    
+    def add_bullet_point(doc, text, indent_level=0):
+        """Agrega viñeta con formato"""
+        p = doc.add_paragraph(style='List Bullet')
+        p.paragraph_format.left_indent = Cm(1.25 + (indent_level * 0.5))
+        p.paragraph_format.first_line_indent = Cm(-0.5)
+        run = p.add_run(text)
+        run.font.name = 'Helvetica'
+        run.font.size = Pt(11)
+        run.font.color.rgb = COLOR_TEXT
+        return p
+    
+    def set_cell_shading(cell, color):
+        """Aplica color de fondo a celda"""
+        shading_elm = OxmlElement('w:shd')
+        shading_elm.set(qn('w:fill'), color)
+        cell._tc.get_or_add_tcPr().append(shading_elm)
+    
+    def set_cell_border(cell, **kwargs):
+        """Configura bordes de celda"""
+        tc = cell._tc
+        tcPr = tc.get_or_add_tcPr()
+        tcBorders = OxmlElement('w:tcBorders')
+        
+        for edge in ('top', 'left', 'bottom', 'right'):
+            edge_data = kwargs.get(edge)
+            if edge_data:
+                tag = f'w:{edge}'
+                element = OxmlElement(tag)
+                for key in ["sz", "val", "color", "space"]:
+                    if key in edge_data:
+                        element.set(qn(f'w:{key}'), str(edge_data[key]))
+                tcBorders.append(element)
+        
+        tcPr.append(tcBorders)
+    
+    def create_professional_table(doc, headers, data, col_widths=None):
+        """Crea tabla con estilo profesional"""
+        table = doc.add_table(rows=1, cols=len(headers))
+        table.style = 'Table Grid'
+        
+        # Configurar ancho de columnas si se especifica
+        if col_widths:
+            for i, width in enumerate(col_widths):
+                for cell in table.columns[i].cells:
+                    cell.width = Cm(width)
+        
+        # Encabezado con color corporativo
+        hdr_cells = table.rows[0].cells
+        for i, header in enumerate(headers):
+            hdr_cells[i].text = header
+            set_cell_shading(hdr_cells[i], '1e3a5f')  # Azul marino
+            set_cell_border(hdr_cells[i], 
+                          top={"sz": "12", "val": "single", "color": "1e3a5f"},
+                          bottom={"sz": "12", "val": "single", "color": "c9a227"})  # Línea dorada abajo
+            
+            # Formato texto encabezado
+            for paragraph in hdr_cells[i].paragraphs:
+                for run in paragraph.runs:
+                    run.font.name = 'Helvetica'
+                    run.font.size = Pt(10)
+                    run.font.bold = True
+                    run.font.color.rgb = COLOR_WHITE
+                paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        
+        # Datos
+        for row_data in data:
+            row_cells = table.add_row().cells
+            for i, cell_text in enumerate(row_data):
+                row_cells[i].text = str(cell_text)
+                # Alternar colores de fondo (zebra striping)
+                if len(table.rows) % 2 == 0:
+                    set_cell_shading(row_cells[i], 'f8fafc')  # Gris muy claro
+                
+                # Formato
+                for paragraph in row_cells[i].paragraphs:
+                    for run in paragraph.runs:
+                        run.font.name = 'Helvetica'
+                        run.font.size = Pt(9)
+                        run.font.color.rgb = COLOR_TEXT
+        
+        doc.add_paragraph()  # Espacio después de tabla
+        return table
+    
+    def add_page_break(doc):
+        """Agrega salto de página"""
+        doc.add_page_break()
+    
+    # =========================================================================
+    # ENCABEZADO Y PIE DE PÁGINA
+    # =========================================================================
+    
+    section = doc.sections[0]
+    
+    # Encabezado
+    header = section.header
+    header_para = header.paragraphs[0]
+    header_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    
+    # Tabla en encabezado para layout profesional
+    header_table = header.add_table(1, 3, width=Inches(6))
+    header_table.autofit = False
+    
+    # Celda izquierda: Logo (si existe)
+    logo_cell = header_table.rows[0].cells[0]
+    logo_cell.width = Inches(1)
+    
+    logo_bytes_data = empresa.get('logo')
+    if logo_bytes_data:
+        try:
+            if isinstance(logo_bytes_data, str):
+                import base64
+                logo_bytes = base64.b64decode(logo_bytes_data)
+            else:
+                logo_bytes = logo_bytes_data
+            
+            # Verificar que sea imagen válida
+            from PIL import Image as PILImage
+            test_img = PILImage.open(BytesIO(logo_bytes))
+            test_img.verify()
+            
+            logo_para = logo_cell.paragraphs[0]
+            logo_run = logo_para.add_run()
+            logo_run.add_picture(BytesIO(logo_bytes), width=Inches(0.8))
+            logo_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        except:
+            pass
+    
+    # Celda centro: Nombre empresa
+    center_cell = header_table.rows[0].cells[1]
+    center_cell.width = Inches(4)
+    center_para = center_cell.paragraphs[0]
+    center_run = center_para.add_run(empresa.get('nombre', 'EMPRESA').upper())
+    center_run.font.name = 'Helvetica'
+    center_run.font.size = Pt(12)
+    center_run.font.bold = True
+    center_run.font.color.rgb = COLOR_PRIMARY
+    center_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    
+    # Celda derecha: Versión y fecha
+    right_cell = header_table.rows[0].cells[2]
+    right_cell.width = Inches(1)
+    right_para = right_cell.paragraphs[0]
+    right_run = right_para.add_run(f"Versión {version}\n{fecha_actual}")
+    right_run.font.name = 'Helvetica'
+    right_run.font.size = Pt(8)
+    right_run.font.color.rgb = COLOR_TEXT
+    right_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    
+    # Línea decorativa debajo del encabezado
+    header_border = header.add_paragraph()
+    header_border.paragraph_format.space_before = Pt(2)
+    header_border_run = header_border.add_run("_" * 80)
+    header_border_run.font.color.rgb = COLOR_SECONDARY
+    
+    # Pie de página
+    footer = section.footer
+    footer_para = footer.paragraphs[0]
+    footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    
+    # Tabla en pie de página
+    footer_table = footer.add_table(1, 3, width=Inches(6))
+    
+    # Elaborado/Revisado/Aprobado
+    footer_table.rows[0].cells[0].text = f"Elaborado: {elaborado}"
+    footer_table.rows[0].cells[1].text = f"Revisado: {revisado}"
+    footer_table.rows[0].cells[2].text = f"Aprobado: {aprobado}"
+    
+    for cell in footer_table.rows[0].cells:
+        for paragraph in cell.paragraphs:
+            for run in paragraph.runs:
+                run.font.name = 'Helvetica'
+                run.font.size = Pt(8)
+                run.font.color.rgb = COLOR_TEXT
+            paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    
+    # Línea decorativa y número de página
+    footer_line = footer.add_paragraph()
+    footer_line_run = footer_line.add_run("─" * 30)
+    footer_line_run.font.color.rgb = COLOR_SECONDARY
+    footer_line.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    
+    page_num = footer.add_paragraph()
+    page_num_run = page_num.add_run("Página ")
+    page_num_run.font.name = 'Helvetica'
+    page_num_run.font.size = Pt(9)
+    page_num_run.font.bold = True
+    page_num_run.font.color.rgb = COLOR_PRIMARY
+    
+    # Agregar campo de número de página (se actualiza automáticamente en Word)
+    page_num_run2 = page_num.add_run()
+    fldChar1 = OxmlElement('w:fldChar')
+    fldChar1.set(qn('w:fldCharType'), 'begin')
+    
+    instrText = OxmlElement('w:instrText')
+    instrText.text = "PAGE"
+    
+    fldChar2 = OxmlElement('w:fldChar')
+    fldChar2.set(qn('w:fldCharType'), 'end')
+    
+    page_num_run2._r.append(fldChar1)
+    page_num_run2._r.append(instrText)
+    page_num_run2._r.append(fldChar2)
+    
+    page_num.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    
+    # =========================================================================
+    # CONTENIDO DEL DOCUMENTO
+    # =========================================================================
+    
+    # ============================================
+    # PARTE 1: RESUMEN EJECUTIVO
+    # ============================================
+    
+    add_custom_heading(doc, "RESUMEN EJECUTIVO", level=1)
+    
+    intro_text = (f"El presente documento constituye el Plan Estratégico de {empresa.get('nombre', 'la empresa')}, "
+                  f"elaborado con fecha {fecha_actual}. Este resumen ejecutivo presenta los hallazgos más relevantes "
+                  f"del diagnóstico estratégico y las recomendaciones prioritarias para la alta dirección.")
+    add_formatted_paragraph(doc, intro_text)
+    
+    # Diagnóstico clave
+    add_custom_heading(doc, "Diagnóstico Estratégico Clave", level=2)
+    
+    if estrategia_principal:
+        estrategia_text = (f"Estrategia Principal Recomendada: {estrategia_principal}. "
+                          f"Esta postura estratégica se determina a partir del análisis FODA cruzado y representa "
+                          f"la orientación prioritaria para el período de planificación.")
+        add_formatted_paragraph(doc, estrategia_text, bold=True)
+    
+    # Gráfico FODA (insertar imagen si existe)
+    if puntajes_foda is not None and not puntajes_foda.empty:
+        grafico_foda = generar_grafico_foda_radar_mejorado(puntajes_foda)
+        if grafico_foda:
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run = p.add_run()
+            run.add_picture(grafico_foda, width=Inches(3.5))
+            
+            caption = doc.add_paragraph()
+            caption.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            caption_run = caption.add_run("Figura 1. Posicionamiento estratégico según análisis FODA cruzado.")
+            caption_run.font.name = 'Helvetica'
+            caption_run.font.size = Pt(10)
+            caption_run.font.italic = True
+            caption_run.font.color.rgb = RGBColor(107, 114, 128)  # Gris
+    
+    # Análisis PEST resumido
+    if not df_pest.empty:
+        add_custom_heading(doc, "Factores Críticos del Entorno", level=2)
+        
+        pest_criticos = df_pest.nlargest(3, 'valor_ponderado')
+        for _, row in pest_criticos.iterrows():
+            add_bullet_point(doc, f"{row['categoria']}: {row['factor'][:100]}...")
+        
+        # Gráfico PEST
+        grafico_pest = generar_grafico_barras_pest_mejorado(df_pest)
+        if grafico_pest:
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run = p.add_run()
+            run.add_picture(grafico_pest, width=Inches(4))
+            
+            caption = doc.add_paragraph()
+            caption.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            caption_run = caption.add_run("Figura 2. Distribución de factores PEST por impacto.")
+            caption_run.font.name = 'Helvetica'
+            caption_run.font.size = Pt(10)
+            caption_run.font.italic = True
+            caption_run.font.color.rgb = RGBColor(107, 114, 128)
+    
+    # Estrategias priorizadas
+    if not df_estrategias.empty:
+        add_custom_heading(doc, "Estrategias Prioritarias", level=2)
+        
+        estrategias_alta = df_estrategias[df_estrategias['importancia'].isin(['Alta', 'Media Alta'])].head(5)
+        for _, row in estrategias_alta.iterrows():
+            add_bullet_point(doc, f"{row['cuadrante']} - {row['plan_asignado']}: {row['estrategia'][:150]}...")
+    
+    # Indicadores financieros
+    if not df_cb.empty:
+        add_custom_heading(doc, "Viabilidad Financiera", level=2)
+        
+        datos_cb = df_cb.iloc[0]
+        
+        # Tabla resumen financiero
+        headers = ['Indicador', 'Valor', 'Interpretación']
+        data = [
+            ['Relación Costo-Beneficio', f"{float(datos_cb['relacion_costo_beneficio_dolares']):.2f}", 
+             'Rentable' if datos_cb['relacion_costo_beneficio_dolares'] >= 1 else 'No rentable'],
+            ['Periodo de Recuperación', 
+             f"{float(datos_cb['payback_periodo_anios']):.1f} años" if datos_cb['payback_periodo_anios'] else 'N/A',
+             'Aceptable' if datos_cb['payback_periodo_anios'] and datos_cb['payback_periodo_anios'] <= 5 else 'Revisar'],
+            ['Inversión Total', f"${float(datos_cb['inversion_total']):,.2f}", 'Requerimiento de capital'],
+        ]
+        create_professional_table(doc, headers, data, col_widths=[5, 3.5, 4])
+        
+        # Gráfico de proyección
+        if not df_proy.empty:
+            grafico_proy = generar_grafico_proyeccion_mejorado(df_proy)
+            if grafico_proy:
+                p = doc.add_paragraph()
+                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                run = p.add_run()
+                run.add_picture(grafico_proy, width=Inches(5))
+                
+                caption = doc.add_paragraph()
+                caption.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                caption_run = caption.add_run("Figura 3. Proyección financiera del plan estratégico.")
+                caption_run.font.name = 'Helvetica'
+                caption_run.font.size = Pt(10)
+                caption_run.font.italic = True
+                caption_run.font.color.rgb = RGBColor(107, 114, 128)
+    
+    # Recomendación final
+    add_custom_heading(doc, "Recomendación Ejecutiva", level=2)
+    
+    if not df_cb.empty:
+        puntos_positivos = sum([
+            datos_cb['relacion_costo_beneficio_dolares'] >= 1,
+            datos_cb['payback_periodo_anios'] is not None and datos_cb['payback_periodo_anios'] <= 5,
+            datos_cb['relacion_cb_unidades'] >= 1
+        ])
+        
+        if puntos_positivos >= 2:
+            recomendacion = ("APROBAR EL PROYECTO. El análisis integral indica que el Plan Estratégico es "
+                           "viable financieramente y alineado con la posición competitiva de la empresa. "
+                           "Se recomienda iniciar la implementación priorizando las estrategias de alta importancia.")
+        elif puntos_positivos == 1:
+            recomendacion = ("EVALUAR CON PRECAUCIÓN. El proyecto presenta riesgos moderados. "
+                           "Se sugiere revisar los supuestos críticos y desarrollar planes de contingencia "
+                           "antes de aprobar la inversión total.")
+        else:
+            recomendacion = ("RECHAZAR O REPLANTEAR. El análisis revela riesgos significativos. "
+                           "Se recomienda revisar la estrategia, reducir el alcance inicial o buscar "
+                           "alternativas de menor inversión.")
+        
+        add_formatted_paragraph(doc, recomendacion, bold=True)
+    
+    add_page_break(doc)
+    
+    # ============================================
+    # PARTE 2: PLAN ESTRATÉGICO
+    # ============================================
+    
+    # Portada interna
+    doc.add_paragraph()
+    doc.add_paragraph()
+    title_para = doc.add_paragraph()
+    title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    title_run = title_para.add_run("PLAN ESTRATÉGICO")
+    title_run.font.name = 'Helvetica'
+    title_run.font.size = Pt(24)
+    title_run.font.bold = True
+    title_run.font.color.rgb = COLOR_PRIMARY
+    
+    doc.add_paragraph()
+    empresa_para = doc.add_paragraph()
+    empresa_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    empresa_run = empresa_para.add_run(empresa.get('nombre', 'EMPRESA').upper())
+    empresa_run.font.name = 'Helvetica'
+    empresa_run.font.size = Pt(18)
+    empresa_run.font.bold = True
+    empresa_run.font.color.rgb = COLOR_PRIMARY
+    
+    doc.add_paragraph()
+    doc.add_paragraph()
+    
+    # Logo grande si existe
+    if logo_bytes_data:
+        try:
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run = p.add_run()
+            run.add_picture(BytesIO(logo_bytes), width=Inches(2))
+        except:
+            pass
+    
+    doc.add_paragraph()
+    doc.add_paragraph()
+    
+    # Metadatos
+    meta_data = [
+        f"Versión: {version}",
+        f"Fecha: {fecha_actual}",
+        f"Elaborado por: {elaborado}",
+        f"Revisado por: {revisado}",
+        f"Aprobado por: {aprobado}"
+    ]
+    
+    for meta in meta_data:
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = p.add_run(meta)
+        run.font.name = 'Helvetica'
+        run.font.size = Pt(11)
+        run.font.color.rgb = COLOR_TEXT
+    
+    add_page_break(doc)
+    
+    # 1. INTRODUCCIÓN Y FUNDAMENTOS
+    add_custom_heading(doc, "1. INTRODUCCIÓN Y FUNDAMENTOS", level=1)
+    
+    add_custom_heading(doc, "1.1 Datos Generales de la Empresa", level=2)
+    
+    headers = ['Campo', 'Información']
+    data = [
+        ['Nombre de la Empresa', empresa.get('nombre', 'N/A')],
+        ['Giro del Negocio', empresa.get('giro', 'N/A')],
+        ['Fecha del Plan', fecha_actual],
+        ['Versión del Documento', version],
+    ]
+    create_professional_table(doc, headers, data, col_widths=[5, 7])
+    
+    # Logo
+    if logo_bytes_data:
+        try:
+            add_custom_heading(doc, "Logo de la Empresa", level=3)
+            p = doc.add_paragraph()
+            run = p.add_run()
+            run.add_picture(BytesIO(logo_bytes), width=Inches(2))
+        except:
+            pass
+    
+    # 1.2 Cultura Organizacional
+    add_custom_heading(doc, "1.2 Elementos Orientadores de la Cultura Organizacional", level=2)
+    
+    if empresa.get('mision'):
+        add_custom_heading(doc, "Misión", level=3)
+        add_formatted_paragraph(doc, empresa['mision'])
+    
+    if empresa.get('vision'):
+        add_custom_heading(doc, "Visión", level=3)
+        add_formatted_paragraph(doc, empresa['vision'])
+    
+    if empresa.get('valores'):
+        add_custom_heading(doc, "Valores y Principios", level=3)
+        valores = empresa['valores']
+        if len(valores) > 200:
+            lineas_valores = [v.strip() for v in valores.replace('\n', ',').split(',') if v.strip()]
+            for val in lineas_valores[:5]:
+                add_bullet_point(doc, val)
+        else:
+            add_formatted_paragraph(doc, valores)
+    
+    if empresa.get('objetivo_plan'):
+        add_custom_heading(doc, "Objetivo del Plan Estratégico", level=3)
+        add_formatted_paragraph(doc, empresa['objetivo_plan'])
+    
+    # Organigrama
+    organigrama_bytes = None
+    org_bytes_data = empresa.get('organigrama')
+    if org_bytes_data:
+        try:
+            if isinstance(org_bytes_data, str):
+                import base64
+                organigrama_bytes = base64.b64decode(org_bytes_data)
+            else:
+                organigrama_bytes = org_bytes_data
+            
+            from PIL import Image as PILImage
+            test_img = PILImage.open(BytesIO(organigrama_bytes))
+            test_img.verify()
+            
+            add_custom_heading(doc, "1.3 Organigrama de la Empresa", level=2)
+            p = doc.add_paragraph()
+            run = p.add_run()
+            run.add_picture(BytesIO(organigrama_bytes), width=Inches(6))
+            
+            caption = doc.add_paragraph()
+            caption.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            caption_run = caption.add_run("Figura 1.1. Estructura organizacional de la empresa.")
+            caption_run.font.name = 'Helvetica'
+            caption_run.font.size = Pt(10)
+            caption_run.font.italic = True
+            caption_run.font.color.rgb = RGBColor(107, 114, 128)
+        except Exception as e:
+            add_custom_heading(doc, "1.3 Organigrama de la Empresa", level=2)
+            add_formatted_paragraph(doc, "[El organigrama no pudo ser cargado - formato de imagen no válido]")
+    
+    add_page_break(doc)
+    
+    # 2. ANÁLISIS SITUACIONAL
+    add_custom_heading(doc, "2. ANÁLISIS SITUACIONAL", level=1)
+    add_formatted_paragraph(doc, 
+        "El análisis situacional examina tanto los factores internos como externos que afectan "
+        "a la organización, permitiendo identificar fortalezas, debilidades, oportunidades y amenazas.")
+    
+    # 2.1 Diagnóstico Interno
+    add_custom_heading(doc, "2.1 Diagnóstico Interno", level=2)
+    
+    if not df_made.empty:
+        add_custom_heading(doc, "2.1.1 Análisis de Marketing Interno (MADE)", level=3)
+        add_formatted_paragraph(doc, 
+            "La matriz MADE evalúa las variables internas de marketing: Producto, Precio, Plaza y Promoción.")
+        
+        # Tabla resumen MADE
+        headers = ['Variable', 'Factor', 'Rating', 'Ponderación']
+        data = []
+        for _, row in df_made.head(10).iterrows():
+            data.append([
+                str(row.get('variable', ''))[:20],
+                str(row.get('factor', ''))[:30],
+                str(row.get('rating', '')),
+                f"{row.get('weight_percent', '')}%"
+            ])
+        create_professional_table(doc, headers, data, col_widths=[3, 6, 2, 2.5])
+        
+        # Análisis de IA
+        analisis_made = empresa.get('analisis_made', '')
+        if analisis_made:
+            add_custom_heading(doc, "Análisis de Marketing Interno", level=3)
+            # Parsear y agregar contenido estructurado
+            for linea in str(analisis_made).split('\n'):
+                if linea.strip():
+                    if linea.strip().startswith('-') or linea.strip().startswith('•'):
+                        add_bullet_point(doc, linea.strip()[1:].strip())
+                    elif linea[0].isdigit() and '.' in linea[:3]:
+                        add_custom_heading(doc, linea.strip(), level=4)
+                    else:
+                        add_formatted_paragraph(doc, linea.strip())
+    
+    # 2.2 Diagnóstico Externo
+    add_custom_heading(doc, "2.2 Diagnóstico Externo", level=2)
+    
+    if not df_madi.empty:
+        add_custom_heading(doc, "2.2.1 Análisis de Marketing Externo (MADI)", level=3)
+        add_formatted_paragraph(doc, 
+            "La matriz MADI evalúa las variables externas de marketing que impactan en la posición competitiva.")
+        
+        headers = ['Variable', 'Factor', 'Rating', 'Ponderación']
+        data = []
+        for _, row in df_madi.head(10).iterrows():
+            data.append([
+                str(row.get('variable', ''))[:20],
+                str(row.get('factor', ''))[:30],
+                str(row.get('rating', '')),
+                f"{row.get('weight_percent', '')}%"
+            ])
+        create_professional_table(doc, headers, data, col_widths=[3, 6, 2, 2.5])
+        
+        analisis_madi = empresa.get('analisis_madi', '')
+        if analisis_madi:
+            add_custom_heading(doc, "Análisis de Marketing Externo", level=3)
+            for linea in str(analisis_madi).split('\n'):
+                if linea.strip():
+                    if linea.strip().startswith('-') or linea.strip().startswith('•'):
+                        add_bullet_point(doc, linea.strip()[1:].strip())
+                    elif linea[0].isdigit() and '.' in linea[:3]:
+                        add_custom_heading(doc, linea.strip(), level=4)
+                    else:
+                        add_formatted_paragraph(doc, linea.strip())
+    
+    # Análisis PEST
+    if not df_pest.empty:
+        add_custom_heading(doc, "2.2.2 Análisis del Entorno PEST", level=3)
+        add_formatted_paragraph(doc, 
+            "El análisis PEST examina los factores Políticos, Económicos, Sociales y Tecnológicos.")
+        
+        headers = ['Categoría', 'Factor', 'Tipo FODA', 'Puntaje', 'Ponderado']
+        data = []
+        for _, row in df_pest.head(15).iterrows():
+            factor_text = str(row.get('factor', ''))
+            data.append([
+                str(row.get('categoria', '')),
+                (factor_text[:35] + '...') if len(factor_text) > 35 else factor_text,
+                str(row.get('tipo_foda', '')),
+                str(row.get('puntaje', '')),
+                f"{row.get('valor_ponderado', 0):.2f}"
+            ])
+        create_professional_table(doc, headers, data, col_widths=[2.5, 6, 2, 1.5, 2])
+        
+        # Gráfico PEST
+        grafico_pest = generar_grafico_barras_pest_mejorado(df_pest)
+        if grafico_pest:
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run = p.add_run()
+            run.add_picture(grafico_pest, width=Inches(5))
+            
+            caption = doc.add_paragraph()
+            caption.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            caption_run = caption.add_run("Figura 2.1. Análisis PEST - Distribución por categoría.")
+            caption_run.font.name = 'Helvetica'
+            caption_run.font.size = Pt(10)
+            caption_run.font.italic = True
+            caption_run.font.color.rgb = RGBColor(107, 114, 128)
+        
+        analisis_pest = empresa.get('analisis_pest', '')
+        if analisis_pest:
+            add_custom_heading(doc, "Interpretación del Análisis PEST", level=3)
+            for linea in str(analisis_pest).split('\n'):
+                if linea.strip():
+                    if linea.strip().startswith('-') or linea.strip().startswith('•'):
+                        add_bullet_point(doc, linea.strip()[1:].strip())
+                    elif linea[0].isdigit() and '.' in linea[:3]:
+                        add_custom_heading(doc, linea.strip(), level=4)
+                    else:
+                        add_formatted_paragraph(doc, linea.strip())
+    
+    # Matriz FODA Cruzado
+    if not df_foda.empty:
+        add_custom_heading(doc, "2.3 Matriz FODA Cruzado", level=2)
+        add_formatted_paragraph(doc, 
+            "El análisis FODA cruzado identifica estrategias a partir de la combinación de "
+            "fortalezas, debilidades, oportunidades y amenazas.")
+        
+        headers = ['Cuadrante', 'Factor Fila', 'Factor Columna', 'Impacto']
+        data = []
+        for _, row in df_foda.head(20).iterrows():
+            data.append([
+                str(row.get('cuadrante', '')),
+                str(row.get('factor_fila', ''))[:30] + ('...' if len(str(row.get('factor_fila', ''))) > 30 else ''),
+                str(row.get('factor_columna', ''))[:30] + ('...' if len(str(row.get('factor_columna', ''))) > 30 else ''),
+                str(row.get('impacto', ''))
+            ])
+        create_professional_table(doc, headers, data, col_widths=[2.5, 5, 5, 1.5])
+        
+        # Gráfico FODA
+        if puntajes_foda is not None and not puntajes_foda.empty:
+            grafico_foda = generar_grafico_foda_radar_mejorado(puntajes_foda)
+            if grafico_foda:
+                p = doc.add_paragraph()
+                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                run = p.add_run()
+                run.add_picture(grafico_foda, width=Inches(4))
+                
+                caption = doc.add_paragraph()
+                caption.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                caption_run = caption.add_run("Figura 2.2. Posicionamiento estratégico según FODA cruzado.")
+                caption_run.font.name = 'Helvetica'
+                caption_run.font.size = Pt(10)
+                caption_run.font.italic = True
+                caption_run.font.color.rgb = RGBColor(107, 114, 128)
+        
+        # Postura estratégica
+        if analisis_foda_df is not None:
+            add_custom_heading(doc, "Postura Estratégica Recomendada", level=3)
+            postura_text = (f"Basado en el análisis cruzado, la estrategia principal recomendada es "
+                          f"{estrategia_principal}. La distribución de puntajes por estrategia es:")
+            add_formatted_paragraph(doc, postura_text, bold=True)
+            
+            headers = ['Estrategia', 'Puntaje Total']
+            data = []
+            for _, row in analisis_foda_df.iterrows():
+                data.append([str(row['Estrategia']), str(row['Puntaje Total'])])
+            create_professional_table(doc, headers, data, col_widths=[7.5, 2.5])
+        
+        analisis_foda_texto = empresa.get('analisis_foda', '')
+        if analisis_foda_texto:
+            add_custom_heading(doc, "Interpretación del Análisis FODA", level=3)
+            for linea in str(analisis_foda_texto).split('\n'):
+                if linea.strip():
+                    if linea.strip().startswith('-') or linea.strip().startswith('•'):
+                        add_bullet_point(doc, linea.strip()[1:].strip())
+                    elif linea[0].isdigit() and '.' in linea[:3]:
+                        add_custom_heading(doc, linea.strip(), level=4)
+                    else:
+                        add_formatted_paragraph(doc, linea.strip())
+    
+    add_page_break(doc)
+    
+    # 3. ESTRATEGIAS
+    add_custom_heading(doc, "3. ESTRATEGIAS", level=1)
+    add_formatted_paragraph(doc, 
+        "Las estrategias representan las acciones específicas diseñadas para alcanzar los objetivos "
+        "organizacionales, derivadas del análisis situacional.")
+    
+    if not df_estrategias.empty:
+        estrategia_intro = (f"Se han formulado {len(df_estrategias)} estrategias distribuidas en los cuatro cuadrantes "
+                          f"del análisis FODA cruzado. La estrategia principal recomendada es {estrategia_principal}.")
+        add_formatted_paragraph(doc, estrategia_intro)
+        
+        add_custom_heading(doc, "3.1 Resumen de Estrategias por Cuadrante", level=2)
+        
+        resumen_est = df_estrategias.groupby('cuadrante').agg({
+            'estrategia': 'count',
+            'plan_asignado': lambda x: ', '.join(x.unique())
+        }).reset_index()
+        resumen_est.columns = ['Cuadrante', 'N° Estrategias', 'Planes Asignados']
+        
+        headers = ['Cuadrante', 'N° Estrategias', 'Planes Asignados']
+        data = []
+        for _, row in resumen_est.iterrows():
+            data.append([row['Cuadrante'], str(row['N° Estrategias']), row['Planes Asignados']])
+        create_professional_table(doc, headers, data, col_widths=[3, 3, 6])
+        
+        add_custom_heading(doc, "3.2 Estrategias Detalladas", level=2)
+        
+        for idx, row in df_estrategias.iterrows():
+            add_custom_heading(doc, f"Estrategia {idx + 1}: [{row['cuadrante']}] {row['estrategia']}", level=3)
+            add_formatted_paragraph(doc, f"Plan asignado: {row['plan_asignado']}", bold=False)
+            add_formatted_paragraph(doc, f"Importancia: {row['importancia']}", bold=False)
+            add_formatted_paragraph(doc, f"Actividades clave: {row['actividades']}")
+    else:
+        add_formatted_paragraph(doc, "No se han generado estrategias en el sistema.")
+    
+    add_page_break(doc)
+    
+    # 4. PLAN DE ACCIÓN
+    add_custom_heading(doc, "4. PLAN DE ACCIÓN", level=1)
+    add_formatted_paragraph(doc, 
+        "El plan de acción detalla las actividades específicas, responsables, tiempos y recursos "
+        "necesarios para implementar las estrategias formuladas.")
+    
+    # Planes Maestros
+    planes_maestros = empresa.get('analisis_operativo', '')
+    if planes_maestros and str(planes_maestros).strip():
+        add_custom_heading(doc, "4.1 Planes Funcionales Detallados", level=2)
+        
+        # Intentar dividir por secciones si están marcadas
+        import re
+        secciones_planes = re.split(r'\n(?=\d+\.\s+PLAN\s+)', str(planes_maestros))
+        
+        if len(secciones_planes) > 1:
+            for seccion in secciones_planes:
+                if seccion.strip():
+                    for linea in seccion.split('\n'):
+                        if linea.strip():
+                            if linea.strip().startswith('==='):
+                                continue
+                            elif linea[0].isdigit() and '.' in linea[:5]:
+                                add_custom_heading(doc, linea.strip(), level=3)
+                            elif linea.strip().startswith('-') or linea.strip().startswith('•'):
+                                add_bullet_point(doc, linea.strip()[1:].strip())
+                            else:
+                                add_formatted_paragraph(doc, linea.strip())
+        else:
+            for linea in str(planes_maestros).split('\n'):
+                if linea.strip():
+                    if linea[0].isdigit() and '.' in linea[:5]:
+                        add_custom_heading(doc, linea.strip(), level=3)
+                    elif linea.strip().startswith('-') or linea.strip().startswith('•'):
+                        add_bullet_point(doc, linea.strip()[1:].strip())
+                    else:
+                        add_formatted_paragraph(doc, linea.strip())
+        
+        add_page_break(doc)
+    
+    # Operativización
+    add_custom_heading(doc, "4.2 Operativización y Presupuesto", level=2)
+    
+    if not df_oper.empty:
+        oper_intro = (f"La operativización detalla {len(df_oper)} actividades derivadas de las estrategias formuladas, "
+                     f"con una inversión total estimada de ${total_costo:,.2f}.")
+        add_formatted_paragraph(doc, oper_intro, bold=True)
+        
+        add_custom_heading(doc, "4.2.1 Resumen de Inversión por Plan", level=3)
+        
+        presupuesto_plan = df_oper.groupby('plan_asignado').agg({
+            'costo': 'sum',
+            'descripcion_actividad': 'count'
+        }).reset_index()
+        presupuesto_plan.columns = ['Plan', 'Costo Total', 'N° Actividades']
+        
+        headers = ['Plan Estratégico', 'Costo Total', 'N° Actividades']
+        data = []
+        for _, row in presupuesto_plan.iterrows():
+            data.append([row['Plan'], f"${row['Costo Total']:,.2f}", str(int(row['N° Actividades']))])
+        create_professional_table(doc, headers, data, col_widths=[7.5, 3, 2.5])
+        
+        add_custom_heading(doc, "4.2.2 Cuadro de Operativización Detallado", level=3)
+        
+        headers = ['Estrategia', 'Actividad', 'Plazo', 'Responsable', 'Costo']
+        data = []
+        for _, row in df_oper.head(30).iterrows():
+            data.append([
+                (row['estrategia_nombre'][:25] + '...') if len(row['estrategia_nombre']) > 25 else row['estrategia_nombre'],
+                (row['descripcion_actividad'][:35] + '...') if len(row['descripcion_actividad']) > 35 else row['descripcion_actividad'],
+                row['plazo'] or 'Pendiente',
+                row['responsable'] or 'Sin asignar',
+                f"${row['costo']:,.2f}"
+            ])
+        create_professional_table(doc, headers, data, col_widths=[4.5, 5.5, 2, 2.5, 2])
+        
+        if len(df_oper) > 30:
+            add_formatted_paragraph(doc, 
+                f"Nota: Se muestran 30 de {len(df_oper)} actividades. El detalle completo está en los anexos.",
+                italic=True)
+        
+        add_custom_heading(doc, "4.2.3 Actividades de Mayor Inversión", level=3)
+        
+        actividades_criticas = df_oper.nlargest(5, 'costo')
+        for _, row in actividades_criticas.iterrows():
+            add_bullet_point(doc, 
+                f"${row['costo']:,.2f} - {row['descripcion_actividad'][:80]}... ({row['responsable'] or 'Sin asignar'})")
+    else:
+        add_formatted_paragraph(doc, "No se ha completado la operativización de estrategias.")
+    
+    add_page_break(doc)
+    
+    # 5. EVALUACIÓN Y CONTROL
+    add_custom_heading(doc, "5. EVALUACIÓN Y CONTROL", level=1)
+    add_formatted_paragraph(doc, 
+        "La evaluación y control permiten monitorear el desempeño de las estrategias mediante "
+        "indicadores clave de desempeño (KPIs) y sistemas de alerta temprana.")
+    
+    add_custom_heading(doc, "5.1 Cuadro de Mando Integral (CMI)", level=2)
+    
+    if not df_estrategias.empty:
+        add_formatted_paragraph(doc, 
+            "El Cuadro de Mando Integral traduce las estrategias en indicadores medibles "
+            "desde cuatro perspectivas: Financiera, Cliente, Procesos Internos, y Aprendizaje y Crecimiento.")
+        
+        # Intentar obtener CMI guardado
+        cmi_guardado = empresa.get('analisis_cmi', '')
+        df_cmi = pd.DataFrame()
+        
+        if cmi_guardado and '|' in str(cmi_guardado):
+            try:
+                df_cmi = pd.read_csv(io.StringIO(cmi_guardado), sep="|")
+            except:
+                pass
+        
+        if not df_cmi.empty:
+            add_custom_heading(doc, "5.1.1 Indicadores Clave por Perspectiva", level=3)
+            
+            headers = ['Estrategia', 'Perspectiva', 'KPI', 'Frecuencia', 'Límites']
+            data = []
+            for _, row in df_cmi.head(15).iterrows():
+                limites = f"LI:{row.get('LI','')} LC:{row.get('LC','')} LS:{row.get('LS','')}"
+                data.append([
+                    (row['Estrategia'][:35] + '...') if len(row['Estrategia']) > 35 else row['Estrategia'],
+                    row['Perspectiva'],
+                    (row['KPIs'][:30] + '...') if len(row['KPIs']) > 30 else row['KPIs'],
+                    row['Frecuencia'],
+                    limites
+                ])
+            create_professional_table(doc, headers, data, col_widths=[5, 3, 4.5, 2, 3])
+            
+            if len(df_cmi) > 15:
+                add_formatted_paragraph(doc, 
+                    f"Nota: Se muestran 15 de {len(df_cmi)} indicadores. El detalle completo está en los anexos.",
+                    italic=True)
+    
+    add_custom_heading(doc, "5.2 Semaforización Estratégica", level=2)
+    
+    analisis_semaforo = empresa.get('analisis_semaforo_resumen', '')
+    if analisis_semaforo:
+        add_formatted_paragraph(doc, analisis_semaforo)
+    else:
+        add_formatted_paragraph(doc, 
+            "El sistema de semaforización evalúa el estado de cada estrategia considerando alineación "
+            "con objetivos, recursos asignados y contexto externo. Las estrategias se clasifican en: "
+            "Óptimas (implementar según plan), Atención (requieren ajustes), "
+            "y Críticas (necesitan revisión inmediata).")
+    
+    add_page_break(doc)
+    
+    # ============================================
+    # PARTE 3: ANEXOS
+    # ============================================
+    
+    add_custom_heading(doc, "ANEXOS", level=1)
+    
+    # Anexo A: Análisis Detallados
+    add_custom_heading(doc, "Anexo A. Análisis Detallados de Matrices", level=2)
+    
+    if not df_made.empty:
+        add_custom_heading(doc, "A.1 Matriz MADE (Marketing Interno) - Datos Completos", level=3)
+        
+        headers = ['Variable', 'Factor', 'Producto', 'Precio', 'Plaza', 'Promoción', 'Rating', 'Peso %', 'Valor']
+        data = []
+        for _, row in df_made.iterrows():
+            data.append([
+                str(row.get('variable', ''))[:15],
+                str(row.get('factor', ''))[:25],
+                str(row.get('producto', ''))[:10],
+                str(row.get('precio', ''))[:10],
+                str(row.get('plaza', ''))[:10],
+                str(row.get('promocion', ''))[:10],
+                str(row.get('rating', '')),
+                f"{row.get('weight_percent', '')}%",
+                str(row.get('valor', ''))
+            ])
+        create_professional_table(doc, headers, data, col_widths=[2.2, 3.8, 1.8, 1.8, 1.8, 1.8, 1.5, 1.8, 1.5])
+        add_page_break(doc)
+    
+    if not df_madi.empty:
+        add_custom_heading(doc, "A.2 Matriz MADI (Marketing Externo) - Datos Completos", level=3)
+        
+        headers = ['Variable', 'Factor', 'Producto', 'Precio', 'Plaza', 'Promoción', 'Rating', 'Peso %', 'Valor']
+        data = []
+        for _, row in df_madi.iterrows():
+            data.append([
+                str(row.get('variable', ''))[:15],
+                str(row.get('factor', ''))[:25],
+                str(row.get('producto', ''))[:10],
+                str(row.get('precio', ''))[:10],
+                str(row.get('plaza', ''))[:10],
+                str(row.get('promocion', ''))[:10],
+                str(row.get('rating', '')),
+                f"{row.get('weight_percent', '')}%",
+                str(row.get('valor', ''))
+            ])
+        create_professional_table(doc, headers, data, col_widths=[2.2, 3.8, 1.8, 1.8, 1.8, 1.8, 1.5, 1.8, 1.5])
+        add_page_break(doc)
+    
+    if not df_pest.empty:
+        add_custom_heading(doc, "A.3 Análisis PEST Completo", level=3)
+        
+        headers = ['Categoría', 'Factor', 'Tipo FODA', 'Puntaje', 'Importancia', 'Ponderado']
+        data = []
+        for _, row in df_pest.iterrows():
+            factor_text = str(row.get('factor', ''))
+            data.append([
+                row['categoria'],
+                (factor_text[:40] + '...') if len(factor_text) > 40 else factor_text,
+                str(row.get('tipo_foda', '')),
+                str(row.get('puntaje', '')),
+                f"{row['importancia']}%",
+                f"{row['valor_ponderado']:.2f}"
+            ])
+        create_professional_table(doc, headers, data, col_widths=[2.5, 7.5, 2.5, 2, 2.5, 2.5])
+        
+        if grafico_pest:
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run = p.add_run()
+            run.add_picture(grafico_pest, width=Inches(6))
+            
+            caption = doc.add_paragraph()
+            caption.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            caption_run = caption.add_run("Figura A.1. Análisis PEST - Distribución de factores por categoría.")
+            caption_run.font.name = 'Helvetica'
+            caption_run.font.size = Pt(10)
+            caption_run.font.italic = True
+            caption_run.font.color.rgb = RGBColor(107, 114, 128)
+        
+        add_page_break(doc)
+    
+    if not df_foda.empty:
+        add_custom_heading(doc, "A.4 Matriz FODA Cruzado Completa", level=3)
+        
+        headers = ['Cuadrante', 'Factor Fila', 'Factor Columna', 'Impacto']
+        data = []
+        for _, row in df_foda.iterrows():
+            data.append([
+                row['cuadrante'],
+                str(row['factor_fila']),
+                str(row['factor_columna']),
+                str(row['impacto'])
+            ])
+        create_professional_table(doc, headers, data, col_widths=[2.5, 6.25, 6.25, 2])
+        
+        if puntajes_foda is not None and not puntajes_foda.empty:
+            grafico_foda = generar_grafico_foda_radar_mejorado(puntajes_foda)
+            if grafico_foda:
+                p = doc.add_paragraph()
+                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                run = p.add_run()
+                run.add_picture(grafico_foda, width=Inches(5))
+                
+                caption = doc.add_paragraph()
+                caption.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                caption_run = caption.add_run("Figura A.2. Posicionamiento estratégico - Matriz FODA cruzada.")
+                caption_run.font.name = 'Helvetica'
+                caption_run.font.size = Pt(10)
+                caption_run.font.italic = True
+                caption_run.font.color.rgb = RGBColor(107, 114, 128)
+        
+        add_page_break(doc)
+    
+    # Anexo B: Dashboards
+    add_custom_heading(doc, "Anexo B. Dashboards de Análisis Estratégico", level=2)
+    add_formatted_paragraph(doc, "Este anexo presenta las visualizaciones completas del análisis estratégico.")
+    
+    if not df_estrategias.empty:
+        add_custom_heading(doc, "B.1 Distribución de Estrategias por Cuadrante", level=3)
+        
+        # Crear gráfico de barras simple
+        import matplotlib.pyplot as plt
+        import numpy as np
+        
+        fig, ax = plt.subplots(figsize=(7, 4))
+        est_counts = df_estrategias['cuadrante'].value_counts()
+        colors_est = {'FO': '#2ca02c', 'FA': '#d62728', 'DO': '#ff7f0e', 'DA': '#9467bd'}
+        bars = ax.bar(est_counts.index, est_counts.values, 
+                     color=[colors_est.get(x, '#1f77b4') for x in est_counts.index],
+                     edgecolor='black', linewidth=0.5)
+        ax.set_title('Distribución de Estrategias por Cuadrante FODA', fontsize=11, fontweight='bold')
+        ax.set_ylabel('Número de Estrategias')
+        
+        for bar in bars:
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height, f'{int(height)}', 
+                   ha='center', va='bottom')
+        
+        plt.tight_layout()
+        buf_est = BytesIO()
+        plt.savefig(buf_est, format='PNG', dpi=150, bbox_inches='tight', facecolor='white')
+        plt.close()
+        buf_est.seek(0)
+        
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = p.add_run()
+        run.add_picture(buf_est, width=Inches(5))
+    
+    if not df_proy.empty:
+        add_custom_heading(doc, "B.2 Proyección Financiera Detallada", level=3)
+        
+        grafico_proy = generar_grafico_proyeccion_mejorado(df_proy)
+        if grafico_proy:
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run = p.add_run()
+            run.add_picture(grafico_proy, width=Inches(6))
+        
+        headers = ['Año', 'Ingresos Proyectados', 'Costos Proyectados', 'Utilidad Neta Proyectada']
+        data = []
+        for _, row in df_proy.iterrows():
+            data.append([
+                str(int(row['anio'])),
+                f"${row['ingresos_proyectados']:,.0f}",
+                f"${row['costos_proyectados']:,.0f}",
+                f"${row['utilidad_neta_proyectada']:,.0f}"
+            ])
+        create_professional_table(doc, headers, data, col_widths=[2.5, 4.5, 4.5, 4.5])
+        add_page_break(doc)
+    
+    if not df_cb.empty:
+        add_custom_heading(doc, "B.3 Análisis Costo-Beneficio Detallado", level=3)
+        
+        datos_cb = df_cb.iloc[0]
+        
+        headers = ['Indicador', 'Valor', 'Umbral Aceptable', 'Estado']
+        data = [
+            ['Relación C-B ($)', f"{float(datos_cb['relacion_costo_beneficio_dolares']):.2f}", '≥ 1.0', 
+             'Aceptable' if datos_cb['relacion_costo_beneficio_dolares'] >= 1 else 'No aceptable'],
+            ['Payback (años)', 
+             f"{float(datos_cb['payback_periodo_anios']):.1f}" if datos_cb['payback_periodo_anios'] else 'N/A',
+             '≤ 5', 
+             'Aceptable' if datos_cb['payback_periodo_anios'] and datos_cb['payback_periodo_anios'] <= 5 else 'Revisar'],
+            ['VPN Total', f"${float(datos_cb['vpn_total']):,.2f}", '> 0', 
+             'Positivo' if datos_cb['vpn_total'] > 0 else 'Negativo'],
+            ['Inversión Total', f"${float(datos_cb['inversion_total']):,.2f}", '-', 'Requerimiento'],
+            ['Beneficio/Unidad', f"${float(datos_cb['beneficio_por_unidad']):,.2f}", '≥ Costo/Unidad', 
+             'Rentable' if datos_cb['relacion_cb_unidades'] >= 1 else 'No rentable'],
+        ]
+        create_professional_table(doc, headers, data, col_widths=[4.5, 3.75, 3.75, 3.75])
+        add_page_break(doc)
+    
+    # Anexo C: Operativización Completa
+    if not df_oper.empty:
+        add_custom_heading(doc, "Anexo C. Cuadro de Operativización Completo", level=2)
+        
+        # Dividir en chunks para no sobrecargar
+        chunk_size = 40
+        datos_oper_full = [['N°', 'Estrategia', 'Actividad', 'Plazo', 'Responsable', 'Costo']]
+        
+        for idx, row in df_oper.iterrows():
+            datos_oper_full.append([
+                str(idx + 1),
+                (row['estrategia_nombre'][:30] + '...') if len(row['estrategia_nombre']) > 30 else row['estrategia_nombre'],
+                (row['descripcion_actividad'][:40] + '...') if len(row['descripcion_actividad']) > 40 else row['descripcion_actividad'],
+                row['plazo'] or 'Pendiente',
+                row['responsable'] or 'Sin asignar',
+                f"${row['costo']:,.2f}"
+            ])
+        
+        for i in range(0, len(datos_oper_full), chunk_size):
+            chunk = datos_oper_full[i:i+chunk_size]
+            if i == 0:
+                create_professional_table(doc, chunk[0], chunk[1:], col_widths=[1.25, 5, 6.25, 2, 3, 2.5])
+            else:
+                # Continuación sin encabezado
+                table = doc.add_table(rows=len(chunk), cols=len(chunk[0]))
+                table.style = 'Table Grid'
+                for row_idx, row_data in enumerate(chunk):
+                    for col_idx, cell_text in enumerate(row_data):
+                        cell = table.rows[row_idx].cells[col_idx]
+                        cell.text = str(cell_text)
+                        # Formato
+                        for paragraph in cell.paragraphs:
+                            for run in paragraph.runs:
+                                run.font.name = 'Helvetica'
+                                run.font.size = Pt(9)
+            if i + chunk_size < len(datos_oper_full):
+                add_page_break(doc)
+    
+    # Anexo D: CMI Completo
+    if not df_cmi.empty:
+        add_page_break(doc)
+        add_custom_heading(doc, "Anexo D. Cuadro de Mando Integral Completo", level=2)
+        
+        headers = ['Estrategia', 'Perspectiva', 'KPIs', 'Fórmulas', 'Frecuencia', 'LI', 'LC', 'LS']
+        data = []
+        for _, row in df_cmi.iterrows():
+            data.append([
+                (row['Estrategia'][:40] + '...') if len(row['Estrategia']) > 40 else row['Estrategia'],
+                row['Perspectiva'],
+                (row['KPIs'][:35] + '...') if len(row['KPIs']) > 35 else row['KPIs'],
+                (row['Formulas'][:25] + '...') if len(row['Formulas']) > 25 else row['Formulas'],
+                row['Frecuencia'],
+                str(row['LI']),
+                str(row['LC']),
+                str(row['LS'])
+            ])
+        create_professional_table(doc, headers, data, col_widths=[4.5, 2.5, 4.5, 3, 2, 1.5, 1.5, 1.5])
+    
+    # Guardar en buffer
+    word_buffer = BytesIO()
     doc.save(word_buffer)
     word_buffer.seek(0)
     return word_buffer
@@ -5344,22 +6562,49 @@ Sé directo y accionable. Máximo 200 palabras."""
                     st.session_state['pdf_generado'] = True
                     st.success("✅ Documento PDF generado correctamente.")
         
-        # Mostrar botones de descarga si el documento fue generado
-        if st.session_state.get('pdf_generado', False) and 'pdf_bytes' in st.session_state:
-            col1, col2 = st.columns([1, 3])
-            with col1:
-                # Botón descargar PDF
-                download_buffer = BytesIO(st.session_state['pdf_bytes'])
-                st.download_button(
-                    label="⬇️ Descargar PDF", 
-                    data=download_buffer, 
-                    file_name=st.session_state.get('pdf_nombre', 'plan_estrategico.pdf'), 
-                    mime="application/pdf",
-                    type="primary"
+# Mostrar botones de descarga si el documento fue generado
+if st.session_state.get('pdf_generado', False) and 'pdf_bytes' in st.session_state:
+    col1, col2, col3 = st.columns([1, 1, 2])
+    with col1:
+        # Botón descargar PDF
+        download_buffer = BytesIO(st.session_state['pdf_bytes'])
+        st.download_button(
+            label="⬇️ Descargar PDF", 
+            data=download_buffer, 
+            file_name=st.session_state.get('pdf_nombre', 'plan_estrategico.pdf'), 
+            mime="application/pdf",
+            type="primary"
+        )
+    with col2:
+        # Botón descargar Word
+        if st.button("📄 Generar Word Editable", type="primary"):
+            with st.spinner("Generando documento Word con formato profesional..."):
+                word_buffer = generar_word_completo_mejorado(
+                    empresa_id, 
+                    pdf_version, 
+                    pdf_elaborado, 
+                    pdf_revisado, 
+                    pdf_aprobado
                 )
-            with col2:
-                st.success(f"Documento listo: {st.session_state.get('pdf_nombre', 'plan_estrategico.pdf')}")
-                st.caption("Formato profesional APA con encabezado, pie de página y todas las secciones.")
+                if word_buffer:
+                    st.session_state['word_bytes'] = word_buffer.getvalue()
+                    st.session_state['word_nombre'] = f"Plan_Estrategico_{empresa_data.get('nombre', 'Empresa')}_V{pdf_version}.docx"
+                    st.success("✅ Documento Word generado")
+                    st.rerun()
+                else:
+                    st.error("Error al generar Word")
+        
+        if 'word_bytes' in st.session_state:
+            st.download_button(
+                label="⬇️ Descargar Word", 
+                data=BytesIO(st.session_state['word_bytes']), 
+                file_name=st.session_state.get('word_nombre', 'plan_estrategico.docx'), 
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                type="secondary"
+            )
+    with col3:
+        st.success(f"Documentos listos: PDF y Word")
+        st.caption("Formato profesional APA con encabezado, pie de página y todas las secciones.")
 
             # Botón para generar nuevo documento
             if st.button("🔄 Generar Nuevo", type="secondary"):
@@ -5421,6 +6666,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
