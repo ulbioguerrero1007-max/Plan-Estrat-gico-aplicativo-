@@ -973,7 +973,9 @@ def create_professional_table(data, col_widths=None, has_header=True):
     """Crea tabla con diseño profesional moderno"""
     if col_widths is None:
         num_cols = len(data[0]) if data else 1
-        col_widths = [inch * 1.5] * num_cols
+        # Ancho total disponible: 6.5 pulgadas (A4 - márgenes)
+        available_width = 6.5 * inch
+        col_widths = [available_width / num_cols] * num_cols
     
     table = Table(data, colWidths=col_widths, repeatRows=1 if has_header else 0)
     
@@ -991,6 +993,8 @@ def create_professional_table(data, col_widths=None, has_header=True):
         ('LINEABOVE', (0, 0), (-1, 0), 1, ColorPalette.PRIMARY),
         ('LINEBELOW', (0, -1), (-1, -1), 1, ColorPalette.PRIMARY),
         ('GRID', (0, 0), (-1, -1), 0.25, ColorPalette.BORDER),
+        # Permitir que el texto se ajuste (word wrap)
+        ('WORDWRAP', (0, 0), (-1, -1), True),
     ]
     
     if has_header:
@@ -1015,7 +1019,6 @@ def create_professional_table(data, col_widths=None, has_header=True):
 
 # Alias para compatibilidad con código existente
 create_table_pdf = create_professional_table
-
     
 def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, aprobado):
     """
@@ -1672,15 +1675,26 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         
         datos_oper = [['Estrategia', 'Actividad', 'Plazo', 'Responsable', 'Costo']]
         for _, row in df_oper.head(30).iterrows():  # Mostrar primeras 30 para no sobrecargar
+            # Truncar estrategia si es muy larga pero mantener más caracteres
+            estrategia_texto = row['estrategia_nombre'][:45] + '...' if len(row['estrategia_nombre']) > 45 else row['estrategia_nombre']
+            # Truncar actividad pero mantener más caracteres  
+            actividad_texto = row['descripcion_actividad'][:55] + '...' if len(row['descripcion_actividad']) > 55 else row['descripcion_actividad']
+            # Responsable más corto
+            responsable_texto = row['responsable'][:35] + '...' if len(row['responsable']) > 35 else row['responsable']
+            
             datos_oper.append([
-                row['estrategia_nombre'][:25] + '...' if len(row['estrategia_nombre']) > 25 else row['estrategia_nombre'],
-                row['descripcion_actividad'][:35] + '...' if len(row['descripcion_actividad']) > 35 else row['descripcion_actividad'],
+                estrategia_texto,
+                actividad_texto,
                 row['plazo'] or 'Pendiente',
-                row['responsable'] or 'Sin asignar',
+                responsable_texto,
                 f"${row['costo']:,.2f}"
             ])
         
-        tabla_oper = create_table_pdf(datos_oper, col_widths=[1.8*inch, 2.2*inch, 1*inch, 1.2*inch, 1*inch])
+        # Anchos de columna ajustados para dar más espacio a Estrategia y Actividad
+        tabla_oper = create_table_pdf(
+            datos_oper, 
+            col_widths=[1.6*inch, 2.4*inch, 0.8*inch, 1.3*inch, 1.0*inch]
+        )
         story.append(tabla_oper)
         story.append(Spacer(1, 0.1*inch))
         
@@ -4918,3 +4932,4 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
