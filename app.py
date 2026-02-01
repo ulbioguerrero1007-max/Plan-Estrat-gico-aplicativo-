@@ -4683,7 +4683,7 @@ def aplicacion_principal():
 
 # --- PESTAÑA 3: ESTRATEGIA (CORREGIDA CON GENERACIÓN IA) ---
     with tab3:
-    st.header("🎯 Formulación de Estrategias")
+        st.header("🎯 Formulación de Estrategias")
     
     df_estrategias = get_datos_tabla('estrategias_generadas', empresa_id)
     df_foda_estrategia = get_datos_tabla('foda_cruzado', empresa_id)
@@ -6729,6 +6729,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
