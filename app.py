@@ -6612,8 +6612,13 @@ if st.session_state.get('pdf_generado', False) and 'pdf_bytes' in st.session_sta
                     del st.session_state['pdf_bytes']
                 if 'pdf_nombre' in st.session_state:
                     del st.session_state['pdf_nombre']
+                if 'word_bytes' in st.session_state:
+                    del st.session_state['word_bytes']
+                if 'word_nombre' in st.session_state:
+                    del st.session_state['word_nombre']
                 st.session_state['pdf_generado'] = False
-                st.rerun()            
+                st.rerun()
+                
 def pantalla_acceso():
     st.sidebar.title("Estratega Pro UG-UCE")
     opcion = st.sidebar.radio("Acceso al Sistema", ["Entrar", "Crear Cuenta"])
@@ -6666,6 +6671,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
