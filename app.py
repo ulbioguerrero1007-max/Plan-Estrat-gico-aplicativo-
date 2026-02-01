@@ -78,35 +78,94 @@ def generar_analisis_ia(tipo_matriz, datos_contexto):
 
 def generar_analisis(prompt, client=None):
     errores = []
-    prompt_limpio = prompt + "\n\nIMPORTANTE: Proporciona el análisis en texto claro y profesional. NO uses asteriscos (*), almohadillas (#), negritas ni ningún formato Markdown. Usa solo párrafos bien estructurados."
+    
+    # Prompt mejorado que EXIGE estructura jerárquica clara
+    prompt_estructurado = prompt + """
+
+ESTRUCTURA OBLIGATORIA DEL ANÁLISIS:
+
+Usa el siguiente formato EXACTO para organizar el contenido:
+
+1. TÍTULO PRINCIPAL
+   [Escribe aquí el título general del análisis]
+
+2. RESUMEN EJECUTIVO
+   [1-2 párrafos con los hallazgos más importantes]
+
+3. ANÁLISIS DETALLADO
+   3.1 [Subtítulo específico 1]
+       • Punto clave 1: [Descripción detallada]
+       • Punto clave 2: [Descripción detallada]
+       
+   3.2 [Subtítulo específico 2]
+       • Punto clave 1: [Descripción detallada]
+       • Punto clave 2: [Descripción detallada]
+
+4. CONCLUSIONES
+   • Conclusión 1
+   • Conclusión 2
+   • Conclusión 3
+
+5. RECOMENDACIONES
+   5.1 Recomendación prioritaria: [Descripción]
+   5.2 Recomendación secundaria: [Descripción]
+
+REGLAS DE FORMATO:
+- Usa NUMERALES (1., 2., 3.) para títulos principales
+- Usa NUMERALES CON PUNTO (3.1, 3.2) para subtítulos
+- Usa VIÑETAS (•) para listas de puntos clave
+- Deja LÍNEAS EN BLANCO entre secciones
+- NO uses Markdown (*, #, **)
+- NO escribas todo seguido; respeta los saltos de línea entre párrafos
+"""
+    
     try:
         modelos_disponibles = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
         modelos_a_probar = []
         modelos_a_probar.extend([m for m in modelos_disponibles if 'flash' in m.lower()])
         modelos_a_probar.extend([m for m in modelos_disponibles if 'pro' in m.lower() and m not in modelos_a_probar])
+        
         if not modelos_a_probar:
             return "No se encontraron modelos de Gemini disponibles."
+            
         for nombre_modelo in modelos_a_probar:
             try:
                 model = genai.GenerativeModel(
                     model_name=nombre_modelo,
-                    system_instruction="Eres un consultor senior de estrategia empresarial. Tu lenguaje es formal, directo y limpio. No usas decoraciones innecesarias en el texto como asteriscos o almohadillas."
+                    system_instruction="""Eres un consultor senior de estrategia empresarial. 
+                    
+Tu especialidad es redactar informes ejecutivos con ESTRUCTURA JERÁRQUICA CLARA:
+- Títulos numerados (1., 2., 3.)
+- Subtítulos (3.1, 3.2)
+- Viñetas para listas (•)
+- Saltos de línea entre secciones
+
+NUNCA escribas todo el texto seguido. Siempre organiza el contenido en secciones bien diferenciadas."""
                 )
-                response = model.generate_content(prompt_limpio)
+                
+                response = model.generate_content(prompt_estructurado)
                 texto = response.text
-                texto = re.sub(r'\*+', '', texto)
-                texto = re.sub(r'#+', '', texto)
-                texto = re.sub(r'_+', '', texto)
-                texto = texto.replace("****", "").replace("###", "").replace("##", "")
+                
+                # Limpiar solo el Markdown, pero preservar la estructura numérica y viñetas
+                texto = re.sub(r'\*\*', '', texto)  # Quitar negritas markdown
+                texto = re.sub(r'\*', '', texto)    # Quitar asteriscos sueltos
+                texto = re.sub(r'#{1,6}\s*', '', texto)  # Quitar almohadillas pero dejar el texto
+                
+                # Asegurar que haya saltos de línea después de numerales
+                texto = re.sub(r'(\d+\.\s+[^\n]+)\n(?=\d+\.)', r'\1\n\n', texto)
+                
                 return texto.strip()
+                
             except Exception as e:
                 errores.append(f"{nombre_modelo}: {str(e)}")
                 continue
+                
     except Exception as e:
         return f"Error de conexión: {str(e)}"
+        
     return f"Error en análisis. Intentados: {', '.join(errores)}"
 
-st.set_page_config(page_title="Estratega Pro | Business Intelligence", page_icon="♟️", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Estratega Pro UG-UCE", page_icon="♟️", layout="wide", initial_sidebar_state="expanded")
 st.markdown("""
     <style>
     .main { background-color: #f5f5f5; }
@@ -4918,3 +4977,4 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
