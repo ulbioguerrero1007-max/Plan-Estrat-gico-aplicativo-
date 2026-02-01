@@ -4251,10 +4251,16 @@ def aplicacion_principal():
 
     puede_editar = es_propietario or es_editor
 
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
-    "1. Introducción", "2. Diagnóstico Situacional", "3. Estrategia", 
-    "4. Planes", "5. CMI/Indicadores", "6. Semaforización", 
-    "7. Operativización/Presupuesto", "8. Dashboard de Análisis", "9. Resumen y Conclusiones"
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
+    "1. Introducción", 
+    "2. Diagnóstico Situacional", 
+    "3. Estrategia", 
+    "4. Planes", 
+    "5. CMI/Indicadores", 
+    "6. Semaforización", 
+    "7. Operativización/Presupuesto", 
+    "8. Dashboard de Análisis", 
+    "9. Resumen y Conclusiones"
 ])
     
     # --- PESTAÑA 1: INTRODUCCION ---
@@ -4824,7 +4830,7 @@ with tab3:
                     pass
                         
     # --- PESTAÑA 4: PLANES ESTRATÉGICOS ---
-    with tab3:
+    with tab4:
         st.header("📋 Planes Estratégicos Funcionales")
         
         # Importar re al inicio de la pestaña para evitar UnboundLocalError
@@ -5101,7 +5107,7 @@ with tab3:
         mostrar_ultimo_analisis_guardado(empresa_data, 'operativo')        
         
     # --- PESTAÑA 5: CMI/INDICADORES ---
-    with tab4:
+    with tab5:
         st.header("CMI / Indicadores")
         df_estrategias_cmi = get_datos_tabla('estrategias_generadas', empresa_id)
         
@@ -5274,8 +5280,8 @@ with tab3:
         else:
             st.warning("No hay estrategias disponibles para generar el CMI. Genera estrategias primero en la pestaña anterior.")    
 
-    # --- PESTAÑA 5: ANÁLISIS DE SEMAFORIZACIÓN ESTRATÉGICA (NUEVA) ---
-    with tab5:
+    # --- PESTAÑA 6: ANÁLISIS DE SEMAFORIZACIÓN ESTRATÉGICA (NUEVA) ---
+    with tab6:
         st.header("🚦 Análisis de Semaforización Estratégica")
         st.markdown("""
         *Análisis inteligente del estado de tus estrategias basado en el CMI, FODA y contexto empresarial*
@@ -5573,8 +5579,8 @@ Lenguaje ejecutivo y directo."""
                 preview_df.columns = ['Cuadrante', 'Estrategia', 'Plan', 'Importancia']
                 st.dataframe(preview_df, use_container_width=True, hide_index=True)
     
-    # --- PESTAÑA 6: OPERATIVIZACIÓN/PRESUPUESTO ---
-    with tab6:
+    # --- PESTAÑA 7: OPERATIVIZACIÓN/PRESUPUESTO ---
+    with tab7:
         st.header("Operativización / Presupuesto")
         
         # Obtener estrategias generadas
@@ -6082,7 +6088,7 @@ Lenguaje ejecutivo y directo."""
 
     
     # --- PESTAÑA DASHBOARD: BUSINESS INTELLIGENCE INTEGRADO ---
-    with tab_dash:
+    with tab8:
         st.header("📊 Dashboard Ejecutivo - Business Intelligence")
         st.markdown("*Análisis interactivo tipo Power BI con filtros dinámicos y visualizaciones en tiempo real*")
         
@@ -6566,7 +6572,7 @@ Sé directo y accionable. Máximo 200 palabras."""
                     st.error(f"Error al generar análisis: {e}")    
 
     # --- PESTAÑA 9: RESUMEN Y CONCLUSIONES ---
-    with tab7:
+    with tab9:
         st.header("Resumen, Conclusiones y Exportación")
     
         st.subheader("📄 Generar Documento Final (Formato APA)")
@@ -6723,6 +6729,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
