@@ -42,12 +42,102 @@ class ColorPalette:
     BACKGROUND_ALT = HexColor('#f8fafc')   # Gris muy claro
     BORDER = HexColor('#e2e8f0')       # Gris borde
 
+# ============================================================================
+# FUNCIONES DE SANITIZACIÓN PARA PDF (AGREGAR ESTAS)
+# ============================================================================
+
+def sanitizar_texto_para_pdf(texto):
+    """
+    Limpia el texto para que ReportLab lo renderice correctamente.
+    Elimina emojis, normaliza unicode y quita caracteres problemáticos.
+    """
+    if not texto:
+        return ""
+    
+    # Convertir a string
+    texto = str(texto)
+    
+    # 1. Normalizar unicode (NFD separa tildes de letras)
+    texto = unicodedata.normalize('NFKD', texto)
+    
+    # 2. Eliminar emojis y caracteres de control (excepto \n, \t)
+    texto = ''.join(c for c in texto if unicodedata.category(c)[0] != 'C' or c in '\n\t')
+    
+    # 3. Eliminar caracteres de formato de la IA (markdown)
+    texto = re.sub(r'[\*#_`~\[\]\(\)\{\}]', '', texto)  # Markdown básico
+    texto = re.sub(r'!\[.*?\]\(.*?\)', '', texto)  # Imágenes markdown
+    texto = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', texto)  # Links -> solo texto
+    
+    # 4. Limpiar espacios múltiples y saltos de línea excesivos
+    texto = re.sub(r' +', ' ', texto)
+    texto = re.sub(r'\n{3,}', '\n\n', texto)
+    texto = re.sub(r'\t+', ' ', texto)
+    
+    # 5. Eliminar caracteres no imprimibles
+    texto = ''.join(c for c in texto if ord(c) >= 32 or c in '\n\t')
+    
+    # 6. Codificar a latin-1 (ISO-8859-1) que soporta ReportLab con Helvetica
+    # Esto elimina caracteres que no se pueden representar
+    try:
+        texto = texto.encode('latin-1', 'ignore').decode('latin-1')
+    except:
+        texto = texto.encode('ascii', 'ignore').decode('ascii')
+    
+    return texto.strip()
+
+
+def limpiar_para_paragraph(texto, max_length=None):
+    """
+    Versión segura para usar con Paragraph de ReportLab.
+    Opcionalmente trunca a max_length caracteres.
+    """
+    texto = sanitizar_texto_para_pdf(texto)
+    if max_length and len(texto) > max_length:
+        texto = texto[:max_length-3] + "..."
+    return texto
+
+
+def crear_parrafo_seguro(texto, estilo, max_length=None):
+    """
+    Crea un Paragraph de ReportLab con texto sanitizado.
+    Maneja errores silenciosamente.
+    """
+    try:
+        texto_limpio = limpiar_para_paragraph(texto, max_length)
+        return Paragraph(texto_limpio, estilo)
+    except Exception as e:
+        # Si falla, intentar con texto ultra-limpio
+        try:
+            texto_ultra = re.sub(r'[^\w\s\.\,\;\:\-\(\)\n]', '', str(texto))
+            return Paragraph(texto_ultra[:500], estilo)
+        except:
+            # Último recurso: texto de error
+            return Paragraph("[Error al renderizar texto]", estilo)
+
+
+def safe_append_story(story, elemento, fallback=None):
+    """
+    Agrega elemento a story con manejo de errores.
+    """
+    try:
+        story.append(elemento)
+        return True
+    except Exception as e:
+        print(f"Error agregando elemento a story: {e}")
+        if fallback:
+            try:
+                story.append(fallback)
+            except:
+                pass
+        return False
+
 class Typography:
-    """Configuración tipográfica profesional"""
-    FONT_MAIN = 'Times-Roman'
-    FONT_BOLD = 'Times-Bold'
-    FONT_ITALIC = 'Times-Italic'
-    FONT_BOLD_ITALIC = 'Times-BoldItalic'
+    """Configuración tipográfica profesional con soporte UTF-8 mejorado"""
+    # CAMBIO CLAVE: Helvetica tiene mejor soporte UTF-8 que Times-Roman
+    FONT_MAIN = 'Helvetica'
+    FONT_BOLD = 'Helvetica-Bold'
+    FONT_ITALIC = 'Helvetica-Oblique'
+    FONT_BOLD_ITALIC = 'Helvetica-BoldOblique'
     SIZE_TITLE = 16
     SIZE_H1 = 14
     SIZE_H2 = 12
@@ -142,51 +232,57 @@ def get_ia_client():
 
 def generar_analisis_ia(tipo_matriz, datos_contexto):
     if not get_ia_client():
-        return "Error: No se encontró la API Key de Gemini en st.secrets."
-    prompt = f"Actúa como un consultor senior de estrategia. Analiza la siguiente matriz {tipo_matriz} y proporciona conclusiones estratégicas clave, riesgos y recomendaciones. Datos: {datos_contexto}"
+        return "Error: No se encontro la API Key de Gemini en st.secrets."
+    prompt = f"Actua como un consultor senior de estrategia. Analiza la siguiente matriz {tipo_matriz} y proporciona conclusiones estrategicas clave, riesgos y recomendaciones. Datos: {datos_contexto}"
     return generar_analisis(prompt)
 
+
 def generar_analisis(prompt, client=None):
+    """
+    Genera analisis con IA y sanitiza el texto para PDF seguro.
+    """
     errores = []
     
-    # Prompt mejorado que EXIGE estructura jerárquica clara
+    # Prompt mejorado que EXIGE estructura jerarquica clara Y texto plano
     prompt_estructurado = prompt + """
 
-ESTRUCTURA OBLIGATORIA DEL ANÁLISIS:
+ESTRUCTURA OBLIGATORIA DEL ANALISIS:
 
 Usa el siguiente formato EXACTO para organizar el contenido:
 
-1. TÍTULO PRINCIPAL
-   [Escribe aquí el título general del análisis]
+1. TITULO PRINCIPAL
+   [Escribe aqui el titulo general del analisis]
 
 2. RESUMEN EJECUTIVO
-   [1-2 párrafos con los hallazgos más importantes]
+   [1-2 parrafos con los hallazgos mas importantes]
 
-3. ANÁLISIS DETALLADO
-   3.1 [Subtítulo específico 1]
-       • Punto clave 1: [Descripción detallada]
-       • Punto clave 2: [Descripción detallada]
+3. ANALISIS DETALLADO
+   3.1 [Subtitulo especifico 1]
+       - Punto clave 1: [Descripcion detallada]
+       - Punto clave 2: [Descripcion detallada]
        
-   3.2 [Subtítulo específico 2]
-       • Punto clave 1: [Descripción detallada]
-       • Punto clave 2: [Descripción detallada]
+   3.2 [Subtitulo especifico 2]
+       - Punto clave 1: [Descripcion detallada]
+       - Punto clave 2: [Descripcion detallada]
 
 4. CONCLUSIONES
-   • Conclusión 1
-   • Conclusión 2
-   • Conclusión 3
+   - Conclusion 1
+   - Conclusion 2
+   - Conclusion 3
 
 5. RECOMENDACIONES
-   5.1 Recomendación prioritaria: [Descripción]
-   5.2 Recomendación secundaria: [Descripción]
+   5.1 Recomendacion prioritaria: [Descripcion]
+   5.2 Recomendacion secundaria: [Descripcion]
 
-REGLAS DE FORMATO:
-- Usa NUMERALES (1., 2., 3.) para títulos principales
-- Usa NUMERALES CON PUNTO (3.1, 3.2) para subtítulos
-- Usa VIÑETAS (•) para listas de puntos clave
-- Deja LÍNEAS EN BLANCO entre secciones
-- NO uses Markdown (*, #, **)
-- NO escribas todo seguido; respeta los saltos de línea entre párrafos
+REGLAS DE FORMATO ESTRICTAS:
+- Usa NUMERALES (1., 2., 3.) para titulos principales
+- Usa NUMERALES CON PUNTO (3.1, 3.2) para subtitulos
+- Usa GUIONES MEDIOS (-) para listas de puntos clave. PROHIBIDO usar viñetas (•)
+- Deja LINEAS EN BLANCO entre secciones
+- NO uses Markdown (*, #, **, __)
+- NO uses emojis ni caracteres especiales
+- NO escribas todo seguido; respeta los saltos de linea entre parrafos
+- Usa SOLO letras, numeros, puntos, comas, dos puntos, punto y coma, parentesis y guiones
 """
     
     try:
@@ -204,11 +300,12 @@ REGLAS DE FORMATO:
                     model_name=nombre_modelo,
                     system_instruction="""Eres un consultor senior de estrategia empresarial. 
                     
-Tu especialidad es redactar informes ejecutivos con ESTRUCTURA JERÁRQUICA CLARA:
-- Títulos numerados (1., 2., 3.)
-- Subtítulos (3.1, 3.2)
-- Viñetas para listas (•)
-- Saltos de línea entre secciones
+Tu especialidad es redactar informes ejecutivos con ESTRUCTURA JERARQUICA CLARA:
+- Titulos numerados (1., 2., 3.)
+- Subtitulos (3.1, 3.2)
+- Listas con GUIONES MEDIOS (-), NUNCA viñetas (•)
+- Saltos de linea entre secciones
+- TEXTO PLANO: sin emojis, sin markdown, sin caracteres especiales
 
 NUNCA escribas todo el texto seguido. Siempre organiza el contenido en secciones bien diferenciadas."""
                 )
@@ -216,13 +313,40 @@ NUNCA escribas todo el texto seguido. Siempre organiza el contenido en secciones
                 response = model.generate_content(prompt_estructurado)
                 texto = response.text
                 
-                # Limpiar solo el Markdown, pero preservar la estructura numérica y viñetas
-                texto = re.sub(r'\*\*', '', texto)  # Quitar negritas markdown
-                texto = re.sub(r'\*', '', texto)    # Quitar asteriscos sueltos
-                texto = re.sub(r'#{1,6}\s*', '', texto)  # Quitar almohadillas pero dejar el texto
+                # =========================================================================
+                # SANITIZACION AGRESIVA PARA PDF SEGURO
+                # =========================================================================
                 
-                # Asegurar que haya saltos de línea después de numerales
-                texto = re.sub(r'(\d+\.\s+[^\n]+)\n(?=\d+\.)', r'\1\n\n', texto)
+                # 1. Eliminar emojis y caracteres de control
+                texto = ''.join(c for c in texto if unicodedata.category(c)[0] not in ['C', 'So'] or c in '\n\t')
+                
+                # 2. Eliminar markdown
+                texto = re.sub(r'\*\*', '', texto)      # Negritas
+                texto = re.sub(r'__', '', texto)        # Negritas alt
+                texto = re.sub(r'\*', '', texto)        # Asteriscos sueltos
+                texto = re.sub(r'_{1,2}', '', texto)    # Guiones bajos
+                texto = re.sub(r'#{1,6}\s*', '', texto) # Almohadillas
+                
+                # 3. REEMPLAZAR viñetas problemáticas por guiones seguros
+                texto = texto.replace('•', '-')         # Viñeta bullet → guion
+                texto = texto.replace('●', '-')         # Circulo negro → guion
+                texto = texto.replace('○', '-')         # Circulo blanco → guion
+                texto = texto.replace('▪', '-')         # Cuadrado → guion
+                texto = texto.replace('■', '-')         # Cuadrado negro → guion
+                texto = texto.replace('‣', '-')         # Triangulo → guion
+                texto = texto.replace('⁃', '-')         # Guion raro → guion normal
+                texto = texto.replace('◦', '-')         # Circulo pequeño → guion
+                
+                # 4. Normalizar espacios y saltos de linea
+                texto = re.sub(r' +', ' ', texto)       # Espacios multiples → uno
+                texto = re.sub(r'\n{3,}', '\n\n', texto) # Saltos excesivos → doble
+                texto = re.sub(r'\t+', '    ', texto)   # Tabs → 4 espacios
+                
+                # 5. Limpiar caracteres no latin-1 (para Helvetica/ReportLab)
+                texto = texto.encode('latin-1', 'ignore').decode('latin-1')
+                
+                # 6. Asegurar saltos de linea despues de numerales para mejor legibilidad
+                texto = re.sub(r'(\d+\.\s+[^\n]{50,})\s+(?=\d+\.)', r'\1\n\n', texto)
                 
                 return texto.strip()
                 
@@ -231,9 +355,9 @@ NUNCA escribas todo el texto seguido. Siempre organiza el contenido en secciones
                 continue
                 
     except Exception as e:
-        return f"Error de conexión: {str(e)}"
+        return f"Error de conexion: {str(e)}"
         
-    return f"Error en análisis. Intentados: {', '.join(errores)}"
+    return f"Error en analisis. Intentados: {', '.join(errores)}"
 
 st.set_page_config(page_title="Estratega Pro UG-UCE", page_icon="♟️", layout="wide", initial_sidebar_state="expanded")
 st.markdown("""
@@ -2235,7 +2359,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         tabla_cmi_full = create_table_pdf(datos_cmi_full, col_widths=[1.8*inch, 1*inch, 1.8*inch, 1.2*inch, 0.8*inch, 0.6*inch, 0.6*inch, 0.6*inch])
         story.append(tabla_cmi_full)
     
-    # Construir el PDF
+    # Construir el PDF con manejo de errores mejorado
     try:
         from reportlab.platypus import PageTemplate
 
@@ -2247,12 +2371,26 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         )
         doc.addPageTemplates([page_template])
 
-        # Construir documento
-        doc.build(story)
+        # Construir documento con manejo de errores por elemento
+        try:
+            doc.build(story)
+        except Exception as build_error:
+            # Si falla, intentar identificar qué elemento causó el problema
+            st.error(f"Error en construcción del PDF: {build_error}")
+            
+            # Intentar construir con story mínima para diagnóstico
+            story_minima = [
+                Paragraph("DOCUMENTO DE PRUEBA - ERROR EN GENERACION", styles['Heading1Enhanced']),
+                Paragraph(f"Error detectado: {str(build_error)[:200]}", styles['BodyTextEnhanced']),
+                Paragraph("Verifique que los textos de la IA no contengan caracteres especiales.", styles['BodyTextEnhanced'])
+            ]
+            doc.build(story_minima)
+            
         pdf_buffer.seek(0)
         return pdf_buffer
+        
     except Exception as e:
-        st.error(f"Error al generar PDF: {e}")
+        st.error(f"Error fatal al generar PDF: {e}")
         import traceback
         st.error(traceback.format_exc())
         return None
@@ -5122,6 +5260,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
