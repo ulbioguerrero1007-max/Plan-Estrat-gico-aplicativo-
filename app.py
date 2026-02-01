@@ -6518,7 +6518,7 @@ Sé directo y accionable. Máximo 200 palabras."""
                 except Exception as e:
                     st.error(f"Error al generar análisis: {e}")    
 
-# --- PESTAÑA 9: RESUMEN Y CONCLUSIONES ---
+    # --- PESTAÑA 9: RESUMEN Y CONCLUSIONES ---
     with tab7:
         st.header("Resumen, Conclusiones y Exportación")
     
@@ -6562,51 +6562,56 @@ Sé directo y accionable. Máximo 200 palabras."""
                     st.session_state['pdf_generado'] = True
                     st.success("✅ Documento PDF generado correctamente.")
         
-# Mostrar botones de descarga si el documento fue generado
-if st.session_state.get('pdf_generado', False) and 'pdf_bytes' in st.session_state:
-    col1, col2, col3 = st.columns([1, 1, 2])
-    with col1:
-        # Botón descargar PDF
-        download_buffer = BytesIO(st.session_state['pdf_bytes'])
-        st.download_button(
-            label="⬇️ Descargar PDF", 
-            data=download_buffer, 
-            file_name=st.session_state.get('pdf_nombre', 'plan_estrategico.pdf'), 
-            mime="application/pdf",
-            type="primary"
-        )
-    with col2:
-        # Botón descargar Word
-        if st.button("📄 Generar Word Editable", type="primary"):
-            with st.spinner("Generando documento Word con formato profesional..."):
-                word_buffer = generar_word_completo_mejorado(
-                    empresa_id, 
-                    pdf_version, 
-                    pdf_elaborado, 
-                    pdf_revisado, 
-                    pdf_aprobado
+        # Mostrar botones de descarga si el documento fue generado
+        if st.session_state.get('pdf_generado', False) and 'pdf_bytes' in st.session_state:
+            col1, col2, col3 = st.columns([1, 1, 2])
+            with col1:
+                # Botón descargar PDF
+                download_buffer = BytesIO(st.session_state['pdf_bytes'])
+                st.download_button(
+                    label="⬇️ Descargar PDF", 
+                    data=download_buffer, 
+                    file_name=st.session_state.get('pdf_nombre', 'plan_estrategico.pdf'), 
+                    mime="application/pdf",
+                    type="primary"
                 )
-                if word_buffer:
-                    st.session_state['word_bytes'] = word_buffer.getvalue()
-                    st.session_state['word_nombre'] = f"Plan_Estrategico_{empresa_data.get('nombre', 'Empresa')}_V{pdf_version}.docx"
-                    st.success("✅ Documento Word generado")
-                    st.rerun()
+            with col2:
+                # Botón descargar Word
+                if st.button("📄 Generar Word Editable", type="primary"):
+                    with st.spinner("Generando documento Word con formato profesional..."):
+                        word_buffer = generar_word_completo_mejorado(
+                            empresa_id, 
+                            pdf_version, 
+                            pdf_elaborado, 
+                            pdf_revisado, 
+                            pdf_aprobado
+                        )
+                        if word_buffer:
+                            st.session_state['word_bytes'] = word_buffer.getvalue()
+                            st.session_state['word_nombre'] = f"Plan_Estrategico_{empresa_data.get('nombre', 'Empresa')}_V{pdf_version}.docx"
+                            st.success("✅ Documento Word generado")
+                            st.rerun()
+                        else:
+                            st.error("Error al generar Word")
+                
+                if 'word_bytes' in st.session_state:
+                    st.download_button(
+                        label="⬇️ Descargar Word", 
+                        data=BytesIO(st.session_state['word_bytes']), 
+                        file_name=st.session_state.get('word_nombre', 'plan_estrategico.docx'), 
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        type="secondary"
+                    )
+            with col3:
+                # Mensaje actualizado que refleja ambos formatos
+                if 'word_bytes' in st.session_state:
+                    st.success("✅ Ambos documentos listos")
+                    st.caption("📄 PDF para presentación final | 📝 Word para ediciones")
                 else:
-                    st.error("Error al generar Word")
-        
-        if 'word_bytes' in st.session_state:
-            st.download_button(
-                label="⬇️ Descargar Word", 
-                data=BytesIO(st.session_state['word_bytes']), 
-                file_name=st.session_state.get('word_nombre', 'plan_estrategico.docx'), 
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                type="secondary"
-            )
-    with col3:
-        st.success(f"Documentos listos: PDF y Word")
-        st.caption("Formato profesional APA con encabezado, pie de página y todas las secciones.")
-
-            # Botón para generar nuevo documento
+                    st.success("✅ PDF generado")
+                    st.caption("Formato APA profesional. Genera el Word si necesitas editar.")
+            
+            # Botón para generar nuevo documento (FUERA de los columns)
             if st.button("🔄 Generar Nuevo", type="secondary"):
                 if 'pdf_bytes' in st.session_state:
                     del st.session_state['pdf_bytes']
@@ -6671,6 +6676,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
