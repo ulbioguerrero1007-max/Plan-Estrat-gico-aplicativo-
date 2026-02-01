@@ -106,7 +106,7 @@ def generar_analisis(prompt, client=None):
         return f"Error de conexión: {str(e)}"
     return f"Error en análisis. Intentados: {', '.join(errores)}"
 
-st.set_page_config(page_title="Estratega Pro | Business Intelligence", page_icon="♟️", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Estratega Pro UG-UCE ", page_icon="♟️", layout="wide", initial_sidebar_state="expanded")
 st.markdown("""
     <style>
     .main { background-color: #f5f5f5; }
@@ -3131,7 +3131,7 @@ def aplicacion_principal():
                         "=== [NOMBRE DEL PLAN] ===",
                         "",
                         "1. FUNDAMENTO ESTRATÉGICO",
-                        "[Explicación de por qué este plan es crítico para la empresa en su contexto actual, 3-4 párrafos profundos]",
+                        "[Explicación de por qué este plan es crítico para la empresa en su contexto actual, 1-2 párrafos profundos]",
                         "",
                         "2. OBJETIVO GENERAL DEL PLAN",
                         "[Objetivo SMART específico]",
