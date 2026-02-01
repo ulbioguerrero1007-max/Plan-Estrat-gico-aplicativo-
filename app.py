@@ -1789,7 +1789,10 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     
     story.append(PageBreak())
     
-    # 4. PLAN DE ACCIÓN (Planes Funcionales + Operativización)
+    # ============================================
+    # 4. PLAN DE ACCIÓN - PLANES FUNCIONALES
+    # ============================================
+    
     story.append(Paragraph("4. PLAN DE ACCIÓN", styles['Heading1Enhanced']))
     story.append(Paragraph(
         "El plan de acción detalla las actividades específicas, responsables, tiempos y recursos "
@@ -1805,7 +1808,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     # Generar planes con IA (siempre devuelve string)
     planes_contenido = generar_planes_por_plantilla(estrategia_principal, pest_total, empresa_id)
     
-    # Procesar el string de planes
+    # Procesar el string de planes dividiendo por los separadores === PLAN X ===
     import re
     patron = r'={2,}\s*(\d+\.\s+PLAN\s+[A-ZÁÉÍÓÚÑa-záéíóúñ\s]+)\s*={2,}'
     secciones = re.split(patron, planes_contenido)
@@ -1817,7 +1820,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
                 titulo_plan = secciones[i].strip()
                 contenido_plan = secciones[i+1] if i+1 < len(secciones) else ""
                 
-                # Agregar título del plan
+                # Agregar título del plan como Heading 1
                 story.append(Paragraph(titulo_plan, styles['Heading1Enhanced']))
                 story.append(Spacer(1, 0.15*inch))
                 
@@ -1829,31 +1832,14 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
     else:
         # Si no se detectaron separadores, mostrar todo como texto plano
         story.append(Paragraph(planes_contenido, styles['BodyTextEnhanced']))
+        story.append(PageBreak())
     
-    # Caso 2: Si viene dict de plantillas (fallback)
-    elif isinstance(planes_resultado, dict):
-        for idx, (nombre_plan, contenido_plan) in enumerate(planes_resultado.items(), 1):
-            # Título del plan
-            story.append(Paragraph(f"4.1.{idx} {nombre_plan.upper()}", styles['Heading1Enhanced']))
-            story.append(Spacer(1, 0.15*inch))
-            
-            # Formatear contenido
-            elementos_plan = formatear_contenido_plan(contenido_plan, styles)
-            story.extend(elementos_plan)
-            
-            story.append(PageBreak())
-    
-    # Caso 3: Error o formato no reconocido
-    else:
-        story.append(Paragraph("Error al generar planes funcionales.", styles['BodyTextEnhanced']))
-    
-    # Análisis de planes maestros si existe
+    # 4.2 Planes Funcionales Detallados (si existe análisis guardado)
     planes_maestros = empresa.get('analisis_operativo', '')
-    if planes_maestros:
-        story.append(Paragraph("4.2 Planes Funcionales Detallados", styles['Heading2Enhanced']))
+    if planes_maestros and planes_maestros != planes_contenido:
+        story.append(Paragraph("4.2 Análisis Operativo Adicional", styles['Heading2Enhanced']))
         story.append(Paragraph(planes_maestros, styles['BodyTextEnhanced']))
-    
-    story.append(PageBreak())
+        story.append(PageBreak())
     
     # 4.3 Operativización (Cuadro de Operativización)
     story.append(Paragraph("4.3 Operativización y Presupuesto", styles['Heading2Enhanced']))
@@ -5136,6 +5122,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
