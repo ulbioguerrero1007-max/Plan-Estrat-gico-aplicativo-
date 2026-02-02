@@ -24,185 +24,6 @@ import unicodedata
 import time
 from supabase import create_client, Client
 from reportlab.lib.colors import HexColor, Color, white
-import hashlib
-import json
-from functools import wraps
-from datetime import datetime, timedelta
-
-# ============================================================================
-# NUEVO: SISTEMA DE CACHÉ Y RATE LIMITING (AGREGAR AQUÍ)
-# ============================================================================
-
-class GeminiRateLimiter:
-    """
-    Gestiona el rate limiting para la API de Gemini.
-    Implementa token bucket algorithm para controlar RPM (requests per minute).
-    """
-    def __init__(self, max_requests_per_minute=10, max_tokens_per_minute=500000):
-        self.max_requests_per_minute = max_requests_per_minute
-        self.max_tokens_per_minute = max_tokens_per_minute
-        self.requests_timestamps = []
-        self.tokens_used = []
-        self.last_request_time = 0
-        self.min_delay_between_requests = 4.0  # segundos mínimos entre requests
-        
-    def _clean_old_entries(self):
-        """Limpia entradas antiguas (más de 1 minuto)"""
-        now = time.time()
-        one_minute_ago = now - 60
-        self.requests_timestamps = [t for t in self.requests_timestamps if t > one_minute_ago]
-        self.tokens_used = [(t, tokens) for t, tokens in self.tokens_used if t > one_minute_ago]
-    
-    def can_make_request(self, estimated_tokens=1000):
-        """Verifica si se puede hacer una request respetando los límites"""
-        self._clean_old_entries()
-        now = time.time()
-        
-        # Verificar RPM
-        if len(self.requests_timestamps) >= self.max_requests_per_minute:
-            return False, f"RPM limit reached: {len(self.requests_timestamps)}/{self.max_requests_per_minute}"
-        
-        # Verificar TPM
-        tokens_last_minute = sum(tokens for _, tokens in self.tokens_used)
-        if tokens_last_minute + estimated_tokens > self.max_tokens_per_minute:
-            return False, f"TPM limit would be exceeded: {tokens_last_minute + estimated_tokens}/{self.max_tokens_per_minute}"
-        
-        # Verificar delay mínimo
-        time_since_last = now - self.last_request_time
-        if time_since_last < self.min_delay_between_requests:
-            return False, f"Need to wait {self.min_delay_between_requests - time_since_last:.1f}s"
-            
-        return True, "OK"
-    
-    def wait_if_needed(self, estimated_tokens=1000):
-        """Espera hasta que se pueda hacer la request"""
-        while True:
-            can_proceed, reason = self.can_make_request(estimated_tokens)
-            if can_proceed:
-                break
-            # Extraer tiempo de espera del mensaje si es por delay
-            if "Need to wait" in reason:
-                try:
-                    wait_time = float(reason.split("wait ")[1].split("s")[0])
-                    time.sleep(min(wait_time + 0.5, 5))  # Esperar máximo 5s por iteración
-                except:
-                    time.sleep(2)
-            else:
-                # Calcular tiempo hasta que se libere un slot
-                if self.requests_timestamps:
-                    oldest = min(self.requests_timestamps)
-                    wait = 60 - (time.time() - oldest) + 1
-                    st.info(f"⏳ Rate limit alcanzado. Esperando {wait:.0f}s...")
-                    time.sleep(min(wait, 10))
-                else:
-                    time.sleep(2)
-    
-    def record_request(self, tokens_used=1000):
-        """Registra una request realizada"""
-        now = time.time()
-        self.requests_timestamps.append(now)
-        self.tokens_used.append((now, tokens_used))
-        self.last_request_time = now
-
-
-class ResponseCache:
-    """
-    Caché simple en memoria para respuestas de la IA.
-    Usa hashing del prompt para identificar respuestas idénticas.
-    """
-    def __init__(self, max_size=50, ttl_hours=24):
-        self.cache = {}
-        self.max_size = max_size
-        self.ttl = timedelta(hours=ttl_hours)
-        self.access_order = []  # Para LRU eviction
-    
-    def _generate_key(self, prompt, model_name="default"):
-        """Genera una clave única para el prompt"""
-        # Normalizar prompt (quitar espacios extras, lowercase)
-        normalized = " ".join(prompt.lower().split())
-        key = hashlib.md5(f"{model_name}:{normalized}".encode()).hexdigest()
-        return key
-    
-    def get(self, prompt, model_name="default"):
-        """Obtiene respuesta cacheada si existe y no expiró"""
-        key = self._generate_key(prompt, model_name)
-        
-        if key in self.cache:
-            entry = self.cache[key]
-            # Verificar TTL
-            if datetime.now() - entry['timestamp'] < self.ttl:
-                # Actualizar orden LRU
-                if key in self.access_order:
-                    self.access_order.remove(key)
-                self.access_order.append(key)
-                return entry['response']
-            else:
-                # Expirado, eliminar
-                del self.cache[key]
-                if key in self.access_order:
-                    self.access_order.remove(key)
-        return None
-    
-    def set(self, prompt, response, model_name="default"):
-        """Guarda respuesta en caché"""
-        # Evicción LRU si está lleno
-        if len(self.cache) >= self.max_size and self.access_order:
-            oldest_key = self.access_order.pop(0)
-            if oldest_key in self.cache:
-                del self.cache[oldest_key]
-        
-        key = self._generate_key(prompt, model_name)
-        self.cache[key] = {
-            'response': response,
-            'timestamp': datetime.now()
-        }
-        self.access_order.append(key)
-    
-    def clear(self):
-        """Limpia toda la caché"""
-        self.cache.clear()
-        self.access_order.clear()
-
-
-# Instancias globales - AGREGAR ESTAS LÍNEAS
-rate_limiter = GeminiRateLimiter(max_requests_per_minute=10, max_tokens_per_minute=500000)
-response_cache = ResponseCache(max_size=50, ttl_hours=24)
-
-
-def cached_ai_call(func):
-    """
-    Decorador que implementa caché y rate limiting para llamadas a IA.
-    """
-    @wraps(func)
-    def wrapper(prompt, *args, **kwargs):
-        # Verificar caché primero
-        cached_response = response_cache.get(prompt)
-        if cached_response:
-            st.info("♻️ Usando respuesta cacheada (optimización de tokens)")
-            return cached_response
-        
-        # Rate limiting
-        # Estimar tokens (aproximadamente 4 caracteres por token)
-        estimated_tokens = len(prompt) // 4 + 500  # +500 para la respuesta estimada
-        
-        with st.spinner("⏳ Controlando rate limits de la API..."):
-            rate_limiter.wait_if_needed(estimated_tokens)
-        
-        # Hacer la llamada
-        result = func(prompt, *args, **kwargs)
-        
-        # Guardar en caché si es exitosa
-        if result and not result.startswith("Error"):
-            response_cache.set(prompt, result)
-            rate_limiter.record_request(estimated_tokens)
-        
-        return result
-    
-    return wrapper
-
-# ============================================================================
-# FIN DEL SISTEMA DE CACHÉ Y RATE LIMITING
-# ============================================================================
 
 class ColorPalette:
     """Paleta de colores profesional para documentos ejecutivos"""
@@ -416,11 +237,9 @@ def generar_analisis_ia(tipo_matriz, datos_contexto):
     return generar_analisis(prompt)
 
 
-@cached_ai_call
 def generar_analisis(prompt, client=None):
     """
     Genera analisis con IA y sanitiza el texto para PDF seguro.
-    Implementa caché y rate limiting automáticos.
     """
     errores = []
     
@@ -432,17 +251,26 @@ ESTRUCTURA OBLIGATORIA DEL ANALISIS:
 Usa el siguiente formato EXACTO para organizar el contenido:
 
 1. TITULO PRINCIPAL
-   [Escribe aqui el titulo del analisis]
-   
-2. ANALISIS DETALLADO
+   [Escribe aqui el titulo general del analisis]
+
+2. RESUMEN EJECUTIVO
    [1-2 parrafos con los hallazgos mas importantes]
-   
-3. CONCLUSIONES
+
+3. ANALISIS DETALLADO
+   3.1 [Subtitulo especifico 1]
+       - Punto clave 1: [Descripcion detallada]
+       - Punto clave 2: [Descripcion detallada]
+       
+   3.2 [Subtitulo especifico 2]
+       - Punto clave 1: [Descripcion detallada]
+       - Punto clave 2: [Descripcion detallada]
+
+4. CONCLUSIONES
    - Conclusion 1
    - Conclusion 2
    - Conclusion 3
 
-4. RECOMENDACIONES
+5. RECOMENDACIONES
    5.1 Recomendacion prioritaria: [Descripcion]
    5.2 Recomendacion secundaria: [Descripcion]
 
@@ -482,18 +310,7 @@ Tu especialidad es redactar informes ejecutivos con ESTRUCTURA JERARQUICA CLARA:
 NUNCA escribas todo el texto seguido. Siempre organiza el contenido en secciones bien diferenciadas."""
                 )
                 
-                # Configurar generation config para optimizar tokens
-                generation_config = {
-                    "temperature": 0.7,
-                    "top_p": 0.8,
-                    "top_k": 40,
-                    "max_output_tokens": 2048,  # Limitar tokens de salida
-                }
-                
-                response = model.generate_content(
-                    prompt_estructurado,
-                    generation_config=generation_config
-                )
+                response = model.generate_content(prompt_estructurado)
                 texto = response.text
                 
                 # =========================================================================
@@ -535,10 +352,6 @@ NUNCA escribas todo el texto seguido. Siempre organiza el contenido en secciones
                 
             except Exception as e:
                 errores.append(f"{nombre_modelo}: {str(e)}")
-                # Si es error de rate limit, esperar antes de reintentar
-                if "429" in str(e) or "rate" in str(e).lower():
-                    st.warning(f"⏳ Rate limit en {nombre_modelo}, esperando...")
-                    time.sleep(5)
                 continue
                 
     except Exception as e:
@@ -779,7 +592,7 @@ def analizar_foda(df_foda):
 def generar_planes_por_plantilla(estrategia_foda, pest_total, empresa_id=None):
     """
     Genera los 7 planes funcionales usando exclusivamente IA.
-    Implementa chunking para evitar límites de tokens.
+    Si falla, devuelve mensaje de error en lugar de plantillas.
     """
     
     # Obtener contexto adicional si hay empresa_id
@@ -798,105 +611,85 @@ Misión: {empresa.get('mision', 'No disponible')[:200]}
     es_adaptativa = "Adaptativa" in str(estrategia_foda)
     contexto_postura = "crecimiento agresivo" if (es_ofensiva or es_adaptativa) else "consolidación defensiva"
     
-    # ESTRATEGIA: Generar planes en 2 batches para reducir tokens por llamada
-    planes_completos = []
-    
-    # Batch 1: Planes 1-4
-    prompt_batch1 = f"""Actúa como consultor senior. Genera 4 PLANES FUNCIONALES detallados.
+    # Prompt maestro para IA
+    prompt_maestro = f"""Actúa como un consultor senior de estrategia empresarial con 20 años de experiencia.
 
-CONTEXTO: {contexto_empresa}
-Estrategia: {estrategia_foda} | Postura: {contexto_postura} | PEST: {pest_total:.2f}
+CONTEXTO ESTRATÉGICO:
+{contexto_empresa}
+Estrategia FODA principal: {estrategia_foda}
+Postura estratégica: {contexto_postura}
+Entorno PEST score: {pest_total:.2f} ({'favorable' if pest_total > 2.5 else 'desafiante'})
 
-PLANES A GENERAR:
-1. PLAN ADMINISTRATIVO
-2. PLAN OPERATIVO  
-3. PLAN TECNOLÓGICO
-4. PLAN FINANCIERO
+GENERA LOS 7 PLANES FUNCIONALES ESTRATÉGICOS SIGUIENDO ESTA ESTRUCTURA EXACTA:
 
-ESTRUCTURA por plan (máximo 300 palabras cada uno):
-=== [NÚMERO]. PLAN [NOMBRE] ===
-1. FUNDAMENTO: [2 párrafos]
-2. OBJETIVO SMART: [1 oración]
-3. 3 OBJETIVOS ESPECÍFICOS: [lista con -]
-4. 3 ESTRATEGIAS: [A, B, C con descripción breve]
-5. 3 KPIs: [nombre | meta | frecuencia]
-6. RECURSOS: [humanos, financieros]
-7. RIESGO PRINCIPAL: [descripción | mitigación]
+=== 1. PLAN ADMINISTRATIVO ===
 
-REGLAS: Texto plano, sin emojis, sin markdown, usa - para listas.
+1.1 FUNDAMENTO ESTRATÉGICO
+    [2-3 párrafos explicando por qué este plan es crítico]
 
-Genera los 4 planes ahora:"""
+1.2 OBJETIVO GENERAL DEL PLAN
+    [Objetivo SMART específico]
 
-    # Batch 2: Planes 5-7
-    prompt_batch2 = f"""Actúa como consultor senior. Genera 3 PLANES FUNCIONALES detallados.
+1.3 OBJETIVOS ESPECÍFICOS
+    • Objetivo 1: [Descripción]
+    • Objetivo 2: [Descripción]
+    • Objetivo 3: [Descripción]
 
-CONTEXTO: {contexto_empresa}
-Estrategia: {estrategia_foda} | Postura: {contexto_postura} | PEST: {pest_total:.2f}
+1.4 ESTRATEGIAS DE IMPLEMENTACIÓN
+    A. [Nombre estrategia]
+       - Descripción detallada
+       - Recursos necesarios
+       
+    B. [Nombre estrategia]
+       - Descripción detallada
+       - Recursos necesarios
 
-PLANES A GENERAR:
-5. PLAN DE MONITOREO Y CONTROL
-6. PLAN DE MEJORA
-7. PLAN DE CONTINGENCIA
+1.5 KPIs Y METAS
+    • KPI 1: [Nombre] | Meta: [X] | Frecuencia: [mensual]
 
-ESTRUCTURA por plan (máximo 300 palabras cada uno):
-=== [NÚMERO]. PLAN [NOMBRE] ===
-1. FUNDAMENTO: [2 párrafos]
-2. OBJETIVO SMART: [1 oración]
-3. 3 OBJETIVOS ESPECÍFICOS: [lista con -]
-4. 3 ESTRATEGIAS: [A, B, C con descripción breve]
-5. 3 KPIs: [nombre | meta | frecuencia]
-6. RECURSOS: [humanos, financieros]
-7. RIESGO PRINCIPAL: [descripción | mitigación]
+1.6 RECURSOS REQUERIDOS
+    • Humanos: [Detalle]
+    • Financieros: [Presupuesto]
+
+1.7 RESPONSABLES Y GOBIERNO
+    • Responsable: [Rol]
+
+1.8 RIESGOS Y MITIGACIÓN
+    • Riesgo: [Descripción] | Mitigación: [Acción]
+
+1.9 ALINEACIÓN CON ESTRATEGIA FODA
+    [Explicación]
+
+=== 2. PLAN OPERATIVO ===
+[Repetir estructura 2.1 a 2.9]
+
+=== 3. PLAN TECNOLÓGICO ===
+[Repetir estructura 3.1 a 3.9]
+
+=== 4. PLAN FINANCIERO ===
+[Repetir estructura 4.1 a 4.9]
+
+=== 5. PLAN DE MONITOREO Y CONTROL ===
+[Repetir estructura 5.1 a 5.9]
+
+=== 6. PLAN DE MEJORA ===
+[Repetir estructura 6.1 a 6.9]
+
+=== 7. PLAN DE CONTINGENCIA ===
+[Repetir estructura 7.1 a 7.9]
 
 REGLAS:
 - USA numeración X.Y para subtítulos
 - USA viñetas (•) para listas
 - DEJA líneas en blanco entre secciones
+- Adapta contenido a: {contexto_postura} y PEST {pest_total:.2f}
 
-Genera los 3 planes ahora:"""
+Genera los 7 planes completos ahora:"""
 
-    # Generar con manejo de errores y reintentos
-    max_retries = 3
+    # Llamar a IA
+    planes_generados = generar_analisis(prompt_maestro)
     
-    # Batch 1
-    for attempt in range(max_retries):
-        try:
-            st.info(f"🔄 Generando planes 1-4 (intento {attempt + 1})...")
-            batch1 = generar_analisis(prompt_batch1)
-            if not batch1.startswith("Error"):
-                planes_completos.append(batch1)
-                st.success("✅ Planes 1-4 generados")
-                break
-        except Exception as e:
-            if attempt < max_retries - 1:
-                st.warning(f"⚠️ Error en batch 1, reintentando...")
-                time.sleep(2 ** attempt)
-            else:
-                st.error("❌ Falló batch 1")
-    
-    # Batch 2
-    for attempt in range(max_retries):
-        try:
-            st.info(f"🔄 Generando planes 5-7 (intento {attempt + 1})...")
-            batch2 = generar_analisis(prompt_batch2)
-            if not batch2.startswith("Error"):
-                planes_completos.append(batch2)
-                st.success("✅ Planes 5-7 generados")
-                break
-        except Exception as e:
-            if attempt < max_retries - 1:
-                st.warning(f"⚠️ Error en batch 2, reintentando...")
-                time.sleep(2 ** attempt)
-            else:
-                st.error("❌ Falló batch 2")
-    
-    # Combinar resultados
-    if len(planes_completos) == 2:
-        return "\n\n".join(planes_completos)
-    elif len(planes_completos) == 1:
-        return planes_completos[0] + "\n\n[NOTA: Solo se generaron 4 planes. Regenera para obtener los 7 completos.]"
-    else:
-        return "Error: No se pudieron generar los planes. Intenta nuevamente."
+    return planes_generados
 
 def generar_cuadro_de_mando_ia(estrategias_df):
     if estrategias_df.empty:
@@ -918,14 +711,7 @@ Genera una tabla de Cuadro de Mando Integral (CMI) con las siguientes columnas e
 7. (LC): Límite de Control (Amarillo/Preventivo).
 8. (LS): Límite Superior (Verde/Satisfactorio).
 Formato de salida: ESTRATEGIA|PERSPECTIVA|KPI|FORMULA|FRECUENCIA|LI|LC|LS
-REGLAS:
-- Perspectiva: Financiera/Cliente/Procesos/Aprendizaje
-- Máximo 2 KPI por estrategia
-- Fórmula breve
-- Solo líneas de datos, sin encabezados
-
-Genera {max_estrategias} líneas:"""
-
+No incluyas encabezados ni texto adicional, solo las líneas de datos separadas por pipe (|)."""
     
     resultado_ia = generar_analisis(prompt)
     cmi_rows = []
@@ -934,14 +720,14 @@ Genera {max_estrategias} líneas:"""
         partes = line.split("|")
         if len(partes) >= 8:
             cmi_rows.append({
-                "Estrategia": partes[0].strip()[:100],
+                "Estrategia": partes[0].strip(),
                 "Perspectiva": partes[1].strip(),
-                "KPIs": partes[2].strip()[:50],
-                "Formulas": partes[3].strip()[:30],
+                "KPIs": partes[2].strip(),
+                "Formulas": partes[3].strip(),
                 "Frecuencia": partes[4].strip(),
-                "LI": partes[5].strip()[:10],
-                "LC": partes[6].strip()[:10],
-                "LS": partes[7].strip()[:10]
+                "LI": partes[5].strip(),
+                "LC": partes[6].strip(),
+                "LS": partes[7].strip()
             })
     
     df_cmi = pd.DataFrame(cmi_rows)
@@ -4434,33 +4220,7 @@ def aplicacion_principal():
                 del st.session_state[key]
             st.success("Sesión cerrada correctamente")
             st.rerun()
-
-        # ============================================================================
-        # NUEVO: CONTROLES DE CACHÉ Y RATE LIMITING (AGREGAR AL FINAL DEL SIDEBAR)
-        # ============================================================================
-        st.divider()
-        with st.expander("⚙️ Configuración Avanzada"):
-            st.caption(f"🗄️ Respuestas cacheadas: {len(response_cache.cache)}")
-            st.caption(f"⏱️ Requests último minuto: {len(rate_limiter.requests_timestamps)}")
-            
-            if st.button("🗑️ Limpiar Caché de IA", key="clear_cache"):
-                response_cache.clear()
-                st.success("Caché limpiada")
-                st.rerun()
-            
-            if st.button("📊 Ver Estado de Rate Limits", key="view_rate"):
-                rate_limiter._clean_old_entries()
-                st.info(f"""
-                **Estado actual:**
-                - RPM: {len(rate_limiter.requests_timestamps)}/{rate_limiter.max_requests_per_minute}
-                - Última request: hace {time.time() - rate_limiter.last_request_time:.1f}s
-                - Delay mínimo: {rate_limiter.min_delay_between_requests}s
-                """)
-        # ============================================================================
-        # FIN CONTROLES DE CACHÉ
-        # ============================================================================
-    
-    
+                
     if not empresa_id:
         st.info("👈 Por favor, selecciona o crea una empresa en el menú lateral para comenzar.")
         st.stop()
@@ -6969,8 +6729,6 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
-
-
 
 
 
