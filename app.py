@@ -4435,7 +4435,7 @@ def aplicacion_principal():
             st.success("Sesión cerrada correctamente")
             st.rerun()
 
-============================================================================
+        # ============================================================================
         # NUEVO: CONTROLES DE CACHÉ Y RATE LIMITING (AGREGAR AL FINAL DEL SIDEBAR)
         # ============================================================================
         st.divider()
@@ -6969,6 +6969,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
