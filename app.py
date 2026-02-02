@@ -4681,153 +4681,154 @@ def aplicacion_principal():
             
             mostrar_ultimo_analisis_guardado(empresa_data, 'foda')
 
-# --- PESTAÑA 3: ESTRATEGIA (CORREGIDA CON GENERACIÓN IA) ---
+    # --- PESTAÑA 3: ESTRATEGIA (CORREGIDA CON GENERACIÓN IA) ---
     with tab3:
         st.header("🎯 Formulación de Estrategias")
     
-    df_estrategias = get_datos_tabla('estrategias_generadas', empresa_id)
-    df_foda_estrategia = get_datos_tabla('foda_cruzado', empresa_id)
-    
-    if df_estrategias.empty:
-        st.info("No hay estrategias generadas. Utiliza el botón de abajo para generarlas automáticamente con IA basándote en el análisis FODA.")
+        df_estrategias = get_datos_tabla('estrategias_generadas', empresa_id)
+        df_foda_estrategia = get_datos_tabla('foda_cruzado', empresa_id)
         
-        if st.button("🤖 Generar Estrategias con IA (3 por cuadrante = 12 estrategias)", disabled=not puede_editar, type="primary"):
-            if df_foda_estrategia.empty:
-                st.error("Primero debes cargar los datos del FODA Cruzado en la pestaña anterior.")
-            else:
-                with st.spinner("Generando 12 estrategias estratégicas (3 por cuadrante) con 5 actividades cada una..."):
-                    # Obtener factores por cuadrante para contexto
-                    contexto_foda = df_foda_estrategia.to_string()
-                    
-                    prompt_estrategias = (
-                        "Basado en el siguiente análisis FODA Cruzado:\n"
-                        f"{contexto_foda}\n\n"
-                        "Genera exactamente 3 estrategias para cada uno de los 4 cuadrantes (FO, FA, DO, DA), total 12 estrategias.\n"
-                        "Para cada estrategia proporciona:\n"
-                        "1. Cuadrante (FO, FA, DO, o DA)\n"
-                        "2. Estrategia: Descripción clara y específica de la estrategia\n"
-                        "3. Importancia: Selecciona una de (Alta, Media Alta, Media Baja, Baja)\n"
-                        "4. Actividades: Lista de EXACTAMENTE 5 actividades clave separadas por punto y coma (;) para implementar la estrategia\n"
-                        "5. Plan Asignado: Selecciona uno de (Plan Administrativo, Plan Operativo, Plan Tecnológico, Plan Financiero, Plan de Monitoreo y control, Plan de Mejora, Plan de Contingencia)\n\n"
-                        "Formato de salida EXACTO (una estrategia por línea):\n"
-                        "CUADRANTE|ESTRATEGIA|IMPORTANCIA|ACTIVIDAD|PLAN_ASIGNADO\n\n"
-                        "Ejemplo:\n"
-                        "FO|Expandir mercado en nuevas regiones utilizando fortalezas tecnológicas|Alta|Investigar mercados potenciales;Adaptar producto a nuevas necesidades;Lanzar campaña marketing digital;Capacitar equipo de ventas;Establecer alianzas locales|Plan Operativo\n"
-                        "FO|Alianza estratégica con proveedores clave|Media Alta|Identificar proveedores potenciales;Negociar contratos marco;Implementar integración de sistemas;Capacitar personal en nuevos procesos;Evaluar desempeño de proveedores|Plan Administrativo\n"
-                        "FA|Programa de retención de clientes ante nueva competencia|Alta|Analizar tasa de churn actual;Crear programa fidelización;Capacitar equipo de servicio al cliente;Implementar encuestas satisfacción;Diseñar promociones exclusivas|Plan de Mejora\n\n"
-                        "Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). Cada estrategia debe tener EXACTAMENTE 5 actividades separadas por punto y coma (;). No uses encabezados."
-                    )                        
-                    resultado = generar_analisis(prompt_estrategias)
-                    
-                    # Parsear resultado con mejor manejo de errores
-                    estrategias_list = []
-                    lineas = [l.strip() for l in resultado.split('\n') if l.strip()]
-                    
-                    st.write("Debug - Respuesta de IA:", resultado[:500] if len(resultado) > 500 else resultado)
-                    
-                    for linea in lineas[:12]:  # Máximo 12 estrategias
-                        partes = linea.split('|')
-                        if len(partes) >= 5:
-                            # Asegurar que hay 5 actividades
-                            actividades = partes[3].strip()
-                            # Contar actividades separadas por ;
-                            num_actividades = len([a for a in actividades.split(';') if a.strip()])
-                            
-                            estrategias_list.append({
-                                'empresa_id': empresa_id,
-                                'cuadrante': partes[0].strip().upper(),
-                                'estrategia': partes[1].strip(),
-                                'importancia': partes[2].strip(),
-                                'actividades': actividades,
-                                'plan_asignado': partes[4].strip()
-                            })
-                        elif len(partes) == 4:
-                            # Intentar detectar si falta el plan asignado
-                            estrategias_list.append({
-                                'empresa_id': empresa_id,
-                                'cuadrante': partes[0].strip().upper(),
-                                'estrategia': partes[1].strip(),
-                                'importancia': partes[2].strip(),
-                                'actividades': partes[3].strip(),
-                                'plan_asignado': 'Plan Operativo'  # Default
-                            })
-                    
-                    if estrategias_list:
-                        try:
-                            # Guardar en Supabase
-                            supabase.table('estrategias_generadas').delete().eq('empresa_id', empresa_id).execute()
-                            supabase.table('estrategias_generadas').insert(estrategias_list).execute()
-                            
-                            total_actividades = sum([len([a for a in est['actividades'].split(';') if a.strip()]) for est in estrategias_list])
-                            st.success(f"✅ {len(estrategias_list)} estrategias generadas y guardadas exitosamente.")
-                            st.info(f"📋 Total de actividades generadas: {total_actividades} (objetivo: 60 actividades)")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Error al guardar estrategias: {e}")
-                    else:
-                        st.error("No se pudieron parsear las estrategias generadas. Intenta nuevamente.")
-                        st.write("Respuesta completa de la IA para debugging:")
-                        st.code(resultado)
-    else:
-        # Mostrar estrategias existentes en editor
-        st.success(f"Se encontraron {len(df_estrategias)} estrategias generadas.")
-        
-        # Calcular total de actividades
-        total_actividades = 0
-        for _, est in df_estrategias.iterrows():
-            acts = str(est.get('actividades', ''))
-            total_actividades += len([a for a in acts.split(';') if a.strip()])
-        
-        st.info(f"📋 Total de actividades: {total_actividades} (objetivo: 60 actividades = 12 estrategias × 5 actividades)")
-        
-        st.write("**Editar Estrategias:**")
-        
-        edited_df = st.data_editor(
-            df_estrategias.drop(columns=['id', 'empresa_id'], errors='ignore'), 
-            num_rows="dynamic", 
-            key="editor_estrategias", 
-            use_container_width=True,
-            disabled=not puede_editar,
-            column_config={
-                "cuadrante": st.column_config.SelectboxColumn("Cuadrante", options=["FO", "FA", "DO", "DA"]),
-                "importancia": st.column_config.SelectboxColumn("Importancia", options=["Alta", "Media Alta", "Media Baja", "Baja"]),
-                "plan_asignado": st.column_config.SelectboxColumn("Plan Asignado", 
-                    options=["Plan Administrativo", "Plan Operativo", "Plan Tecnológico", "Plan Financiero", 
-                            "Plan de Monitoreo y control", "Plan de Mejora", "Plan de Contingencia"]),
-                "estrategia": st.column_config.TextColumn("Estrategia", width="large"),
-                "actividades": st.column_config.TextColumn("Actividades (separar con ;)", width="large")
-            }
-        )
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            if st.button("💾 Guardar Cambios", disabled=not puede_editar):
-                try:
-                    supabase.table('estrategias_generadas').delete().eq('empresa_id', empresa_id).execute()
-                    if not edited_df.empty:
-                        df_to_save = edited_df.copy()
-                        df_to_save['empresa_id'] = empresa_id
-                        supabase.table('estrategias_generadas').insert(df_to_save.to_dict(orient='records')).execute()
-                    st.success("Estrategias actualizadas."); 
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error al guardar estrategias: {e}")
-        with col2:
-            if st.button("🗑️ Eliminar Todas", type="secondary", disabled=not puede_editar):
-                try:
-                    supabase.table('estrategias_generadas').delete().eq('empresa_id', empresa_id).execute()
-                    st.success("Estrategias eliminadas."); 
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error al eliminar: {e}")
-        with col3:
-            if st.button("🔄 Regenerar con IA", disabled=not puede_editar):
-                # Eliminar actuales y regenerar
-                try:
-                    supabase.table('estrategias_generadas').delete().eq('empresa_id', empresa_id).execute()
-                    st.rerun()
-                except:
-                    pass
+        if df_estrategias.empty:
+            st.info("No hay estrategias generadas. Utiliza el botón de abajo para generarlas automáticamente con IA basándote en el análisis FODA.")
+            
+            if st.button("🤖 Generar Estrategias con IA (3 por cuadrante = 12 estrategias)", disabled=not puede_editar, type="primary"):
+                if df_foda_estrategia.empty:
+                    st.error("Primero debes cargar los datos del FODA Cruzado en la pestaña anterior.")
+                else:
+                    with st.spinner("Generando 12 estrategias estratégicas (3 por cuadrante) con 5 actividades cada una..."):
+                        # Obtener factores por cuadrante para contexto
+                        contexto_foda = df_foda_estrategia.to_string()
+                        
+                        prompt_estrategias = (
+                            "Basado en el siguiente análisis FODA Cruzado:\n"
+                            f"{contexto_foda}\n\n"
+                            "Genera exactamente 3 estrategias para cada uno de los 4 cuadrantes (FO, FA, DO, DA), total 12 estrategias.\n"
+                            "Para cada estrategia proporciona:\n"
+                            "1. Cuadrante (FO, FA, DO, o DA)\n"
+                            "2. Estrategia: Descripción clara y específica de la estrategia\n"
+                            "3. Importancia: Selecciona una de (Alta, Media Alta, Media Baja, Baja)\n"
+                            "4. Actividades: Lista de EXACTAMENTE 5 actividades clave separadas por punto y coma (;) para implementar la estrategia\n"
+                            "5. Plan Asignado: Selecciona uno de (Plan Administrativo, Plan Operativo, Plan Tecnológico, Plan Financiero, Plan de Monitoreo y control, Plan de Mejora, Plan de Contingencia)\n\n"
+                            "Formato de salida EXACTO (una estrategia por línea):\n"
+                            "CUADRANTE|ESTRATEGIA|IMPORTANCIA|ACTIVIDAD|PLAN_ASIGNADO\n\n"
+                            "Ejemplo:\n"
+                            "FO|Expandir mercado en nuevas regiones utilizando fortalezas tecnológicas|Alta|Investigar mercados potenciales;Adaptar producto a nuevas necesidades;Lanzar campaña marketing digital;Capacitar equipo de ventas;Establecer alianzas locales|Plan Operativo\n"
+                            "FO|Alianza estratégica con proveedores clave|Media Alta|Identificar proveedores potenciales;Negociar contratos marco;Implementar integración de sistemas;Capacitar personal en nuevos procesos;Evaluar desempeño de proveedores|Plan Administrativo\n"
+                            "FA|Programa de retención de clientes ante nueva competencia|Alta|Analizar tasa de churn actual;Crear programa fidelización;Capacitar equipo de servicio al cliente;Implementar encuestas satisfacción;Diseñar promociones exclusivas|Plan de Mejora\n\n"
+                            "Genera exactamente 12 líneas (3 por cada cuadrante FO, FA, DO, DA). Cada estrategia debe tener EXACTAMENTE 5 actividades separadas por punto y coma (;). No uses encabezados."
+                        )                        
+                        resultado = generar_analisis(prompt_estrategias)
+                        
+                        # Parsear resultado con mejor manejo de errores
+                        estrategias_list = []
+                        lineas = [l.strip() for l in resultado.split('\n') if l.strip()]
+                        
+                        st.write("Debug - Respuesta de IA:", resultado[:500] if len(resultado) > 500 else resultado)
+                        
+                        for linea in lineas[:12]:  # Máximo 12 estrategias
+                            partes = linea.split('|')
+                            if len(partes) >= 5:
+                                # Asegurar que hay 5 actividades
+                                actividades = partes[3].strip()
+                                # Contar actividades separadas por ;
+                                num_actividades = len([a for a in actividades.split(';') if a.strip()])
+                                
+                                estrategias_list.append({
+                                    'empresa_id': empresa_id,
+                                    'cuadrante': partes[0].strip().upper(),
+                                    'estrategia': partes[1].strip(),
+                                    'importancia': partes[2].strip(),
+                                    'actividades': actividades,
+                                    'plan_asignado': partes[4].strip()
+                                })
+                            elif len(partes) == 4:
+                                # Intentar detectar si falta el plan asignado
+                                estrategias_list.append({
+                                    'empresa_id': empresa_id,
+                                    'cuadrante': partes[0].strip().upper(),
+                                    'estrategia': partes[1].strip(),
+                                    'importancia': partes[2].strip(),
+                                    'actividades': partes[3].strip(),
+                                    'plan_asignado': 'Plan Operativo'  # Default
+                                })
+                        
+                        if estrategias_list:
+                            try:
+                                # Guardar en Supabase
+                                supabase.table('estrategias_generadas').delete().eq('empresa_id', empresa_id).execute()
+                                supabase.table('estrategias_generadas').insert(estrategias_list).execute()
+                                
+                                total_actividades = sum([len([a for a in est['actividades'].split(';') if a.strip()]) for est in estrategias_list])
+                                st.success(f"✅ {len(estrategias_list)} estrategias generadas y guardadas exitosamente.")
+                                st.info(f"📋 Total de actividades generadas: {total_actividades} (objetivo: 60 actividades)")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Error al guardar estrategias: {e}")
+                        else:
+                            st.error("No se pudieron parsear las estrategias generadas. Intenta nuevamente.")
+                            st.write("Respuesta completa de la IA para debugging:")
+                            st.code(resultado)
+        else:
+            # ESTE BLOQUE ES CRUCIAL - Aquí se muestran las estrategias existentes
+            # Mostrar estrategias existentes en editor
+            st.success(f"Se encontraron {len(df_estrategias)} estrategias generadas.")
+            
+            # Calcular total de actividades
+            total_actividades = 0
+            for _, est in df_estrategias.iterrows():
+                acts = str(est.get('actividades', ''))
+                total_actividades += len([a for a in acts.split(';') if a.strip()])
+            
+            st.info(f"📋 Total de actividades: {total_actividades} (objetivo: 60 actividades = 12 estrategias × 5 actividades)")
+            
+            st.write("**Editar Estrategias:**")
+            
+            edited_df = st.data_editor(
+                df_estrategias.drop(columns=['id', 'empresa_id'], errors='ignore'), 
+                num_rows="dynamic", 
+                key="editor_estrategias", 
+                use_container_width=True,
+                disabled=not puede_editar,
+                column_config={
+                    "cuadrante": st.column_config.SelectboxColumn("Cuadrante", options=["FO", "FA", "DO", "DA"]),
+                    "importancia": st.column_config.SelectboxColumn("Importancia", options=["Alta", "Media Alta", "Media Baja", "Baja"]),
+                    "plan_asignado": st.column_config.SelectboxColumn("Plan Asignado", 
+                        options=["Plan Administrativo", "Plan Operativo", "Plan Tecnológico", "Plan Financiero", 
+                                "Plan de Monitoreo y control", "Plan de Mejora", "Plan de Contingencia"]),
+                    "estrategia": st.column_config.TextColumn("Estrategia", width="large"),
+                    "actividades": st.column_config.TextColumn("Actividades (separar con ;)", width="large")
+                }
+            )
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                if st.button("💾 Guardar Cambios", disabled=not puede_editar):
+                    try:
+                        supabase.table('estrategias_generadas').delete().eq('empresa_id', empresa_id).execute()
+                        if not edited_df.empty:
+                            df_to_save = edited_df.copy()
+                            df_to_save['empresa_id'] = empresa_id
+                            supabase.table('estrategias_generadas').insert(df_to_save.to_dict(orient='records')).execute()
+                        st.success("Estrategias actualizadas."); 
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al guardar estrategias: {e}")
+            with col2:
+                if st.button("🗑️ Eliminar Todas", type="secondary", disabled=not puede_editar):
+                    try:
+                        supabase.table('estrategias_generadas').delete().eq('empresa_id', empresa_id).execute()
+                        st.success("Estrategias eliminadas."); 
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al eliminar: {e}")
+            with col3:
+                if st.button("🔄 Regenerar con IA", disabled=not puede_editar):
+                    # Eliminar actuales y regenerar
+                    try:
+                        supabase.table('estrategias_generadas').delete().eq('empresa_id', empresa_id).execute()
+                        st.rerun()
+                    except:
+                        pass
                         
     # --- PESTAÑA 4: PLANES ESTRATÉGICOS ---
     with tab4:
@@ -6729,6 +6730,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
