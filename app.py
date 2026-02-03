@@ -5566,6 +5566,21 @@ Lenguaje ejecutivo y directo."""
                         if st.button("🗑️ Descartar", key="btn_clear_resumen_semaforo", type="secondary"):
                             del st.session_state['resumen_semaforo_generado']
                             st.rerun()
+# Mostrar último análisis guardado (siempre visible cuando hay resultados de semaforización)
+st.divider()
+st.subheader("📄 Último Análisis Ejecutivo Guardado")
+
+# Obtener el análisis guardado de la empresa
+analisis_guardado = empresa_data.get('analisis_semaforo_resumen', '')
+if analisis_guardado and str(analisis_guardado).strip():
+    with st.container():
+        st.info(analisis_guardado)
+        # Intentar obtener fecha de actualización si existe
+        fecha_actualizacion = empresa_data.get('updated_at', '')
+        if fecha_actualizacion:
+            st.caption(f"📅 Última actualización: {fecha_actualizacion}")
+else:
+    st.info("ℹ️ No hay análisis ejecutivo guardado todavía. Genera uno nuevo usando el botón 'Generar Análisis Completo' arriba.") 
         
         # ✅ ESTE else: DEBE ESTAR AL MISMO NIVEL QUE if 'resultados_semaforo' in st.session_state:
         else:
@@ -6753,6 +6768,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
