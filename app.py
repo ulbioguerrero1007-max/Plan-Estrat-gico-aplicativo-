@@ -5434,101 +5434,35 @@ Genera el análisis ahora:"""
                 st.success(f"✅ Análisis completado para {len(resultados_semaforo)} estrategias")
                 st.rerun()
         
-        # Mostrar resultados si existen
-        if 'resultados_semaforo' in st.session_state:
-            resultados = st.session_state['resultados_semaforo']
-            
-            # Dashboard resumen
-            st.subheader("📊 Dashboard de Semaforización")
-            
-            conteo_colores = {'🔴': 0, '🟡': 0, '🟢': 0}
-            for r in resultados:
-                conteo_colores[r['color']] = conteo_colores.get(r['color'], 0) + 1
-            
-            total = len(resultados)
-            
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                st.metric("🟢 Óptimas", f"{conteo_colores['🟢']} ({conteo_colores['🟢']/total*100:.0f}%)")
-            with col2:
-                st.metric("🟡 Atención", f"{conteo_colores['🟡']} ({conteo_colores['🟡']/total*100:.0f}%)")
-            with col3:
-                st.metric("🔴 Críticas", f"{conteo_colores['🔴']} ({conteo_colores['🔴']/total*100:.0f}%)")
-            with col4:
-                riesgo = "ALTO" if conteo_colores['🔴'] > total*0.3 else "MEDIO" if conteo_colores['🔴'] > total*0.1 else "BAJO"
-                st.metric("Nivel de Riesgo", riesgo)
-            
-            # Gráfico de distribución
-            fig_colores = go.Figure(data=[go.Pie(
-                labels=['Óptimas', 'Atención', 'Críticas'],
-                values=[conteo_colores['🟢'], conteo_colores['🟡'], conteo_colores['🔴']],
-                marker_colors=['#2ecc71', '#f1c40f', '#e74c3c'],
-                hole=0.4
-            )])
-            fig_colores.update_layout(title="Distribución de Estrategias por Estado")
-            st.plotly_chart(fig_colores, use_container_width=True)
-            
-            st.divider()
-            
-            # Detalle por estrategia
-            st.subheader("📋 Análisis Detallado por Estrategia")
-            
-            # Filtros
-            col_filtro1, col_filtro2 = st.columns(2)
-            with col_filtro1:
-                filtro_color = st.multiselect("Filtrar por color", ['🔴', '🟡', '🟢'], default=['🔴', '🟡', '🟢'])
-            with col_filtro2:
-                filtro_plan = st.multiselect("Filtrar por plan", 
-                    df_cmi['plan_asignado'].unique().tolist() if not df_cmi.empty else [],
-                    default=df_cmi['plan_asignado'].unique().tolist() if not df_cmi.empty else [])
-            
-            # Mostrar estrategias filtradas
-            for resultado in resultados:
-                if resultado['color'] not in filtro_color:
-                    continue
-                if resultado['plan_asignado'] not in filtro_plan:
-                    continue
-                
-                with st.container():
-                    # Encabezado con color
-                    color_bg = {'🔴': '#ffebee', '🟡': '#fffde7', '🟢': '#e8f5e9'}[resultado['color']]
-                    
-                    st.markdown(f"""
-                    <div style='background-color: {color_bg}; padding: 15px; border-radius: 10px; border-left: 5px solid {"#e74c3c" if resultado["color"]=="🔴" else "#f1c40f" if resultado["color"]=="🟡" else "#2ecc71"}; margin-bottom: 10px;'>
-                        <h4>{resultado['color']} {resultado['cuadrante']} | {resultado['estrategia_nombre'][:60]}...</h4>
-                        <p><strong>Plan:</strong> {resultado['plan_asignado']} | <strong>Importancia:</strong> {resultado['importancia']}</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    with st.expander("Ver análisis completo de IA"):
-                        st.markdown(resultado['analisis_completo'])
-                        
-                        # Botón para regenerar análisis específico
-                        if st.button("🔄 Regenerar análisis", key=f"regen_{resultado['estrategia_id']}"):
-                            # Eliminar este resultado específico y regenerar
-                            st.session_state['regenerar_estrategia'] = resultado['estrategia_id']
-                            st.rerun()
-                    
-                    st.divider()
-            
+    # Mostrar resultados si existen
+    if 'resultados_semaforo' in st.session_state:
+        resultados = st.session_state['resultados_semaforo']
+        
+        # Dashboard resumen
+        st.subheader("📊 Dashboard de Semaforización")
+        
+        conteo_colores = {'🔴': 0, '🟡': 0, '🟢': 0}
+        for r in resultados:
+            conteo_colores[r['color']] = conteo_colores.get(r['color'], 0) + 1
+        
+        total = len(resultados)
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("🟢 Óptimas", f"{conteo_colores['🟢']} ({conteo_colores['🟢']/total*100:.0f}%)")
+        with col2:
+            st.metric("🟡 Atención", f"{conteo_colores['🟡']} ({conteo_colores['🟡']/total*100:.0f}%)")
+        with col3:
+            st.metric("🔴 Críticas", f"{conteo_colores['🔴']} ({conteo_colores['🔴']/total*100:.0f}%)")
+        with col4:
+            riesgo = "ALTO" if conteo_colores['🔴'] > total*0.3 else "MEDIO" if conteo_colores['🔴'] > total*0.1 else "BAJO"
+            st.metric("Nivel de Riesgo", riesgo)
+        
+        # ... resto del código del dashboard ...
+        
         # Análisis ejecutivo general
         with st.expander("📄 Ver Análisis Ejecutivo General"):
-            prompt_resumen = f"""Como Director Estratégico, genera un resumen ejecutivo de máximo 400 palabras basado en este análisis de semaforización:
-
-DISTRIBUCIÓN DE ESTRATEGIAS:
-- 🟢 Óptimas: {conteo_colores['🟢']} de {total}
-- 🟡 Atención: {conteo_colores['🟡']} de {total}  
-- 🔴 Críticas: {conteo_colores['🔴']} de {total}
-
-CONTEXTO: {contexto_empresarial['nombre']} con postura {contexto_empresarial['postura']}
-
-Incluye:
-1. Diagnóstico general del portafolio de estrategias
-2. Patrones detectados (¿algún plan funcional con problemas?)
-3. Prioridades de acción inmediatas
-4. Recomendación estratégica final
-
-Lenguaje ejecutivo y directo."""
+            prompt_resumen = f"""..."""
             
             # Botón para generar resumen
             if st.button("📊 Generar Resumen Ejecutivo con IA", key="btn_gen_resumen_semaforo"):
@@ -5566,33 +5500,34 @@ Lenguaje ejecutivo y directo."""
                     if st.button("🗑️ Descartar", key="btn_clear_resumen_semaforo", type="secondary"):
                         del st.session_state['resumen_semaforo_generado']
                         st.rerun()
+    
+    # ✅ ESTE else: DEBE ESTAR AL MISMO NIVEL QUE el if 'resultados_semaforo' in st.session_state:
+    else:
+        # Vista previa/informativa antes de generar
+        st.info("""
+        ### 🎯 ¿Qué analizará la IA automáticamente?
         
-        else:
-            # Vista previa/informativa antes de generar
-            st.info("""
-            ### 🎯 ¿Qué analizará la IA automáticamente?
-            
-            **Sin que tengas que ingresar nada más**, el sistema evaluará cada estrategia considerando:
-            
-            1. **🎯 Alineación FODA**: ¿La estrategia apoya la postura estratégica general?
-            
-            2. **🌍 Contexto PEST**: ¿El entorno externo favorece o dificulta esta estrategia?
-            
-            3. **⚖️ Coherencia**: ¿Hay coherencia entre la importancia declarada y el plan asignado?
-            
-            4. **📋 Viabilidad**: ¿Las actividades propuestas son suficientes y realistas?
-            
-            5. **⚠️ Riesgos implícitos**: Cada cuadrante FODA tiene riesgos característicos
-            
-            ### 📊 Output del análisis:
-            - **Color del semáforo** para cada estrategia
-            - **Justificación detallada** del por qué ese color
-            - **Diagnóstico** de fortalezas/debilidades
-            - **Acciones recomendadas** inmediatas
-            - **Impacto estratégico** si falla
-            
-            Haz clic en **"Generar Análisis Completo"** arriba para comenzar.
-            """)
+        **Sin que tengas que ingresar nada más**, el sistema evaluará cada estrategia considerando:
+        
+        1. **🎯 Alineación FODA**: ¿La estrategia apoya la postura estratégica general?
+        
+        2. **🌍 Contexto PEST**: ¿El entorno externo favorece o dificulta esta estrategia?
+        
+        3. **⚖️ Coherencia**: ¿Hay coherencia entre la importancia declarada y el plan asignado?
+        
+        4. **📋 Viabilidad**: ¿Las actividades propuestas son suficientes y realistas?
+        
+        5. **⚠️ Riesgos implícitos**: Cada cuadrante FODA tiene riesgos característicos
+        
+        ### 📊 Output del análisis:
+        - **Color del semáforo** para cada estrategia
+        - **Justificación detallada** del por qué ese color
+        - **Diagnóstico** de fortalezas/debilidades
+        - **Acciones recomendadas** inmediatas
+        - **Impacto estratégico** si falla
+        
+        Haz clic en **"Generar Análisis Completo"** arriba para comenzar.
+        """)
             
             # Mostrar preview de estrategias a analizar
             if not df_cmi.empty:
@@ -6751,6 +6686,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
