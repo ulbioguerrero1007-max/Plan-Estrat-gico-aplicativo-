@@ -5511,9 +5511,9 @@ Genera el análisis ahora:"""
                     
                     st.divider()
             
-            # Análisis ejecutivo general
-            with st.expander("📄 Ver Análisis Ejecutivo General"):
-                prompt_resumen = f"""Como Director Estratégico, genera un resumen ejecutivo de máximo 400 palabras basado en este análisis de semaforización:
+        # Análisis ejecutivo general
+        with st.expander("📄 Ver Análisis Ejecutivo General"):
+            prompt_resumen = f"""Como Director Estratégico, genera un resumen ejecutivo de máximo 400 palabras basado en este análisis de semaforización:
 
 DISTRIBUCIÓN DE ESTRATEGIAS:
 - 🟢 Óptimas: {conteo_colores['🟢']} de {total}
@@ -5529,22 +5529,43 @@ Incluye:
 4. Recomendación estratégica final
 
 Lenguaje ejecutivo y directo."""
-                
-                if st.button("📊 Generar Resumen Ejecutivo con IA"):
-                    with st.spinner("Generando..."):
+            
+            # Botón para generar resumen
+            if st.button("📊 Generar Resumen Ejecutivo con IA", key="btn_gen_resumen_semaforo"):
+                with st.spinner("Generando..."):
+                    try:
                         resumen_ejecutivo = generar_analisis(prompt_resumen)
-                        st.markdown("### 📋 Análisis Generado:")
-                        st.info(resumen_ejecutivo)
-                        
-                        # Botón para guardar en BD
-                        if st.button("💾 Guardar Resumen en Empresa"):
-                            try:
-                                supabase.table('empresas').update({
-                                    'analisis_semaforo_resumen': resumen_ejecutivo
-                                }).eq('id', empresa_id).execute()
-                                st.success("Resumen guardado")
-                            except Exception as e:
-                                st.error(f"Error al guardar: {e}")
+                        st.session_state['resumen_semaforo_generado'] = resumen_ejecutivo
+                        st.success("✅ Resumen generado")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al generar: {e}")
+            
+            # Mostrar resumen si existe en session state
+            if 'resumen_semaforo_generado' in st.session_state:
+                resumen_texto = st.session_state['resumen_semaforo_generado']
+                st.markdown("### 📋 Análisis Generado:")
+                st.info(resumen_texto)
+                
+                # Botón para guardar (separado del botón de generar)
+                col_guardar, col_limpiar = st.columns(2)
+                with col_guardar:
+                    if st.button("💾 Guardar Resumen en Empresa", key="btn_save_resumen_semaforo", type="primary"):
+                        try:
+                            supabase.table('empresas').update({
+                                'analisis_semaforo_resumen': resumen_texto
+                            }).eq('id', empresa_id).execute()
+                            st.success("✅ Resumen guardado correctamente en la base de datos")
+                            # Limpiar el session state después de guardar exitosamente
+                            del st.session_state['resumen_semaforo_generado']
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"❌ Error al guardar: {e}")
+                
+                with col_limpiar:
+                    if st.button("🗑️ Descartar", key="btn_clear_resumen_semaforo", type="secondary"):
+                        del st.session_state['resumen_semaforo_generado']
+                        st.rerun()
         
         else:
             # Vista previa/informativa antes de generar
@@ -6730,6 +6751,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
