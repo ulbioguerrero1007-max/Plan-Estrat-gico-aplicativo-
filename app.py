@@ -2544,21 +2544,6 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
             if i + chunk_size < len(datos_oper_full):
                 story.append(PageBreak())
     
-    # Anexo D: CMI Completo - Eliminado del exterior de la función
-        
-        datos_cmi_full.append([
-            get_safe_value(row.get('Estrategia'), 40),
-            get_safe_value(row.get('Perspectiva'), 20),
-            get_safe_value(row.get('KPIs'), 35),
-            get_safe_value(row.get('Formulas'), 25),
-            get_safe_value(row.get('Frecuencia'), 15),
-            get_safe_value(row.get('LI'), 10),
-            get_safe_value(row.get('LC'), 10),
-            get_safe_value(row.get('LS'), 10),
-        ])
-    
-    tabla_cmi_full = create_professional_table(doc, headers, data, col_widths=[4.5, 2.5, 4.5, 3, 2, 1.5, 1.5, 1.5])
-    story.append(tabla_cmi_full)
     
     # Construir el PDF con manejo de errores mejorado
     try:
@@ -6873,5 +6858,4 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
-
 
