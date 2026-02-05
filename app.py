@@ -2207,8 +2207,8 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         datos_oper = [['Estrategia', 'Actividad', 'Plazo', 'Responsable', 'Costo']]
         for _, row in df_oper.head(30).iterrows():  # Mostrar primeras 30 para no sobrecargar
             datos_oper.append([
-                row['estrategia_nombre'][:25] + '...' if len(row['estrategia_nombre']) > 25 else row['estrategia_nombre'],
-                row['descripcion_actividad'][:35] + '...' if len(row['descripcion_actividad']) > 35 else row['descripcion_actividad'],
+                str(row['estrategia_nombre'])[:25] + '...' if len(str(row['estrategia_nombre'])) > 25 else str(row['estrategia_nombre']),
+                str(row['descripcion_actividad'])[:35] + '...' if len(str(row['descripcion_actividad'])) > 35 else str(row['descripcion_actividad']),
                 row['plazo'] or 'Pendiente',
                 row['responsable'] or 'Sin asignar',
                 f"${row['costo']:,.2f}"
@@ -2282,9 +2282,9 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
             for _, row in df_cmi.head(15).iterrows():
                 limites = f"LI:{row.get('LI','')} LC:{row.get('LC','')} LS:{row.get('LS','')}"
                 datos_cmi.append([
-                    row['Estrategia'][:35] + '...' if len(row['Estrategia']) > 35 else row['Estrategia'],
+                    str(row['Estrategia'])[:35] + '...' if len(str(row['Estrategia'])) > 35 else str(row['Estrategia']),
                     row['Perspectiva'],
-                    row['KPIs'][:30] + '...' if len(row['KPIs']) > 30 else row['KPIs'],
+                    str(row['KPIs'])[:30] + '...' if len(str(row['KPIs'])) > 30 else str(row['KPIs']),
                     row['Frecuencia'],
                     limites
                 ])
@@ -2383,7 +2383,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         for _, row in df_pest.iterrows():
             datos_pest_full.append([
                 row['categoria'],
-                row['factor'][:40] + '...' if len(row['factor']) > 40 else row['factor'],
+                str(row['factor'])[:40] + '...' if len(str(row['factor'])) > 40 else str(row['factor']),
                 row['tipo_foda'],
                 str(row['puntaje']),
                 f"{row['importancia']}%",
@@ -2524,8 +2524,8 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
         for idx, row in df_oper.iterrows():
             datos_oper_full.append([
                 str(idx + 1),
-                row['estrategia_nombre'][:30] + '...' if len(row['estrategia_nombre']) > 30 else row['estrategia_nombre'],
-                row['descripcion_actividad'][:40] + '...' if len(row['descripcion_actividad']) > 40 else row['descripcion_actividad'],
+                str(row['estrategia_nombre'])[:30] + '...' if len(str(row['estrategia_nombre'])) > 30 else str(row['estrategia_nombre']),
+                str(row['descripcion_actividad'])[:40] + '...' if len(str(row['descripcion_actividad'])) > 40 else str(row['descripcion_actividad']),
                 row['plazo'] or 'Pendiente',
                 row['responsable'] or 'Sin asignar',
                 f"${row['costo']:,.2f}"
@@ -3641,8 +3641,8 @@ def generar_word_completo_mejorado(empresa_id, version, elaborado, revisado, apr
         data = []
         for _, row in df_oper.head(30).iterrows():
             data.append([
-                (row['estrategia_nombre'][:25] + '...') if len(row['estrategia_nombre']) > 25 else row['estrategia_nombre'],
-                (row['descripcion_actividad'][:35] + '...') if len(row['descripcion_actividad']) > 35 else row['descripcion_actividad'],
+                (str(row['estrategia_nombre'])[:25] + '...') if len(str(row['estrategia_nombre'])) > 25 else str(row['estrategia_nombre']),
+                (str(row['descripcion_actividad'])[:35] + '...') if len(str(row['descripcion_actividad'])) > 35 else str(row['descripcion_actividad']),
                 row['plazo'] or 'Pendiente',
                 row['responsable'] or 'Sin asignar',
                 f"${row['costo']:,.2f}"
@@ -3696,9 +3696,9 @@ def generar_word_completo_mejorado(empresa_id, version, elaborado, revisado, apr
             for _, row in df_cmi.head(15).iterrows():
                 limites = f"LI:{row.get('LI','')} LC:{row.get('LC','')} LS:{row.get('LS','')}"
                 data.append([
-                    (row['Estrategia'][:35] + '...') if len(row['Estrategia']) > 35 else row['Estrategia'],
+                    (str(row['Estrategia'])[:35] + '...') if len(str(row['Estrategia'])) > 35 else str(row['Estrategia']),
                     row['Perspectiva'],
-                    (row['KPIs'][:30] + '...') if len(row['KPIs']) > 30 else row['KPIs'],
+                    (str(row['KPIs'])[:30] + '...') if len(str(row['KPIs'])) > 30 else str(row['KPIs']),
                     row['Frecuencia'],
                     limites
                 ])
@@ -3928,8 +3928,8 @@ def generar_word_completo_mejorado(empresa_id, version, elaborado, revisado, apr
         for idx, row in df_oper.iterrows():
             datos_oper_full.append([
                 str(idx + 1),
-                (row['estrategia_nombre'][:30] + '...') if len(row['estrategia_nombre']) > 30 else row['estrategia_nombre'],
-                (row['descripcion_actividad'][:40] + '...') if len(row['descripcion_actividad']) > 40 else row['descripcion_actividad'],
+                (str(row['estrategia_nombre'])[:30] + '...') if len(str(row['estrategia_nombre'])) > 30 else str(row['estrategia_nombre']),
+                (str(row['descripcion_actividad'])[:40] + '...') if len(str(row['descripcion_actividad'])) > 40 else str(row['descripcion_actividad']),
                 row['plazo'] or 'Pendiente',
                 row['responsable'] or 'Sin asignar',
                 f"${row['costo']:,.2f}"
@@ -3964,10 +3964,10 @@ def generar_word_completo_mejorado(empresa_id, version, elaborado, revisado, apr
         data = []
         for _, row in df_cmi.iterrows():
             data.append([
-                (row['Estrategia'][:40] + '...') if len(row['Estrategia']) > 40 else row['Estrategia'],
+                (str(row['Estrategia'])[:40] + '...') if len(str(row['Estrategia'])) > 40 else str(row['Estrategia']),
                 row['Perspectiva'],
-                (row['KPIs'][:35] + '...') if len(row['KPIs']) > 35 else row['KPIs'],
-                (row['Formulas'][:25] + '...') if len(row['Formulas']) > 25 else row['Formulas'],
+                (str(row['KPIs'])[:35] + '...') if len(str(row['KPIs'])) > 35 else str(row['KPIs']),
+                (str(row['Formulas'])[:25] + '...') if len(str(row['Formulas'])) > 25 else str(row['Formulas']),
                 row['Frecuencia'],
                 str(row['LI']),
                 str(row['LC']),
