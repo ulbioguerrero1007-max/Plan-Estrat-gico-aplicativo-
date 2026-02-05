@@ -2544,21 +2544,7 @@ def generar_pdf_completo_mejorado(empresa_id, version, elaborado, revisado, apro
             if i + chunk_size < len(datos_oper_full):
                 story.append(PageBreak())
     
-# Anexo D: CMI Completo
-if not df_cmi.empty:
-    add_page_break(doc)
-    add_custom_heading(doc, "Anexo D. Cuadro de Mando Integral Completo", level=2)
-    
-    datos_cmi_full = [['Estrategia', 'Perspectiva', 'KPIs', 'Fórmulas', 'Frecuencia', 'LI', 'LC', 'LS']]
-    for _, row in df_cmi.iterrows():
-        # Función auxiliar para manejar valores None/NaN de forma segura
-        def get_safe_value(value, max_len=None):
-            if value is None or pd.isna(value):
-                return ""
-            result = str(value)
-            if max_len and len(result) > max_len:
-                return result[:max_len] + '...'
-            return result
+    # Anexo D: CMI Completo - Eliminado del exterior de la función
         
         datos_cmi_full.append([
             get_safe_value(row.get('Estrategia'), 40),
@@ -6887,33 +6873,5 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
