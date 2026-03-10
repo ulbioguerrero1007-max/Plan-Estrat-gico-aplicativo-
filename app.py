@@ -4353,48 +4353,45 @@ def aplicacion_principal():
         def contar_palabras(texto):
             return len(texto.split()) if texto else 0
         
-        # Función para mostrar contador de palabras
-        def mostrar_contador(texto, limite, label):
-            palabras = contar_palabras(texto)
-            color = "green" if palabras <= limite else "red"
-            st.markdown(f"<span style='color:{color};font-size:12px;'>{label}: {palabras}/{limite} palabras</span>", unsafe_allow_html=True)
-            return palabras <= limite
+        # Función para crear label con contador integrado
+        def label_con_contador(texto_actual, limite, label_base):
+            palabras = contar_palabras(texto_actual)
+            color = "🟢" if palabras <= limite else "🔴"
+            return f"{label_base} {color} ({palabras}/{limite})"
         
         # DATOS GENERALES (form tradicional)
         with st.form("form_basicos"):
             col1, col2 = st.columns(2)
             with col1:
                 # Nombre de la empresa - 5 palabras
+                nombre_valor = empresa_data.get('nombre', '')
+                nombre_label = label_con_contador(nombre_valor, 5, "Nombre de la Empresa")
                 nombre = st.text_input(
-                    "Nombre de la Empresa", 
-                    empresa_data.get('nombre', ''), 
+                    nombre_label, 
+                    nombre_valor, 
                     disabled=not puede_editar
                 )
-                mostrar_contador(nombre, 5, "Nombre")
-                if contar_palabras(nombre) > 5:
-                    st.warning("⚠️ Máximo 5 palabras")
+                # Actualizar label dinámicamente no es posible en form, validamos al final
                 
                 # Objetivo del plan - 30 palabras
+                obj_plan_valor = empresa_data.get('objetivo_plan', '')
+                obj_plan_label = label_con_contador(obj_plan_valor, 30, "Objetivo del Plan")
                 objetivo_plan = st.text_area(
-                    "Objetivo del Plan", 
-                    empresa_data.get('objetivo_plan', ''), 
+                    obj_plan_label, 
+                    obj_plan_valor, 
                     disabled=not puede_editar, 
                     height=80
                 )
-                mostrar_contador(objetivo_plan, 30, "Objetivo del Plan")
-                if contar_palabras(objetivo_plan) > 30:
-                    st.warning("⚠️ Máximo 30 palabras")
             
             with col2:
                 # Giro del negocio - 15 palabras
+                giro_valor = empresa_data.get('giro', '')
+                giro_label = label_con_contador(giro_valor, 15, "Giro del Negocio")
                 giro = st.text_input(
-                    "Giro del Negocio", 
-                    empresa_data.get('giro', ''), 
+                    giro_label, 
+                    giro_valor, 
                     disabled=not puede_editar
                 )
-                mostrar_contador(giro, 15, "Giro")
-                if contar_palabras(giro) > 15:
-                    st.warning("⚠️ Máximo 15 palabras")
             
             # Logo
             st.divider()
@@ -4408,17 +4405,17 @@ def aplicacion_principal():
             logo_file = st.file_uploader("Cambiar Logo", type=['png', 'jpg', 'jpeg'], disabled=not puede_editar)
             
             if st.form_submit_button("💾 Guardar Datos Básicos", disabled=not puede_editar):
-                # Validar límites antes de guardar
+                # Validar límites
                 errores = []
                 if contar_palabras(nombre) > 5:
-                    errores.append("Nombre: máximo 5 palabras")
+                    errores.append(f"Nombre: {contar_palabras(nombre)}/5 palabras")
                 if contar_palabras(giro) > 15:
-                    errores.append("Giro: máximo 15 palabras")
+                    errores.append(f"Giro: {contar_palabras(giro)}/15 palabras")
                 if contar_palabras(objetivo_plan) > 30:
-                    errores.append("Objetivo del Plan: máximo 30 palabras")
+                    errores.append(f"Objetivo del Plan: {contar_palabras(objetivo_plan)}/30 palabras")
                 
                 if errores:
-                    st.error("❌ No se puede guardar. Corrige los siguientes errores:")
+                    st.error("❌ Límites excedidos:")
                     for error in errores:
                         st.error(f"   • {error}")
                 else:
@@ -4439,57 +4436,78 @@ def aplicacion_principal():
         
         with col_mision:
             with st.expander("🎯 Misión", expanded=False):
-                with st.form("form_mision"):
-                    # Misión - 65 palabras
-                    mision = st.text_area(
-                        "Misión", 
-                        empresa_data.get('mision', ''), 
-                        height=150, 
-                        disabled=not puede_editar
-                    )
-                    mostrar_contador(mision, 65, "Misión")
-                    
-                    if st.form_submit_button("Guardar", disabled=not puede_editar):
-                        if contar_palabras(mision) > 65:
-                            st.error("❌ La Misión no puede exceder 65 palabras")
-                        else:
-                            supabase.table('empresas').update({"mision": mision}).eq('id', empresa_id).execute()
-                            st.success("Guardado!")
-                            st.rerun()
+                # Usar session state para actualización en tiempo real
+                mision_key = "mision_temp"
+                if mision_key not in st.session_state:
+                    st.session_state[mision_key] = empresa_data.get('mision', '')
+                
+                # Contador en el label
+                mision_label = label_con_contador(st.session_state[mision_key], 65, "Misión")
+                
+                mision = st.text_area(
+                    mision_label, 
+                    st.session_state[mision_key], 
+                    height=150, 
+                    disabled=not puede_editar,
+                    key="mision_input"
+                )
+                
+                # Actualizar session state para que el contador cambie
+                st.session_state[mision_key] = mision
+                
+                # Mostrar advertencia si excede
+                if contar_palabras(mision) > 65:
+                    st.error(f"🔴 {contar_palabras(mision)}/65 palabras - ¡Excede el límite!")
+                
+                if st.button("💾 Guardar Misión", disabled=not puede_editar):
+                    if contar_palabras(mision) > 65:
+                        st.error("No se puede guardar. Excede el límite de 65 palabras.")
+                    else:
+                        supabase.table('empresas').update({"mision": mision}).eq('id', empresa_id).execute()
+                        st.success("Guardado!")
+                        st.rerun()
         
         with col_vision:
             with st.expander("👁️ Visión", expanded=False):
-                with st.form("form_vision"):
-                    # Visión - 45 palabras
-                    vision = st.text_area(
-                        "Visión", 
-                        empresa_data.get('vision', ''), 
-                        height=120, 
-                        disabled=not puede_editar
-                    )
-                    mostrar_contador(vision, 45, "Visión")
-                    
-                    if st.form_submit_button("Guardar", disabled=not puede_editar):
-                        if contar_palabras(vision) > 45:
-                            st.error("❌ La Visión no puede exceder 45 palabras")
-                        else:
-                            supabase.table('empresas').update({"vision": vision}).eq('id', empresa_id).execute()
-                            st.success("Guardado!")
-                            st.rerun()
+                vision_key = "vision_temp"
+                if vision_key not in st.session_state:
+                    st.session_state[vision_key] = empresa_data.get('vision', '')
+                
+                vision_label = label_con_contador(st.session_state[vision_key], 45, "Visión")
+                
+                vision = st.text_area(
+                    vision_label, 
+                    st.session_state[vision_key], 
+                    height=120, 
+                    disabled=not puede_editar,
+                    key="vision_input"
+                )
+                
+                st.session_state[vision_key] = vision
+                
+                if contar_palabras(vision) > 45:
+                    st.error(f"🔴 {contar_palabras(vision)}/45 palabras - ¡Excede el límite!")
+                
+                if st.button("💾 Guardar Visión", disabled=not puede_editar):
+                    if contar_palabras(vision) > 45:
+                        st.error("No se puede guardar. Excede el límite de 45 palabras.")
+                    else:
+                        supabase.table('empresas').update({"vision": vision}).eq('id', empresa_id).execute()
+                        st.success("Guardado!")
+                        st.rerun()
         
-        # LISTAS DINÁMICAS CON LÍMITE DE PALABRAS
+        # LISTAS DINÁMICAS CON CONTADOR EN TIEMPO REAL
         st.divider()
         
-        # Función auxiliar para listas dinámicas con límite de palabras
-        def render_lista_dinamica_con_limite(nombre_campo, label, empresa_data, empresa_id, puede_editar, limite_palabras):
-            """Renderiza componente de lista dinámica con límite de palabras por item"""
+        # Función auxiliar para listas dinámicas con contador integrado
+        def render_lista_dinamica_contador(nombre_campo, label, empresa_data, empresa_id, puede_editar, limite_palabras):
             session_key = f"lista_{nombre_campo}"
+            temp_key = f"temp_{nombre_campo}"
             edit_key = f"edit_{nombre_campo}"
             
             if edit_key not in st.session_state:
                 st.session_state[edit_key] = -1
             
-            # Inicializar session state
             if session_key not in st.session_state:
                 datos = empresa_data.get(nombre_campo, '')
                 if datos:
@@ -4510,31 +4528,44 @@ def aplicacion_principal():
                     
                     with cols[0]:
                         if st.session_state[edit_key] == idx:
+                            # Modo edición - contador en tiempo real
+                            edit_temp_key = f"edit_temp_{nombre_campo}_{idx}"
+                            if edit_temp_key not in st.session_state:
+                                st.session_state[edit_temp_key] = item
+                            
+                            # Label con contador dinámico
+                            label_edit = label_con_contador(st.session_state[edit_temp_key], limite_palabras, f"Editar item {idx+1}")
+                            
                             nuevo_valor = st.text_input(
-                                f"edit_{nombre_campo}_{idx}",
-                                value=item,
-                                label_visibility="collapsed",
+                                label_edit,
+                                st.session_state[edit_temp_key],
+                                label_visibility="visible",
                                 key=f"input_edit_{nombre_campo}_{idx}"
                             )
-                            # Mostrar contador en edición
-                            mostrar_contador(nuevo_valor, limite_palabras, f"Item {idx+1}")
+                            
+                            # Actualizar para que el contador cambie
+                            st.session_state[edit_temp_key] = nuevo_valor
+                            
+                            # Validar
+                            palabras_nuevo = contar_palabras(nuevo_valor)
+                            if palabras_nuevo > limite_palabras:
+                                st.error(f"🔴 {palabras_nuevo}/{limite_palabras} - Excede el límite")
                         else:
+                            # Modo visualización
                             st.markdown(f"**{idx + 1}.** {item}")
-                            # Mostrar contador en visualización
-                            mostrar_contador(item, limite_palabras, f"Item {idx+1}")
+                            # Contador del item guardado
+                            st.caption(f"{contar_palabras(item)}/{limite_palabras} palabras")
                     
                     with cols[1]:
                         if puede_editar:
                             if st.session_state[edit_key] == idx:
-                                # Validar límite antes de guardar edición
-                                if contar_palabras(nuevo_valor) <= limite_palabras:
+                                palabras_actuales = contar_palabras(st.session_state.get(f"edit_temp_{nombre_campo}_{idx}", item))
+                                if palabras_actuales <= limite_palabras:
                                     if st.button("✓", key=f"save_{nombre_campo}_{idx}", help="Guardar"):
-                                        st.session_state[session_key][idx] = nuevo_valor
+                                        st.session_state[session_key][idx] = st.session_state[f"edit_temp_{nombre_campo}_{idx}"]
                                         st.session_state[edit_key] = -1
+                                        del st.session_state[f"edit_temp_{nombre_campo}_{idx}"]
                                         st.rerun()
-                                else:
-                                    st.button("✓", key=f"save_{nombre_campo}_{idx}", help="Guardar", disabled=True)
-                                    st.warning(f"Máx {limite_palabras} palabras")
                             else:
                                 if st.button("✏️", key=f"edit_{nombre_campo}_{idx}", help="Editar"):
                                     st.session_state[edit_key] = idx
@@ -4551,33 +4582,40 @@ def aplicacion_principal():
             # Agregar nuevo item
             if puede_editar and st.session_state[edit_key] == -1:
                 st.divider()
+                
+                # Contador en tiempo real para nuevo item
+                if temp_key not in st.session_state:
+                    st.session_state[temp_key] = ""
+                
+                # Label con contador dinámico
+                label_nuevo = label_con_contador(st.session_state[temp_key], limite_palabras, f"Nuevo {label.lower()}")
+                
                 cols = st.columns([4, 1])
                 with cols[0]:
                     nuevo = st.text_input(
-                        f"Nuevo {label.lower()}",
-                        placeholder=f"Escribe un {label.lower()} (máx {limite_palabras} palabras)...",
+                        label_nuevo,
+                        st.session_state[temp_key],
+                        placeholder=f"Escribe aquí (máx {limite_palabras} palabras)...",
                         key=f"new_{nombre_campo}",
-                        label_visibility="collapsed"
+                        label_visibility="visible"
                     )
-                    # Mostrar contador
-                    mostrar_contador(nuevo, limite_palabras, "Nuevo item")
                     
-                    # Validar límite
-                    excede_limite = contar_palabras(nuevo) > limite_palabras
+                    # Actualizar para contador en tiempo real
+                    st.session_state[temp_key] = nuevo
+                    
+                    # Validar
+                    palabras_nuevo = contar_palabras(nuevo)
+                    excede = palabras_nuevo > limite_palabras
+                    
+                    if excede:
+                        st.error(f"🔴 {palabras_nuevo}/{limite_palabras} palabras - ¡Excede el límite!")
                 
                 with cols[1]:
-                    if st.button("➕ Agregar", key=f"add_{nombre_campo}", use_container_width=True, disabled=excede_limite):
-                        if nuevo.strip():
-                            if contar_palabras(nuevo) <= limite_palabras:
-                                st.session_state[session_key].append(nuevo.strip())
-                                st.rerun()
-                            else:
-                                st.warning(f"Máximo {limite_palabras} palabras")
-                        else:
-                            st.warning("Campo vacío")
-                
-                if excede_limite:
-                    st.error(f"❌ Excedes el límite de {limite_palabras} palabras")
+                    if st.button("➕ Agregar", key=f"add_{nombre_campo}", use_container_width=True, disabled=excede or not nuevo.strip()):
+                        if nuevo.strip() and palabras_nuevo <= limite_palabras:
+                            st.session_state[session_key].append(nuevo.strip())
+                            st.session_state[temp_key] = ""
+                            st.rerun()
                 
                 # Botón guardar en BD
                 if st.session_state[session_key]:
@@ -4590,8 +4628,8 @@ def aplicacion_principal():
                         except Exception as e:
                             st.error(f"Error: {e}")
         
-        # Objetivo General - 35 palabras por item
-        render_lista_dinamica_con_limite(
+        # Objetivo General - 35 palabras
+        render_lista_dinamica_contador(
             "obj_general", 
             "🎯 Objetivo General", 
             empresa_data, 
@@ -4602,8 +4640,8 @@ def aplicacion_principal():
         
         st.divider()
         
-        # Objetivos Específicos - 30 palabras por item
-        render_lista_dinamica_con_limite(
+        # Objetivos Específicos - 30 palabras
+        render_lista_dinamica_contador(
             "obj_especificos", 
             "📌 Objetivos Específicos", 
             empresa_data, 
@@ -4614,8 +4652,8 @@ def aplicacion_principal():
         
         st.divider()
         
-        # Políticas - 15 palabras por item
-        render_lista_dinamica_con_limite(
+        # Políticas - 15 palabras
+        render_lista_dinamica_contador(
             "politicas", 
             "📜 Políticas", 
             empresa_data, 
@@ -4626,8 +4664,8 @@ def aplicacion_principal():
         
         st.divider()
         
-        # Valores - 10 palabras por item
-        render_lista_dinamica_con_limite(
+        # Valores - 10 palabras
+        render_lista_dinamica_contador(
             "valores", 
             "💎 Valores", 
             empresa_data, 
@@ -7166,6 +7204,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
