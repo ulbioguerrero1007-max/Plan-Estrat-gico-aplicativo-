@@ -676,20 +676,6 @@ def mostrar_imagen_bd(imagen_data, caption="Imagen", width=None):
     except Exception as e:
         pass
     return False
-    
-def analizar_foda(df_foda):
-    if df_foda.empty: 
-        return None, None, None, pd.Series(dtype='float64')
-    estrategias = {'FO': 'Ofensiva (F+O)', 'FA': 'Defensiva (F+A)', 'DO': 'Adaptativa (D+O)', 'DA': 'Supervivencia (D+A)'}
-    puntajes = df_foda.groupby('cuadrante')['impacto'].sum().reindex(estrategias.keys(), fill_value=0)
-    puntajes_ordenados = puntajes.sort_values(ascending=False)
-    analisis_df = pd.DataFrame({
-        'Estrategia': [estrategias[c] for c in puntajes_ordenados.index],
-        'Puntaje Total': puntajes_ordenados.values
-    }).reset_index(drop=True)
-    estrategia_principal = analisis_df.iloc[0]['Estrategia']
-    resumen = f"La estrategia principal recomendada es **{analisis_df.iloc[0]['Estrategia']}** ({analisis_df.iloc[0]['Puntaje Total']} puntos), seguida por **{analisis_df.iloc[1]['Estrategia']}** ({analisis_df.iloc[1]['Puntaje Total']} puntos)."
-    return analisis_df, resumen, estrategia_principal, puntajes_ordenados
 
 def generar_planes_por_plantilla(estrategia_foda, pest_total, empresa_id=None):
     """
@@ -865,51 +851,86 @@ No incluyas encabezados ni texto adicional, solo las líneas de datos separadas 
         pass
     
     return df_cmi
-# ============================================================================
-# FUNCIONES DE GRÁFICOS MEJORADAS (Agregar estas funciones a tu app.py)
-# ============================================================================
+
 
 import matplotlib.pyplot as plt
 import numpy as np
 
-def generar_grafico_foda_radar_mejorado(puntajes):
-    """Genera gráfico de radar FODA con diseño profesional mejorado"""
-    if puntajes is None or puntajes.empty:
+def analizar_foda_peso(df_foda):
+    """
+    Análisis FODA usando PESO EN PORCENTAJE calculado dinámicamente.
+    Fórmula: peso = (impacto / suma_total_impactos) * 100
+    """
+    if df_foda.empty:
+        return None, None, None, pd.Series(dtype='float64')
+    
+    # Calcular peso dinámicamente
+    suma_total = pd.to_numeric(df_foda['impacto'], errors='coerce').sum()
+    if suma_total == 0:
+        return None, None, None, pd.Series(dtype='float64')
+    
+    df_foda = df_foda.copy()
+    df_foda['peso_porcentaje'] = (df_foda['impacto'] / suma_total * 100)
+    
+    # Estrategias según cuadrante
+    estrategias = {
+        'FO': 'Ofensiva (F+O)', 
+        'FA': 'Defensiva (F+A)', 
+        'DO': 'Adaptativa (D+O)', 
+        'DA': 'Supervivencia (D+A)'
+    }
+    
+    # Agrupar por cuadrante y sumar PESOS
+    pesos = df_foda.groupby('cuadrante')['peso_porcentaje'].sum().reindex(estrategias.keys(), fill_value=0)
+    pesos_ordenados = pesos.sort_values(ascending=False)
+    
+    # Crear DataFrame de análisis
+    analisis_df = pd.DataFrame({
+        'Estrategia': [estrategias[c] for c in pesos_ordenados.index],
+        'Peso % Total': pesos_ordenados.values.round(2)
+    }).reset_index(drop=True)
+    
+    estrategia_principal = analisis_df.iloc[0]['Estrategia']
+    
+    resumen = f"La estrategia principal recomendada es **{analisis_df.iloc[0]['Estrategia']}** ({analisis_df.iloc[0]['Peso % Total']:.2f}% del peso total), seguida por **{analisis_df.iloc[1]['Estrategia']}** ({analisis_df.iloc[1]['Peso % Total']:.2f}%)."
+    
+    return analisis_df, resumen, estrategia_principal, pesos_ordenados
+
+
+def generar_grafico_foda_radar_peso(pesos):
+    """
+    Genera gráfico de radar FODA usando PESOS EN PORCENTAJE.
+    """
+    if pesos is None or pesos.empty:
         return None
     
     labels = ['Ofensiva\n(FO)', 'Defensiva\n(FA)', 
               'Adaptativa\n(DO)', 'Supervivencia\n(DA)']
-    stats = puntajes.reindex(['FO', 'FA', 'DO', 'DA']).fillna(0).values
     
-    # Configurar estilo
+    stats = pesos.reindex(['FO', 'FA', 'DO', 'DA']).fillna(0).values
+    
     plt.style.use('default')
     
     fig, ax = plt.subplots(figsize=(7, 7), subplot_kw=dict(polar=True))
     
-    # Ángulos
     angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False).tolist()
     stats = np.concatenate((stats, [stats[0]]))
     angles += angles[:1]
     
-    # Colores profesionales convertidos a RGB
-    color_fill = (30/255, 58/255, 95/255)  # PRIMARY #1e3a5f
-    color_line = (201/255, 162/255, 39/255)  # SECONDARY #c9a227
+    color_fill = (30/255, 58/255, 95/255)
+    color_line = (201/255, 162/255, 39/255)
     
-    # Dibujar área
     ax.fill(angles, stats, color=color_fill, alpha=0.25)
     ax.plot(angles, stats, color=color_line, linewidth=3, marker='o', 
             markersize=8, markerfacecolor='white', markeredgewidth=2)
     
-    # Configurar ejes
     ax.set_yticklabels([])
     ax.set_xticks(angles[:-1])
     ax.set_xticklabels(labels, fontsize=11, fontweight='bold', color='#1f2937')
     
-    # Título
-    ax.set_title("Posicionamiento Estratégico FODA", 
+    ax.set_title("Posicionamiento Estratégico FODA\n(Peso %)", 
                 fontsize=14, fontweight='bold', color='#1e3a5f', pad=20)
     
-    # Grid mejorado
     ax.grid(True, linestyle='--', alpha=0.5, color='gray')
     ax.spines['polar'].set_color('#e2e8f0')
     
@@ -5003,7 +5024,11 @@ def aplicacion_principal():
                                 df_foda_filtrado['impacto'] = df_foda_filtrado['impacto'].fillna(0).astype(int)
                                 df_foda_filtrado['empresa_id'] = empresa_id
                                 
-                                # Mostrar preview de lo que se va a guardar
+                                # Seleccionar solo columnas que existen en la BD (sin peso_porcentaje)
+                                columnas_bd = ['cuadrante', 'factor_fila', 'factor_columna', 'impacto', 'empresa_id']
+                                df_guardar = df_foda_filtrado[columnas_bd].copy()
+                                
+                                # Mostrar preview con peso calculado (solo en UI)
                                 with st.expander("👁️ Vista previa de datos a guardar"):
                                     st.dataframe(
                                         df_foda_filtrado[['cuadrante', 'factor_fila', 'factor_columna', 'impacto', 'peso_porcentaje']], 
@@ -5013,9 +5038,9 @@ def aplicacion_principal():
                                 
                                 # Eliminar datos anteriores y guardar nuevos
                                 supabase.table('foda_cruzado').delete().eq('empresa_id', empresa_id).execute()
-                                supabase.table('foda_cruzado').insert(df_foda_filtrado.to_dict(orient='records')).execute()
+                                supabase.table('foda_cruzado').insert(df_guardar.to_dict(orient='records')).execute()
                                 
-                                st.success(f"¡{len(df_foda_filtrado)} filas importadas con peso % calculado!")
+                                st.success(f"¡{len(df_guardar)} filas importadas! (Peso % calculado para análisis)")
                                 st.rerun()
                                 
                         except Exception as e:
@@ -5025,15 +5050,23 @@ def aplicacion_principal():
             # Mostrar datos existentes
             df_foda = get_datos_tabla('foda_cruzado', empresa_id)
             if not df_foda.empty:
-                st.write("**Datos FODA Actuales (con peso %):**")
+                st.write("**Datos FODA Actuales:**")
                 
-                # Asegurar que peso_porcentaje exista (para datos antiguos)
-                if 'peso_porcentaje' not in df_foda.columns:
-                    suma_total = df_foda['impacto'].sum()
+                # Calcular peso en porcentaje dinámicamente (no guardar en BD)
+                suma_total = pd.to_numeric(df_foda['impacto'], errors='coerce').sum()
+                if suma_total > 0:
                     df_foda['peso_porcentaje'] = (df_foda['impacto'] / suma_total * 100).round(2)
+                else:
+                    df_foda['peso_porcentaje'] = 0
+                
+                # Reordenar columnas para mostrar peso después de impacto
+                cols_orden = ['cuadrante', 'factor_fila', 'factor_columna', 'impacto', 'peso_porcentaje']
+                cols_existentes = [c for c in cols_orden if c in df_foda.columns]
+                otras_cols = [c for c in df_foda.columns if c not in cols_orden and c not in ['id', 'empresa_id']]
+                df_mostrar = df_foda[cols_existentes + otras_cols]
                 
                 edited_foda = st.data_editor(
-                    df_foda.drop(columns=['id', 'empresa_id'], errors='ignore'), 
+                    df_mostrar.drop(columns=['id', 'empresa_id'], errors='ignore'), 
                     num_rows="dynamic", 
                     key="editor_foda", 
                     use_container_width=True, 
@@ -5042,23 +5075,25 @@ def aplicacion_principal():
                 
                 if st.button("💾 Guardar Cambios en FODA", key="save_foda_changes", disabled=not puede_editar):
                     try:
-                        # Recalcular pesos si se editaron impactos
-                        if 'impacto' in edited_foda.columns:
-                            suma_total = pd.to_numeric(edited_foda['impacto'], errors='coerce').sum()
-                            if suma_total > 0:
-                                edited_foda['peso_porcentaje'] = (edited_foda['impacto'] / suma_total * 100).round(2)
+                        # Guardar solo columnas de la BD (sin peso_porcentaje)
+                        columnas_bd = ['cuadrante', 'factor_fila', 'factor_columna', 'impacto']
+                        for col in columnas_bd:
+                            if col not in edited_foda.columns:
+                                edited_foda[col] = None
+                        
+                        df_guardar = edited_foda[columnas_bd].copy()
+                        df_guardar['empresa_id'] = empresa_id
                         
                         supabase.table('foda_cruzado').delete().eq('empresa_id', empresa_id).execute()
-                        if not edited_foda.empty:
-                            edited_foda['empresa_id'] = empresa_id
-                            supabase.table('foda_cruzado').insert(edited_foda.to_dict(orient='records')).execute()
+                        if not df_guardar.empty:
+                            supabase.table('foda_cruzado').insert(df_guardar.to_dict(orient='records')).execute()
                         st.success("Cambios en FODA guardados.")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error al guardar FODA: {e}")
                 
-                # Análisis con PESO EN PORCENTAJE en lugar de puntaje
-                analisis_df, resumen_foda, estrategia_principal, puntajes_foda = analizar_foda_peso(df_foda)
+                # Análisis con PESO EN PORCENTAJE
+                analisis_df, resumen_foda, estrategia_principal, pesos_foda = analizar_foda_peso(df_foda)
                 
                 if analisis_df is not None:
                     st.subheader("🎯 Postura Competitiva Sugerida (por Peso %)")
@@ -5066,7 +5101,7 @@ def aplicacion_principal():
                     
                     col1, col2 = st.columns(2)
                     with col1:
-                        # Mostrar tabla con PESO % en lugar de puntaje
+                        # Mostrar tabla con PESO %
                         st.dataframe(analisis_df, use_container_width=True)
                         
                         # Mostrar suma total de pesos
@@ -5074,8 +5109,8 @@ def aplicacion_principal():
                         st.caption(f"Suma total de pesos: {total_peso:.2f}%")
                         
                     with col2:
-                        # Gráfico con pesos en lugar de puntajes
-                        grafico_foda = generar_grafico_foda_radar_peso(puntajes_foda)
+                        # Gráfico con pesos
+                        grafico_foda = generar_grafico_foda_radar_peso(pesos_foda)
                         if grafico_foda: 
                             st.image(grafico_foda)
             
@@ -7282,6 +7317,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
