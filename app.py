@@ -25,6 +25,96 @@ import time
 from supabase import create_client, Client
 from reportlab.lib.colors import HexColor, Color, white
 
+def init_lista_session_state(nombre_campo, empresa_data):
+    """Inicializa session state para listas dinámicas"""
+    session_key = f"lista_{nombre_campo}"
+    if session_key not in st.session_state:
+        datos = empresa_data.get(nombre_campo, '')
+        if datos:
+            items = [i.strip() for i in str(datos).split('\n') if i.strip()]
+            st.session_state[session_key] = items
+        else:
+            st.session_state[session_key] = []
+    return st.session_state[session_key]
+
+def render_lista_dinamica(nombre_campo, label, empresa_data, empresa_id, puede_editar):
+    """Renderiza componente de lista dinámica completo con CRUD"""
+    session_key = f"lista_{nombre_campo}"
+    edit_key = f"edit_{nombre_campo}"
+    
+    if edit_key not in st.session_state:
+        st.session_state[edit_key] = -1
+    
+    items = init_lista_session_state(nombre_campo, empresa_data)
+    
+    st.subheader(label)
+    
+    # Mostrar items existentes
+    if items:
+        for idx, item in enumerate(items):
+            cols = st.columns([8, 1, 1])
+            
+            with cols[0]:
+                if st.session_state[edit_key] == idx:
+                    nuevo_valor = st.text_input(
+                        f"edit_{nombre_campo}_{idx}",
+                        value=item,
+                        label_visibility="collapsed",
+                        key=f"input_edit_{nombre_campo}_{idx}"
+                    )
+                else:
+                    st.markdown(f"**{idx + 1}.** {item}")
+            
+            with cols[1]:
+                if puede_editar:
+                    if st.session_state[edit_key] == idx:
+                        if st.button("✓", key=f"save_{nombre_campo}_{idx}", help="Guardar"):
+                            st.session_state[session_key][idx] = nuevo_valor
+                            st.session_state[edit_key] = -1
+                            st.rerun()
+                    else:
+                        if st.button("✏️", key=f"edit_{nombre_campo}_{idx}", help="Editar"):
+                            st.session_state[edit_key] = idx
+                            st.rerun()
+            
+            with cols[2]:
+                if puede_editar and st.session_state[edit_key] != idx:
+                    if st.button("🗑️", key=f"del_{nombre_campo}_{idx}", help="Eliminar"):
+                        st.session_state[session_key].pop(idx)
+                        st.rerun()
+    else:
+        st.info(f"No hay {label.lower()} guardados")
+    
+    # Agregar nuevo item
+    if puede_editar and st.session_state[edit_key] == -1:
+        st.divider()
+        cols = st.columns([4, 1])
+        with cols[0]:
+            nuevo = st.text_input(
+                f"Nuevo {label.lower()}",
+                placeholder=f"Escribe un {label.lower()}...",
+                key=f"new_{nombre_campo}",
+                label_visibility="collapsed"
+            )
+        with cols[1]:
+            if st.button("➕ Agregar", key=f"add_{nombre_campo}", use_container_width=True):
+                if nuevo.strip():
+                    st.session_state[session_key].append(nuevo.strip())
+                    st.rerun()
+                else:
+                    st.warning("Campo vacío")
+        
+        # Botón guardar en BD
+        if st.session_state[session_key]:
+            if st.button(f"💾 Guardar {label}", key=f"save_db_{nombre_campo}", type="primary"):
+                try:
+                    texto = "\n".join(st.session_state[session_key])
+                    supabase.table('empresas').update({nombre_campo: texto}).eq('id', empresa_id).execute()
+                    st.success(f"✅ {label} guardado!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error: {e}")
+
 class ColorPalette:
     """Paleta de colores profesional para documentos ejecutivos"""
     PRIMARY = HexColor('#1e3a5f')      # Azul marino corporativo
@@ -4257,98 +4347,103 @@ def aplicacion_principal():
     
     # --- PESTAÑA 1: INTRODUCCION ---
     with tab1:
-        st.header("Introduccion y Cultura Organizacional")
-        
-        with st.form("form_intro"):
-            st.subheader("Datos Generales")
+    st.header("Introducción y Cultura Organizacional")
+    
+    # DATOS GENERALES (form tradicional)
+    with st.form("form_basicos"):
+        col1, col2 = st.columns(2)
+        with col1:
             nombre = st.text_input("Nombre de la Empresa", empresa_data.get('nombre', ''), disabled=not puede_editar)
+            objetivo_plan = st.text_area("Objetivo del Plan", empresa_data.get('objetivo_plan', ''), disabled=not puede_editar, height=80)
+        with col2:
             giro = st.text_input("Giro del Negocio", empresa_data.get('giro', ''), disabled=not puede_editar)
-            
-            # LOGO
-            st.divider()
-            st.subheader("Logo de la Empresa")
-            
-            logo_actual = empresa_data.get('logo')
-            if logo_actual:
-                try:
-                    import base64
-                    logo_bytes = base64.b64decode(logo_actual)
-                    st.image(logo_bytes, width=150, caption="Logo guardado")
-                except Exception as e:
-                    st.info("No hay logo guardado")
-            else:
-                st.info("No hay logo guardado. Sube uno nuevo.")
-            
-            logo_file = st.file_uploader("Subir Logo", type=['png', 'jpg', 'jpeg'], disabled=not puede_editar)
-            
-            # CULTURA ORGANIZACIONAL
-            st.divider()
-            st.subheader("Cultura Organizacional")
-            objetivo_plan = st.text_area("Objetivo del Plan", empresa_data.get('objetivo_plan', ''), disabled=not puede_editar)
-            mision = st.text_area("Mision", empresa_data.get('mision', ''), disabled=not puede_editar)
-            vision = st.text_area("Vision", empresa_data.get('vision', ''), disabled=not puede_editar)
-            obj_gen = st.text_area("Objetivo General", empresa_data.get('obj_general', ''), disabled=not puede_editar)
-            obj_esp = st.text_area("Objetivos Especificos", empresa_data.get('obj_especificos', ''), disabled=not puede_editar)
-            politicas = st.text_area("Politicas", empresa_data.get('politicas', ''), disabled=not puede_editar)
-            valores = st.text_area("Valores", empresa_data.get('valores', ''), disabled=not puede_editar)
-            
-            # ORGANIGRAMA (AL FINAL)
-            st.divider()
-            st.subheader("Organigrama")
-            
-            org_actual = empresa_data.get('organigrama')
-            if org_actual:
-                try:
-                    import base64
-                    org_bytes = base64.b64decode(org_actual)
-                    st.image(org_bytes, width=600, caption="Organigrama guardado")
-                except Exception as e:
-                    st.info("No hay organigrama guardado")
-            else:
-                st.info("No hay organigrama. Sube uno.")
-            
-            org_file = st.file_uploader("Subir Organigrama", type=['png', 'jpg', 'jpeg'], disabled=not puede_editar)
-            
-            # BOTON GUARDAR
-            submitted = st.form_submit_button("Guardar Todo", disabled=not puede_editar)
-            
-            if submitted:
-                update_data = {
-                    "nombre": nombre, 
-                    "giro": giro, 
-                    "objetivo_plan": objetivo_plan, 
-                    "mision": mision, 
-                    "vision": vision, 
-                    "obj_general": obj_gen, 
-                    "obj_especificos": obj_esp, 
-                    "politicas": politicas, 
-                    "valores": valores
-                }
-                
-                # Logo nuevo
-                if logo_file is not None:
-                    try:
-                        import base64
-                        update_data['logo'] = base64.b64encode(logo_file.getvalue()).decode('utf-8')
-                    except Exception as e:
-                        st.error(f"Error logo: {e}")
-                
-                # Organigrama nuevo
-                if org_file is not None:
-                    try:
-                        import base64
-                        update_data['organigrama'] = base64.b64encode(org_file.getvalue()).decode('utf-8')
-                    except Exception as e:
-                        st.error(f"Error organigrama: {e}")
-                
-                # Guardar
-                try:
-                    supabase.table('empresas').update(update_data).eq('id', empresa_id).execute()
+        
+        # Logo
+        st.divider()
+        logo_actual = empresa_data.get('logo')
+        if logo_actual:
+            try:
+                import base64
+                st.image(base64.b64decode(logo_actual), width=150, caption="Logo actual")
+            except:
+                pass
+        logo_file = st.file_uploader("Cambiar Logo", type=['png', 'jpg', 'jpeg'], disabled=not puede_editar)
+        
+        if st.form_submit_button("💾 Guardar Datos Básicos", disabled=not puede_editar):
+            update = {"nombre": nombre, "giro": giro, "objetivo_plan": objetivo_plan}
+            if logo_file:
+                import base64
+                update['logo'] = base64.b64encode(logo_file.getvalue()).decode('utf-8')
+            supabase.table('empresas').update(update).eq('id', empresa_id).execute()
+            st.success("Guardado!")
+            st.rerun()
+    
+    # CULTURA ORGANIZACIONAL - Listas dinámicas
+    st.divider()
+    st.header("📋 Cultura Organizacional")
+    
+    # Misión y Visión (texto simple en expanders)
+    col_mision, col_vision = st.columns(2)
+    
+    with col_mision:
+        with st.expander("🎯 Misión", expanded=False):
+            with st.form("form_mision"):
+                mision = st.text_area("Misión", empresa_data.get('mision', ''), height=100, disabled=not puede_editar)
+                if st.form_submit_button("Guardar", disabled=not puede_editar):
+                    supabase.table('empresas').update({"mision": mision}).eq('id', empresa_id).execute()
                     st.success("Guardado!")
                     st.rerun()
-                except Exception as e:
-                    st.error(f"Error al guardar: {e}")
-                    
+    
+    with col_vision:
+        with st.expander("👁️ Visión", expanded=False):
+            with st.form("form_vision"):
+                vision = st.text_area("Visión", empresa_data.get('vision', ''), height=100, disabled=not puede_editar)
+                if st.form_submit_button("Guardar", disabled=not puede_editar):
+                    supabase.table('empresas').update({"vision": vision}).eq('id', empresa_id).execute()
+                    st.success("Guardado!")
+                    st.rerun()
+    
+    # LISTAS DINÁMICAS
+    st.divider()
+    
+    # Objetivo General
+    render_lista_dinamica("obj_general", "🎯 Objetivo General", empresa_data, empresa_id, puede_editar)
+    
+    st.divider()
+    
+    # Objetivos Específicos
+    render_lista_dinamica("obj_especificos", "📌 Objetivos Específicos", empresa_data, empresa_id, puede_editar)
+    
+    st.divider()
+    
+    # Políticas
+    render_lista_dinamica("politicas", "📜 Políticas", empresa_data, empresa_id, puede_editar)
+    
+    st.divider()
+    
+    # Valores
+    render_lista_dinamica("valores", "💎 Valores", empresa_data, empresa_id, puede_editar)
+    
+    # Organigrama
+    st.divider()
+    st.header("🗂️ Organigrama")
+    org_actual = empresa_data.get('organigrama')
+    if org_actual:
+        try:
+            import base64
+            st.image(base64.b64decode(org_actual), width=500, caption="Organigrama actual")
+        except:
+            st.info("Sin organigrama")
+    
+    with st.form("form_org"):
+        org_file = st.file_uploader("Subir Organigrama", type=['png', 'jpg', 'jpeg'], disabled=not puede_editar)
+        if st.form_submit_button("💾 Guardar Organigrama", disabled=not puede_editar):
+            if org_file:
+                import base64
+                org_data = base64.b64encode(org_file.getvalue()).decode('utf-8')
+                supabase.table('empresas').update({"organigrama": org_data}).eq('id', empresa_id).execute()
+                st.success("Guardado!")
+                st.rerun()                    
     # --- PESTAÑA 2: DIAGNÓSTICO SITUACIONAL ---
     with tab2:
         st.header("Diagnóstico Situacional (Análisis de Matrices)")
@@ -6858,4 +6953,5 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
