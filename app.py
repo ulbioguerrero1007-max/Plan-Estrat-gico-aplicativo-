@@ -4349,14 +4349,52 @@ def aplicacion_principal():
     with tab1:
         st.header("Introducción y Cultura Organizacional")
         
+        # Función auxiliar para contar palabras
+        def contar_palabras(texto):
+            return len(texto.split()) if texto else 0
+        
+        # Función para mostrar contador de palabras
+        def mostrar_contador(texto, limite, label):
+            palabras = contar_palabras(texto)
+            color = "green" if palabras <= limite else "red"
+            st.markdown(f"<span style='color:{color};font-size:12px;'>{label}: {palabras}/{limite} palabras</span>", unsafe_allow_html=True)
+            return palabras <= limite
+        
         # DATOS GENERALES (form tradicional)
         with st.form("form_basicos"):
             col1, col2 = st.columns(2)
             with col1:
-                nombre = st.text_input("Nombre de la Empresa", empresa_data.get('nombre', ''), disabled=not puede_editar)
-                objetivo_plan = st.text_area("Objetivo del Plan", empresa_data.get('objetivo_plan', ''), disabled=not puede_editar, height=80)
+                # Nombre de la empresa - 5 palabras
+                nombre = st.text_input(
+                    "Nombre de la Empresa", 
+                    empresa_data.get('nombre', ''), 
+                    disabled=not puede_editar
+                )
+                mostrar_contador(nombre, 5, "Nombre")
+                if contar_palabras(nombre) > 5:
+                    st.warning("⚠️ Máximo 5 palabras")
+                
+                # Objetivo del plan - 30 palabras
+                objetivo_plan = st.text_area(
+                    "Objetivo del Plan", 
+                    empresa_data.get('objetivo_plan', ''), 
+                    disabled=not puede_editar, 
+                    height=80
+                )
+                mostrar_contador(objetivo_plan, 30, "Objetivo del Plan")
+                if contar_palabras(objetivo_plan) > 30:
+                    st.warning("⚠️ Máximo 30 palabras")
+            
             with col2:
-                giro = st.text_input("Giro del Negocio", empresa_data.get('giro', ''), disabled=not puede_editar)
+                # Giro del negocio - 15 palabras
+                giro = st.text_input(
+                    "Giro del Negocio", 
+                    empresa_data.get('giro', ''), 
+                    disabled=not puede_editar
+                )
+                mostrar_contador(giro, 15, "Giro")
+                if contar_palabras(giro) > 15:
+                    st.warning("⚠️ Máximo 15 palabras")
             
             # Logo
             st.divider()
@@ -4370,13 +4408,27 @@ def aplicacion_principal():
             logo_file = st.file_uploader("Cambiar Logo", type=['png', 'jpg', 'jpeg'], disabled=not puede_editar)
             
             if st.form_submit_button("💾 Guardar Datos Básicos", disabled=not puede_editar):
-                update = {"nombre": nombre, "giro": giro, "objetivo_plan": objetivo_plan}
-                if logo_file:
-                    import base64
-                    update['logo'] = base64.b64encode(logo_file.getvalue()).decode('utf-8')
-                supabase.table('empresas').update(update).eq('id', empresa_id).execute()
-                st.success("Guardado!")
-                st.rerun()
+                # Validar límites antes de guardar
+                errores = []
+                if contar_palabras(nombre) > 5:
+                    errores.append("Nombre: máximo 5 palabras")
+                if contar_palabras(giro) > 15:
+                    errores.append("Giro: máximo 15 palabras")
+                if contar_palabras(objetivo_plan) > 30:
+                    errores.append("Objetivo del Plan: máximo 30 palabras")
+                
+                if errores:
+                    st.error("❌ No se puede guardar. Corrige los siguientes errores:")
+                    for error in errores:
+                        st.error(f"   • {error}")
+                else:
+                    update = {"nombre": nombre, "giro": giro, "objetivo_plan": objetivo_plan}
+                    if logo_file:
+                        import base64
+                        update['logo'] = base64.b64encode(logo_file.getvalue()).decode('utf-8')
+                    supabase.table('empresas').update(update).eq('id', empresa_id).execute()
+                    st.success("Guardado!")
+                    st.rerun()
         
         # CULTURA ORGANIZACIONAL - Listas dinámicas
         st.divider()
@@ -4388,41 +4440,201 @@ def aplicacion_principal():
         with col_mision:
             with st.expander("🎯 Misión", expanded=False):
                 with st.form("form_mision"):
-                    mision = st.text_area("Misión", empresa_data.get('mision', ''), height=100, disabled=not puede_editar)
+                    # Misión - 65 palabras
+                    mision = st.text_area(
+                        "Misión", 
+                        empresa_data.get('mision', ''), 
+                        height=150, 
+                        disabled=not puede_editar
+                    )
+                    mostrar_contador(mision, 65, "Misión")
+                    
                     if st.form_submit_button("Guardar", disabled=not puede_editar):
-                        supabase.table('empresas').update({"mision": mision}).eq('id', empresa_id).execute()
-                        st.success("Guardado!")
-                        st.rerun()
+                        if contar_palabras(mision) > 65:
+                            st.error("❌ La Misión no puede exceder 65 palabras")
+                        else:
+                            supabase.table('empresas').update({"mision": mision}).eq('id', empresa_id).execute()
+                            st.success("Guardado!")
+                            st.rerun()
         
         with col_vision:
             with st.expander("👁️ Visión", expanded=False):
                 with st.form("form_vision"):
-                    vision = st.text_area("Visión", empresa_data.get('vision', ''), height=100, disabled=not puede_editar)
+                    # Visión - 45 palabras
+                    vision = st.text_area(
+                        "Visión", 
+                        empresa_data.get('vision', ''), 
+                        height=120, 
+                        disabled=not puede_editar
+                    )
+                    mostrar_contador(vision, 45, "Visión")
+                    
                     if st.form_submit_button("Guardar", disabled=not puede_editar):
-                        supabase.table('empresas').update({"vision": vision}).eq('id', empresa_id).execute()
-                        st.success("Guardado!")
-                        st.rerun()
+                        if contar_palabras(vision) > 45:
+                            st.error("❌ La Visión no puede exceder 45 palabras")
+                        else:
+                            supabase.table('empresas').update({"vision": vision}).eq('id', empresa_id).execute()
+                            st.success("Guardado!")
+                            st.rerun()
         
-        # LISTAS DINÁMICAS
+        # LISTAS DINÁMICAS CON LÍMITE DE PALABRAS
         st.divider()
         
-        # Objetivo General
-        render_lista_dinamica("obj_general", "🎯 Objetivo General", empresa_data, empresa_id, puede_editar)
+        # Función auxiliar para listas dinámicas con límite de palabras
+        def render_lista_dinamica_con_limite(nombre_campo, label, empresa_data, empresa_id, puede_editar, limite_palabras):
+            """Renderiza componente de lista dinámica con límite de palabras por item"""
+            session_key = f"lista_{nombre_campo}"
+            edit_key = f"edit_{nombre_campo}"
+            
+            if edit_key not in st.session_state:
+                st.session_state[edit_key] = -1
+            
+            # Inicializar session state
+            if session_key not in st.session_state:
+                datos = empresa_data.get(nombre_campo, '')
+                if datos:
+                    items = [i.strip() for i in str(datos).split('\n') if i.strip()]
+                    st.session_state[session_key] = items
+                else:
+                    st.session_state[session_key] = []
+            
+            items = st.session_state[session_key]
+            
+            st.subheader(label)
+            st.caption(f"Límite: {limite_palabras} palabras por item")
+            
+            # Mostrar items existentes
+            if items:
+                for idx, item in enumerate(items):
+                    cols = st.columns([8, 1, 1])
+                    
+                    with cols[0]:
+                        if st.session_state[edit_key] == idx:
+                            nuevo_valor = st.text_input(
+                                f"edit_{nombre_campo}_{idx}",
+                                value=item,
+                                label_visibility="collapsed",
+                                key=f"input_edit_{nombre_campo}_{idx}"
+                            )
+                            # Mostrar contador en edición
+                            mostrar_contador(nuevo_valor, limite_palabras, f"Item {idx+1}")
+                        else:
+                            st.markdown(f"**{idx + 1}.** {item}")
+                            # Mostrar contador en visualización
+                            mostrar_contador(item, limite_palabras, f"Item {idx+1}")
+                    
+                    with cols[1]:
+                        if puede_editar:
+                            if st.session_state[edit_key] == idx:
+                                # Validar límite antes de guardar edición
+                                if contar_palabras(nuevo_valor) <= limite_palabras:
+                                    if st.button("✓", key=f"save_{nombre_campo}_{idx}", help="Guardar"):
+                                        st.session_state[session_key][idx] = nuevo_valor
+                                        st.session_state[edit_key] = -1
+                                        st.rerun()
+                                else:
+                                    st.button("✓", key=f"save_{nombre_campo}_{idx}", help="Guardar", disabled=True)
+                                    st.warning(f"Máx {limite_palabras} palabras")
+                            else:
+                                if st.button("✏️", key=f"edit_{nombre_campo}_{idx}", help="Editar"):
+                                    st.session_state[edit_key] = idx
+                                    st.rerun()
+                    
+                    with cols[2]:
+                        if puede_editar and st.session_state[edit_key] != idx:
+                            if st.button("🗑️", key=f"del_{nombre_campo}_{idx}", help="Eliminar"):
+                                st.session_state[session_key].pop(idx)
+                                st.rerun()
+            else:
+                st.info(f"No hay {label.lower()} guardados")
+            
+            # Agregar nuevo item
+            if puede_editar and st.session_state[edit_key] == -1:
+                st.divider()
+                cols = st.columns([4, 1])
+                with cols[0]:
+                    nuevo = st.text_input(
+                        f"Nuevo {label.lower()}",
+                        placeholder=f"Escribe un {label.lower()} (máx {limite_palabras} palabras)...",
+                        key=f"new_{nombre_campo}",
+                        label_visibility="collapsed"
+                    )
+                    # Mostrar contador
+                    mostrar_contador(nuevo, limite_palabras, "Nuevo item")
+                    
+                    # Validar límite
+                    excede_limite = contar_palabras(nuevo) > limite_palabras
+                
+                with cols[1]:
+                    if st.button("➕ Agregar", key=f"add_{nombre_campo}", use_container_width=True, disabled=excede_limite):
+                        if nuevo.strip():
+                            if contar_palabras(nuevo) <= limite_palabras:
+                                st.session_state[session_key].append(nuevo.strip())
+                                st.rerun()
+                            else:
+                                st.warning(f"Máximo {limite_palabras} palabras")
+                        else:
+                            st.warning("Campo vacío")
+                
+                if excede_limite:
+                    st.error(f"❌ Excedes el límite de {limite_palabras} palabras")
+                
+                # Botón guardar en BD
+                if st.session_state[session_key]:
+                    if st.button(f"💾 Guardar {label}", key=f"save_db_{nombre_campo}", type="primary"):
+                        try:
+                            texto = "\n".join(st.session_state[session_key])
+                            supabase.table('empresas').update({nombre_campo: texto}).eq('id', empresa_id).execute()
+                            st.success(f"✅ {label} guardado!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error: {e}")
+        
+        # Objetivo General - 35 palabras por item
+        render_lista_dinamica_con_limite(
+            "obj_general", 
+            "🎯 Objetivo General", 
+            empresa_data, 
+            empresa_id, 
+            puede_editar,
+            35
+        )
         
         st.divider()
         
-        # Objetivos Específicos
-        render_lista_dinamica("obj_especificos", "📌 Objetivos Específicos", empresa_data, empresa_id, puede_editar)
+        # Objetivos Específicos - 30 palabras por item
+        render_lista_dinamica_con_limite(
+            "obj_especificos", 
+            "📌 Objetivos Específicos", 
+            empresa_data, 
+            empresa_id, 
+            puede_editar,
+            30
+        )
         
         st.divider()
         
-        # Políticas
-        render_lista_dinamica("politicas", "📜 Políticas", empresa_data, empresa_id, puede_editar)
+        # Políticas - 15 palabras por item
+        render_lista_dinamica_con_limite(
+            "politicas", 
+            "📜 Políticas", 
+            empresa_data, 
+            empresa_id, 
+            puede_editar,
+            15
+        )
         
         st.divider()
         
-        # Valores
-        render_lista_dinamica("valores", "💎 Valores", empresa_data, empresa_id, puede_editar)
+        # Valores - 10 palabras por item
+        render_lista_dinamica_con_limite(
+            "valores", 
+            "💎 Valores", 
+            empresa_data, 
+            empresa_id, 
+            puede_editar,
+            10
+        )
         
         # Organigrama
         st.divider()
@@ -6954,6 +7166,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
