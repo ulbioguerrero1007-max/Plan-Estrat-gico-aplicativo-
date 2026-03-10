@@ -4995,20 +4995,27 @@ def aplicacion_principal():
                             if df_foda_filtrado.empty:
                                 st.error("❌ No hay items con impacto ≥ 3 para procesar")
                             else:
+                                # CALCULAR PESO EN PORCENTAJE
+                                suma_total_impacto = df_foda_filtrado['impacto'].sum()
+                                df_foda_filtrado['peso_porcentaje'] = (df_foda_filtrado['impacto'] / suma_total_impacto * 100).round(2)
+                                
                                 # Convertir impacto a entero
                                 df_foda_filtrado['impacto'] = df_foda_filtrado['impacto'].fillna(0).astype(int)
                                 df_foda_filtrado['empresa_id'] = empresa_id
                                 
                                 # Mostrar preview de lo que se va a guardar
                                 with st.expander("👁️ Vista previa de datos a guardar"):
-                                    st.dataframe(df_foda_filtrado[['cuadrante', 'factor_fila', 'factor_columna', 'impacto']], 
-                                                use_container_width=True)
+                                    st.dataframe(
+                                        df_foda_filtrado[['cuadrante', 'factor_fila', 'factor_columna', 'impacto', 'peso_porcentaje']], 
+                                        use_container_width=True
+                                    )
+                                    st.info(f"Suma total de impactos: {suma_total_impacto}")
                                 
                                 # Eliminar datos anteriores y guardar nuevos
                                 supabase.table('foda_cruzado').delete().eq('empresa_id', empresa_id).execute()
                                 supabase.table('foda_cruzado').insert(df_foda_filtrado.to_dict(orient='records')).execute()
                                 
-                                st.success(f"¡{len(df_foda_filtrado)} filas importadas a FODA Cruzado (impacto ≥ 3)!")
+                                st.success(f"¡{len(df_foda_filtrado)} filas importadas con peso % calculado!")
                                 st.rerun()
                                 
                         except Exception as e:
@@ -5018,7 +5025,13 @@ def aplicacion_principal():
             # Mostrar datos existentes
             df_foda = get_datos_tabla('foda_cruzado', empresa_id)
             if not df_foda.empty:
-                st.write("**Datos FODA Actuales (impacto ≥ 3):**")
+                st.write("**Datos FODA Actuales (con peso %):**")
+                
+                # Asegurar que peso_porcentaje exista (para datos antiguos)
+                if 'peso_porcentaje' not in df_foda.columns:
+                    suma_total = df_foda['impacto'].sum()
+                    df_foda['peso_porcentaje'] = (df_foda['impacto'] / suma_total * 100).round(2)
+                
                 edited_foda = st.data_editor(
                     df_foda.drop(columns=['id', 'empresa_id'], errors='ignore'), 
                     num_rows="dynamic", 
@@ -5029,6 +5042,12 @@ def aplicacion_principal():
                 
                 if st.button("💾 Guardar Cambios en FODA", key="save_foda_changes", disabled=not puede_editar):
                     try:
+                        # Recalcular pesos si se editaron impactos
+                        if 'impacto' in edited_foda.columns:
+                            suma_total = pd.to_numeric(edited_foda['impacto'], errors='coerce').sum()
+                            if suma_total > 0:
+                                edited_foda['peso_porcentaje'] = (edited_foda['impacto'] / suma_total * 100).round(2)
+                        
                         supabase.table('foda_cruzado').delete().eq('empresa_id', empresa_id).execute()
                         if not edited_foda.empty:
                             edited_foda['empresa_id'] = empresa_id
@@ -5038,16 +5057,25 @@ def aplicacion_principal():
                     except Exception as e:
                         st.error(f"Error al guardar FODA: {e}")
                 
-                # Análisis y gráfico
-                analisis_df, _, estrategia_principal, puntajes_foda = analizar_foda(df_foda)
+                # Análisis con PESO EN PORCENTAJE en lugar de puntaje
+                analisis_df, resumen_foda, estrategia_principal, puntajes_foda = analizar_foda_peso(df_foda)
+                
                 if analisis_df is not None:
-                    st.subheader("🎯 Postura Competitiva Sugerida")
+                    st.subheader("🎯 Postura Competitiva Sugerida (por Peso %)")
                     st.info(f"Estrategia Principal: {estrategia_principal}")
+                    
                     col1, col2 = st.columns(2)
                     with col1:
+                        # Mostrar tabla con PESO % en lugar de puntaje
                         st.dataframe(analisis_df, use_container_width=True)
+                        
+                        # Mostrar suma total de pesos
+                        total_peso = analisis_df['Peso % Total'].sum()
+                        st.caption(f"Suma total de pesos: {total_peso:.2f}%")
+                        
                     with col2:
-                        grafico_foda = generar_grafico_foda_radar_mejorado(puntajes_foda)
+                        # Gráfico con pesos en lugar de puntajes
+                        grafico_foda = generar_grafico_foda_radar_peso(puntajes_foda)
                         if grafico_foda: 
                             st.image(grafico_foda)
             
@@ -5068,7 +5096,7 @@ def aplicacion_principal():
                     guardar_analisis_db(empresa_id, 'foda', analisis_foda_text)
             
             mostrar_ultimo_analisis_guardado(empresa_data, 'foda')
-
+            
     # --- PESTAÑA 3: ESTRATEGIA (CORREGIDA CON GENERACIÓN IA) ---
     with tab3:
         st.header("🎯 Formulación de Estrategias")
@@ -7254,6 +7282,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
