@@ -856,6 +856,34 @@ No incluyas encabezados ni texto adicional, solo las líneas de datos separadas 
 import matplotlib.pyplot as plt
 import numpy as np
 
+def analizar_foda(df_foda):
+    """
+    Análisis FODA tradicional usando puntajes (suma de impactos).
+    Mantiene compatibilidad con código existente.
+    """
+    if df_foda.empty: 
+        return None, None, None, pd.Series(dtype='float64')
+    
+    estrategias = {
+        'FO': 'Ofensiva (F+O)', 
+        'FA': 'Defensiva (F+A)', 
+        'DO': 'Adaptativa (D+O)', 
+        'DA': 'Supervivencia (D+A)'
+    }
+    
+    puntajes = df_foda.groupby('cuadrante')['impacto'].sum().reindex(estrategias.keys(), fill_value=0)
+    puntajes_ordenados = puntajes.sort_values(ascending=False)
+    
+    analisis_df = pd.DataFrame({
+        'Estrategia': [estrategias[c] for c in puntajes_ordenados.index],
+        'Puntaje Total': puntajes_ordenados.values
+    }).reset_index(drop=True)
+    
+    estrategia_principal = analisis_df.iloc[0]['Estrategia']
+    resumen = f"La estrategia principal recomendada es **{analisis_df.iloc[0]['Estrategia']}** ({analisis_df.iloc[0]['Puntaje Total']} puntos), seguida por **{analisis_df.iloc[1]['Estrategia']}** ({analisis_df.iloc[1]['Puntaje Total']} puntos)."
+    
+    return analisis_df, resumen, estrategia_principal, puntajes_ordenados
+
 def analizar_foda_peso(df_foda):
     """
     Análisis FODA usando PESO EN PORCENTAJE calculado dinámicamente.
@@ -900,6 +928,7 @@ def analizar_foda_peso(df_foda):
 def generar_grafico_foda_radar_peso(pesos):
     """
     Genera gráfico de radar FODA usando PESOS EN PORCENTAJE.
+    NUEVA FUNCIÓN.
     """
     if pesos is None or pesos.empty:
         return None
@@ -940,8 +969,7 @@ def generar_grafico_foda_radar_peso(pesos):
     plt.close(fig)
     buf.seek(0)
     return buf
-
-
+    
 def generar_grafico_barras_pest_mejorado(df_pest):
     """Genera gráfico de barras PEST con diseño profesional"""
     if df_pest.empty:
@@ -1306,7 +1334,10 @@ def generar_grafico_foda_radar_mejorado(puntajes):
     return buf
 
 def generar_grafico_foda_radar_mejorado(puntajes):
-    """Genera gráfico de radar FODA con diseño profesional mejorado"""
+    """
+    Genera gráfico de radar FODA con diseño profesional mejorado.
+    FUNCIÓN ORIGINAL - usa puntajes (no pesos).
+    """
     if puntajes is None or puntajes.empty:
         return None
     
@@ -1315,7 +1346,7 @@ def generar_grafico_foda_radar_mejorado(puntajes):
     stats = puntajes.reindex(['FO', 'FA', 'DO', 'DA']).fillna(0).values
     
     # Configurar estilo
-    plt.style.use('seaborn-v0_8-whitegrid')
+    plt.style.use('default')
     
     fig, ax = plt.subplots(figsize=(7, 7), subplot_kw=dict(polar=True))
     
@@ -1325,8 +1356,8 @@ def generar_grafico_foda_radar_mejorado(puntajes):
     angles += angles[:1]
     
     # Colores profesionales convertidos a RGB
-    color_fill = (30/255, 58/255, 95/255)  # PRIMARY
-    color_line = (201/255, 162/255, 39/255)  # SECONDARY
+    color_fill = (30/255, 58/255, 95/255)  # PRIMARY #1e3a5f
+    color_line = (201/255, 162/255, 39/255)  # SECONDARY #c9a227
     
     # Dibujar área
     ax.fill(angles, stats, color=color_fill, alpha=0.25)
@@ -1352,7 +1383,6 @@ def generar_grafico_foda_radar_mejorado(puntajes):
     plt.close(fig)
     buf.seek(0)
     return buf
-
 
 def generar_grafico_barras_pest_mejorado(df_pest):
     """Genera gráfico de barras PEST con diseño profesional"""
@@ -5390,7 +5420,7 @@ Genera las 12 estrategias ahora:"""
         
         # Obtener datos necesarios para contextualizar
         df_foda_temp = get_datos_tabla('foda_cruzado', empresa_id)
-        analisis_df_temp, _, estrategia_principal, puntajes_foda = analizar_foda(df_foda_temp)
+        analisis_df_temp, _, estrategia_principal, puntajes_foda = analizar_foda_peso(df_foda_temp)
         df_estrategias_planes = get_datos_tabla('estrategias_generadas', empresa_id)
         empresa_datos = get_datos_empresa(empresa_id)
         
@@ -7317,11 +7347,5 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
-
-
-
-
-
-
 
 
