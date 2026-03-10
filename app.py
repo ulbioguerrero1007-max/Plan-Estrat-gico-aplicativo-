@@ -4,7 +4,7 @@ import google.generativeai as genai
 import pandas as pd
 import sqlite3
 import io
-from io import StringIO, BytesIO  # <-- Asegúrate de tener esta línea
+from io import StringIO, BytesIO  
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4, letter
 from reportlab.lib.units import inch
@@ -4959,37 +4959,86 @@ def aplicacion_principal():
         # --- FODA ---
         with diag_tab5:
             st.subheader("Análisis FODA Cruzado (Numérico)")
+            
             with st.expander("📋 Pegar datos de FODA Cruzado desde Excel"):
-                foda_paste_data = st.text_area("Pega tus datos de FODA aquí (columnas: cuadrante, factor_fila, factor_columna, impacto)", height=200, key="foda_paste")
+                st.info("💡 Solo se procesarán los items con **impacto ≥ 3**")
+                foda_paste_data = st.text_area(
+                    "Pega tus datos de FODA aquí (columnas: cuadrante, factor_fila, factor_columna, impacto)", 
+                    height=200, 
+                    key="foda_paste"
+                )
+                
                 if st.button("Procesar y Guardar Datos FODA", key="process_foda", disabled=not puede_editar):
                     if foda_paste_data:
                         try:
-                            df_foda_pasted = pd.read_csv(StringIO(foda_paste_data), sep='\t', header=0)
+                            import io
+                            
+                            # Leer datos pegados
+                            df_foda_pasted = pd.read_csv(io.StringIO(foda_paste_data), sep='\t', header=0)
                             df_foda_pasted.columns = ['cuadrante', 'factor_fila', 'factor_columna', 'impacto']
-                            df_foda_pasted['impacto'] = pd.to_numeric(df_foda_pasted['impacto'], errors='coerce').fillna(0).astype(int)
-                            df_foda_pasted['empresa_id'] = empresa_id
-                            supabase.table('foda_cruzado').delete().eq('empresa_id', empresa_id).execute()
-                            supabase.table('foda_cruzado').insert(df_foda_pasted.to_dict(orient='records')).execute()
-                            st.success(f"¡{len(df_foda_pasted)} filas importadas a FODA Cruzado!"); 
-                            st.rerun()
+                            
+                            # Convertir impacto a numérico
+                            df_foda_pasted['impacto'] = pd.to_numeric(df_foda_pasted['impacto'], errors='coerce')
+                            
+                            # FILTRAR: Solo impacto >= 3
+                            df_foda_filtrado = df_foda_pasted[df_foda_pasted['impacto'] >= 3].copy()
+                            
+                            # Contar cuántos se eliminaron
+                            total_original = len(df_foda_pasted)
+                            total_filtrado = len(df_foda_filtrado)
+                            eliminados = total_original - total_filtrado
+                            
+                            if eliminados > 0:
+                                st.warning(f"⚠️ Se eliminaron **{eliminados} items** con impacto < 3")
+                                st.info(f"✅ Se procesarán **{total_filtrado} items** con impacto ≥ 3")
+                            
+                            if df_foda_filtrado.empty:
+                                st.error("❌ No hay items con impacto ≥ 3 para procesar")
+                            else:
+                                # Convertir impacto a entero
+                                df_foda_filtrado['impacto'] = df_foda_filtrado['impacto'].fillna(0).astype(int)
+                                df_foda_filtrado['empresa_id'] = empresa_id
+                                
+                                # Mostrar preview de lo que se va a guardar
+                                with st.expander("👁️ Vista previa de datos a guardar"):
+                                    st.dataframe(df_foda_filtrado[['cuadrante', 'factor_fila', 'factor_columna', 'impacto']], 
+                                                use_container_width=True)
+                                
+                                # Eliminar datos anteriores y guardar nuevos
+                                supabase.table('foda_cruzado').delete().eq('empresa_id', empresa_id).execute()
+                                supabase.table('foda_cruzado').insert(df_foda_filtrado.to_dict(orient='records')).execute()
+                                
+                                st.success(f"¡{len(df_foda_filtrado)} filas importadas a FODA Cruzado (impacto ≥ 3)!")
+                                st.rerun()
+                                
                         except Exception as e:
                             st.error(f"Error al procesar los datos: {e}.")
+                            st.info("Asegúrate de que el formato sea: cuadrante | factor_fila | factor_columna | impacto")
             
+            # Mostrar datos existentes
             df_foda = get_datos_tabla('foda_cruzado', empresa_id)
             if not df_foda.empty:
-                st.write("**Datos FODA Actuales:**")
-                edited_foda = st.data_editor(df_foda.drop(columns=['id', 'empresa_id'], errors='ignore'), num_rows="dynamic", key="editor_foda", use_container_width=True, disabled=not puede_editar)
+                st.write("**Datos FODA Actuales (impacto ≥ 3):**")
+                edited_foda = st.data_editor(
+                    df_foda.drop(columns=['id', 'empresa_id'], errors='ignore'), 
+                    num_rows="dynamic", 
+                    key="editor_foda", 
+                    use_container_width=True, 
+                    disabled=not puede_editar
+                )
+                
                 if st.button("💾 Guardar Cambios en FODA", key="save_foda_changes", disabled=not puede_editar):
                     try:
                         supabase.table('foda_cruzado').delete().eq('empresa_id', empresa_id).execute()
                         if not edited_foda.empty:
                             edited_foda['empresa_id'] = empresa_id
                             supabase.table('foda_cruzado').insert(edited_foda.to_dict(orient='records')).execute()
-                        st.success("Cambios en FODA guardados."); 
+                        st.success("Cambios en FODA guardados.")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error al guardar FODA: {e}")
                 
+                # Análisis y gráfico
                 analisis_df, _, estrategia_principal, puntajes_foda = analizar_foda(df_foda)
                 if analisis_df is not None:
                     st.subheader("🎯 Postura Competitiva Sugerida")
@@ -5004,6 +5053,7 @@ def aplicacion_principal():
             
             st.divider()
             st.subheader("📊 Análisis FODA")
+            
             if st.button("🤖 Generar Análisis FODA con IA", key="gen_foda_ia", disabled=not puede_editar):
                 with st.spinner("Analizando matrices FODA..."):
                     contexto = df_foda.to_string() if not df_foda.empty else "Sin datos numéricos"
@@ -7204,6 +7254,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
