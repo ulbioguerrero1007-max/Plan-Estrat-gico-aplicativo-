@@ -4863,7 +4863,7 @@ def aplicacion_principal():
 
             # --- MADI ---
         with diag_tab2:
-            st.subheader("Análisis de Marketing Externo (MADI)")
+            st.subheader("MADI")
             with st.expander("📋 Pegar datos de MADI desde Excel"):
                 madi_paste_data = st.text_area("Pega tus datos de MADI aquí", height=200, key="paste_MADI")
                 if st.button("Procesar y Guardar Datos de MADI", key="process_madi", disabled=not puede_editar):
@@ -7347,6 +7347,7 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
 
