@@ -4819,7 +4819,7 @@ def aplicacion_principal():
 
         # --- MADE ---
         with diag_tab1:
-            st.subheader("Análisis de Marketing Interno (MADE)")
+            st.subheader("MADE")
             # 1. Entrada de datos
             with st.expander("📋 Pegar datos de MADE desde Excel"):
                 made_paste_data = st.text_area("Pega tus datos de MADE aquí", height=200, key="paste_MADE")
@@ -7347,5 +7347,6 @@ if __name__ == "__main__":
         main()
     else:
         st.error("La aplicación no puede iniciarse. Revisa la conexión con la base de datos (Supabase).")
+
 
 
